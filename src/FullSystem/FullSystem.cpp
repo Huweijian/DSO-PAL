@@ -798,13 +798,12 @@ void FullSystem::flagPointsForRemoval()
 
 }
 
-
+// slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
 
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
-
 
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
@@ -821,8 +820,6 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
-
-
 
 
 	if(!initialized)

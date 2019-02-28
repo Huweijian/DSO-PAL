@@ -124,7 +124,7 @@ void FrameHessian::release()
 	immaturePoints.clear();
 }
 
-
+// 构建图像金字塔及其梯度
 void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 {
 

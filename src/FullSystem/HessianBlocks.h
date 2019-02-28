@@ -116,8 +116,11 @@ struct FrameHessian
 	//DepthImageWrap* frame;
 	FrameShell* shell;
 
+	// 原始图像和梯度，每个向量分别是[color dx dy]
 	Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
+	// 图像金字塔和梯度，每个向量分别是[color dx dy]
 	Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
+	// 梯度绝对值(dx^2+dy^2)
 	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
 
