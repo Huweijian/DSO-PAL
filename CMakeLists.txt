@@ -3,21 +3,22 @@ SET(PROJECT_NAME DSO)
 PROJECT(${PROJECT_NAME})
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
-
-
 #set(BUILD_TYPE RelWithDebInfo)
 
 # set(BUILD_TYPE Release)
-# add_definitions("-DENABLE_SSE")
 set(BUILD_TYPE Debug)
 
+if(${BUILD_TYPE} MATCHES "Debug")
+	message("!!!Debug mode!!!")
+	set(CMAKE_CXX_FLAGS "${SSE_FLAGS} -O0 -g -std=c++0x -march=native" )
+	
+else()
+	message("!!!Release mode!!!")
+	add_definitions("-DENABLE_SSE")
+	set(CMAKE_CXX_FLAGS	"${SSE_FLAGS} -O3 -g -std=c++0x -march=native")
 
-set(CMAKE_CXX_FLAGS
-# "${SSE_FLAGS} -O3 -g -std=c++0x -march=native"
-"${SSE_FLAGS} -O0 -g -std=c++0x -march=native"
-)
-
-
+endif()
+	
 set(EXECUTABLE_OUTPUT_PATH bin)
 set(LIBRARY_OUTPUT_PATH lib)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
@@ -31,7 +32,6 @@ find_package(Boost COMPONENTS system thread)
 find_package(LibZip QUIET)
 find_package(Pangolin 0.2 QUIET)
 find_package(OpenCV QUIET)
-
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")

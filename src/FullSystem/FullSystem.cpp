@@ -805,6 +805,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
+	// 初始化图像类型
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
 	FrameShell* shell = new FrameShell();
@@ -816,11 +817,10 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	fh->shell = shell;
 	allFrameHistory.push_back(shell);
 
-
+	// 计算金字塔和梯度
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
-
 
 	if(!initialized)
 	{

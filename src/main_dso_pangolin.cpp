@@ -488,10 +488,9 @@ int main( int argc, char** argv )
             }
 
 
-
-            if(!skipFrame) fullSystem->addActiveFrame(img, i);
-
-
+			// 图像传入
+            if(!skipFrame) 
+				fullSystem->addActiveFrame(img, i);
 
 
             delete img;

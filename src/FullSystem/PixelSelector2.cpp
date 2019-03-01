@@ -62,7 +62,7 @@ PixelSelector::~PixelSelector()
 	delete[] ths;
 	delete[] thsSmoothed;
 }
-
+// 计算直方图below%的点位于直方图的位置
 int computeHistQuantil(int* hist, float below)
 {
 	int th = hist[0]*below+0.5f;
@@ -78,7 +78,7 @@ int computeHistQuantil(int* hist, float below)
 void PixelSelector::makeHists(const FrameHessian* const fh)
 {
 	gradHistFrame = fh;
-	float * mapmax0 = fh->absSquaredGrad[0];
+	float * mapmax0 = fh->absSquaredGrad[0]; //梯度图
 
 	int w = wG[0];
 	int h = hG[0];
@@ -86,7 +86,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 	int w32 = w/32;
 	int h32 = h/32;
 	thsStep = w32;
-
+	// 把图像分为32×32个小块，计算每块的梯度直方图，并且计算梯度中值。
 	for(int y=0;y<h32;y++)
 		for(int x=0;x<w32;x++)
 		{
@@ -107,7 +107,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 		}
-
+	// 均值平滑一下
 	for(int y=0;y<h32;y++)
 		for(int x=0;x<w32;x++)
 		{
@@ -368,17 +368,17 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 
 					if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
 
-
+					// 三个梯度阈值
 					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];
 					float pixelTH1 = pixelTH0*dw1;
 					float pixelTH2 = pixelTH1*dw2;
 
-
+					// 寻找梯度足够大的点，优先在金字塔底寻找
 					float ag0 = mapmax0[idx];
-					if(ag0 > pixelTH0*thFactor)
+					if(ag0 > pixelTH0*thFactor) // 如果梯度大于第一个阈值
 					{
-						Vec2f ag0d = map0[idx].tail<2>();
-						float dirNorm = fabsf((float)(ag0d.dot(dir2)));
+						Vec2f ag0d = map0[idx].tail<2>(); //vector的后两个元素，也就是dx和dy
+						float dirNorm = fabsf((float)(ag0d.dot(dir2))); // 梯度在某个随机方向上的投影
 						if(!setting_selectDirectionDistribution) dirNorm = ag0;
 
 						if(dirNorm > bestVal2)
