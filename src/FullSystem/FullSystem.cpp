@@ -51,6 +51,7 @@
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 
 #include "IOWrapper/Output3DWrapper.h"
+#include "IOWrapper/ImageDisplay.h"
 
 #include "util/ImageAndExposure.h"
 
@@ -801,7 +802,7 @@ void FullSystem::flagPointsForRemoval()
 // slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
-
+	IOWrap::getOCVImg(image->image, image->w, image->h);
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 

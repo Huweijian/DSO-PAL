@@ -210,6 +210,7 @@ void PhotometricUndistorter::unMapFloatImage(float* image)
 	}
 }
 
+// 光度畸变矫正
 template<typename T>
 void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, float factor)
 {
@@ -218,7 +219,7 @@ void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, floa
 	assert(output->w == w && output->h == h);
 	assert(data != 0);
 
-
+	// 如果不矫正光度畸变,那么图像直接乘以一个因子就好
 	if(!valid || exposure_time <= 0 || setting_photometricCalibration==0) // disable full photometric calibration.
 	{
 		for(int i=0; i<wh;i++)
@@ -228,6 +229,7 @@ void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, floa
 		output->exposure_time = exposure_time;
 		output->timestamp = 0;
 	}
+	// 如果矫正光度畸变，那么通过G函数进行映射
 	else
 	{
 		for(int i=0; i<wh;i++)
@@ -235,6 +237,7 @@ void PhotometricUndistorter::processFrame(T* image_in, float exposure_time, floa
 			data[i] = G[image_in[i]];
 		}
 
+		// 如果还要矫正渐晕，那么就再乘以渐晕稀疏
 		if(setting_photometricCalibration==2)
 		{
 			for(int i=0; i<wh;i++)
@@ -382,6 +385,7 @@ void Undistort::loadPhotometricCalibration(std::string file, std::string noiseIm
 	photometricUndist = new PhotometricUndistorter(file, noiseImage, vignetteImage,getOriginalSize()[0], getOriginalSize()[1]);
 }
 
+// 矫正畸变
 template<typename T>
 ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float exposure, double timestamp, float factor) const
 {
@@ -391,7 +395,9 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 		exit(1);
 	}
 
+	// 矫正光度误差(渐晕和CMOS响应)
 	photometricUndist->processFrame<T>(image_raw->data, exposure, factor);
+	// 复制一份
 	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
 	photometricUndist->output->copyMetaTo(*result);
 
@@ -965,7 +971,7 @@ UndistortFOV::UndistortFOV(const char* configFileName, bool noprefix)
 UndistortFOV::~UndistortFOV()
 {
 }
-
+// 生成畸变矫正函数
 void UndistortFOV::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
 {
 	float dist = parsOrg[4];

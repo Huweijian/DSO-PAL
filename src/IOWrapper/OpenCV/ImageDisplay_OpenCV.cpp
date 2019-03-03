@@ -25,7 +25,6 @@
 
 #include "IOWrapper/ImageDisplay.h"
 
-#include <opencv2/highgui/highgui.hpp>
 
 #include <string>
 #include <unordered_set>
@@ -61,6 +60,18 @@ void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 		}
 	}
 	cv::imshow(windowName, image);
+}
+
+
+cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h){
+	cv::Mat img(h, w, CV_8UC1);
+	for(int x=0; x<w; x++){
+		for(int y=0; y<h; y++){
+			img.at<uchar>(y, x) = dI[y*w+x][0]/2;
+		}
+
+	}
+	return img;
 }
 
 

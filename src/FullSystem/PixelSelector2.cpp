@@ -74,7 +74,7 @@ int computeHistQuantil(int* hist, float below)
 	return 90;
 }
 
-
+// 根据梯度直方图计算每块小区域的梯度阈值
 void PixelSelector::makeHists(const FrameHessian* const fh)
 {
 	gradHistFrame = fh;
@@ -86,7 +86,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 	int w32 = w/32;
 	int h32 = h/32;
 	thsStep = w32;
-	// 把图像分为32×32个小块，计算每块的梯度直方图，并且计算梯度中值。
+	// 把图像分为32×32个小块，计算每块的梯度直方图，并计算每个小块的梯度阈值(7+梯度中值)
 	for(int y=0;y<h32;y++)
 		for(int x=0;x<w32;x++)
 		{
@@ -134,11 +134,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 		}
 
-
-
-
-
 }
+
 int PixelSelector::makeMaps(
 		const FrameHessian* const fh,
 		float* map_out, float density, int recursionsLeft, bool plot, float thFactor)
@@ -147,44 +144,21 @@ int PixelSelector::makeMaps(
 	float numWant=density;
 	float quotia;
 	int idealPotential = currentPotential;
-
-
-//	if(setting_pixelSelectionUseFast>0 && allowFast)
-//	{
-//		memset(map_out, 0, sizeof(float)*wG[0]*hG[0]);
-//		std::vector<cv::KeyPoint> pts;
-//		cv::Mat img8u(hG[0],wG[0],CV_8U);
-//		for(int i=0;i<wG[0]*hG[0];i++)
-//		{
-//			float v = fh->dI[i][0]*0.8;
-//			img8u.at<uchar>(i) = (!std::isfinite(v) || v>255) ? 255 : v;
-//		}
-//		cv::FAST(img8u, pts, setting_pixelSelectionUseFast, true);
-//		for(unsigned int i=0;i<pts.size();i++)
-//		{
-//			int x = pts[i].pt.x+0.5;
-//			int y = pts[i].pt.y+0.5;
-//			map_out[x+y*wG[0]]=1;
-//			numHave++;
-//		}
-//
-//		printf("FAST selection: got %f / %f!\n", numHave, numWant);
-//		quotia = numWant / numHave;
-//	}
-//	else
 	{
-
-
-
 
 		// the number of selected pixels behaves approximately as
 		// K / (pot+1)^2, where K is a scene-dependent constant.
 		// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
 
-		if(fh != gradHistFrame) makeHists(fh);
+		// 利用梯度直方图计算梯度阈值
+		if(fh != gradHistFrame) 
+			makeHists(fh);
 
 		// select!
+		// 根据阈值选择点
 		Eigen::Vector3i n = this->select(fh, map_out,currentPotential, thFactor);
+		IOWrap::getOCVImg(fh->dI, 640, 480);
+		// IOWrap::displayImage("hihihi", )
 
 		// sub-select!
 		numHave = n[0]+n[1]+n[2];

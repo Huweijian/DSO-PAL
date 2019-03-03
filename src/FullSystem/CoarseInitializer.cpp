@@ -764,9 +764,12 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f** data)
 		}
 	}
 }
+
+// 设置初始化的第一帧图像
 void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian)
 {
 
+	// 本地化相机参数
 	makeK(HCalib);
 	firstFrame = newFrameHessian;
 
@@ -780,8 +783,9 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 	{
 		sel.currentPotential = 3;
 		int npts;
+		// 对于原始图像，选择一些优化点
 		if(lvl == 0)
-			npts = sel.makeMaps(firstFrame, statusMap,densities[lvl]*w[0]*h[0],1,false,2);
+			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0],1,false,2);
 		else
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
 
@@ -926,7 +930,7 @@ void CoarseInitializer::applyStep(int lvl)
 	}
 	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
 }
-
+// 从相机参数中本地化信息
 void CoarseInitializer::makeK(CalibHessian* HCalib)
 {
 	w[0] = wG[0];

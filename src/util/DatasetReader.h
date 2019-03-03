@@ -34,6 +34,7 @@
 
 #include "util/Undistort.h"
 #include "IOWrapper/ImageRW.h"
+#include "IOWrapper/ImageDisplay.h"
 
 #if HAS_ZIPLIB
 	#include "zip.h"
@@ -288,6 +289,7 @@ private:
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
 				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
 		delete minimg;
+		IOWrap::getOCVImg(ret2->image, ret2->w, ret2->h);	
 		return ret2;
 	}
 

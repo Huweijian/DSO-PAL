@@ -27,8 +27,7 @@
 #include <vector>
 #include "util/NumType.h"
 #include "util/MinimalImage.h"
-
-
+#include <opencv2/highgui/highgui.hpp>
 namespace dso
 {
 
@@ -40,7 +39,23 @@ void displayImage(const char* windowName, const MinimalImageB3* img, bool autoSi
 void displayImage(const char* windowName, const MinimalImageF* img, bool autoSize = false);
 void displayImage(const char* windowName, const MinimalImageF3* img, bool autoSize = false);
 void displayImage(const char* windowName, const MinimalImageB16* img, bool autoSize = false);
+cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h);
 
+template<typename T>
+cv::Mat getOCVImg(T* data, int w, int h){
+	cv::Mat img(h, w, CV_32FC1, data);
+	cv::Mat imgtoshow(h, w, CV_8UC1);
+
+	for(int i=0; i<w; i++){
+		for(int j=0; j<h; j++){
+			imgtoshow.at<uchar>(j, i) = data[j*w+i];
+		}
+	}
+
+	cv::imshow("hihi", imgtoshow);
+	cv::waitKey(0);
+	return img;
+}
 
 void displayImageStitch(const char* windowName, const std::vector<MinimalImageB*> images, int cc=0, int rc=0);
 void displayImageStitch(const char* windowName, const std::vector<MinimalImageB3*> images, int cc=0, int rc=0);
