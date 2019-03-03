@@ -77,9 +77,11 @@ CoarseInitializer::~CoarseInitializer()
 	delete[] JbBuffer_new;
 }
 
-
+// 初始化的跟踪
+// 返回值：是否跟踪成功
 bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps)
 {
+	// TODO: 该看这个了
 	newFrame = newFrameHessian;
 
     for(IOWrap::Output3DWrapper* ow : wraps)
@@ -766,7 +768,7 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f** data)
 }
 
 // 设置初始化的第一帧图像
-void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian)
+void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHessian)
 {
 
 	// 本地化相机参数
@@ -781,15 +783,15 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 	float densities[] = {0.03,0.05,0.15,0.5,1};
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
+
 		sel.currentPotential = 3;
 		int npts;
-		// 对于原始图像，选择一些优化点
 		if(lvl == 0)
+			// 对于原始图像，选择一些梯度较大的点
 			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0],1,false,2);
 		else
+			// 对于其他金字塔图像
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
-
-
 
 		if(points[lvl] != 0) delete[] points[lvl];
 		points[lvl] = new Pnt[npts];
@@ -801,10 +803,10 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 		for(int y=patternPadding+1;y<hl-patternPadding-2;y++)
 		for(int x=patternPadding+1;x<wl-patternPadding-2;x++)
 		{
-			//if(x==2) printf("y=%d!\n",y);
+			// 如果这个点被选中了
 			if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 			{
-				//assert(patternNum==9);
+				// 初始化这个点的信息
 				pl[nl].u = x+0.1;
 				pl[nl].v = y+0.1;
 				pl[nl].idepth = 1;
@@ -814,42 +816,37 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 				pl[nl].lastHessian=0;
 				pl[nl].lastHessian_new=0;
 				pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
+				pl[nl].outlierTH = patternNum*setting_outlierTH;
 
 				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
-				float sumGrad2=0;
+				float sumGrad2=0;// 所有pattern点的梯度和
 				for(int idx=0;idx<patternNum;idx++)
 				{
 					int dx = patternP[idx][0];
 					int dy = patternP[idx][1];
-					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
+					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm(); //pattern点的梯度绝对值
 					sumGrad2 += absgrad;
 				}
-
-//				float gth = setting_outlierTH * (sqrtf(sumGrad2)+setting_outlierTHSumComponent);
-//				pl[nl].outlierTH = patternNum*gth*gth;
-//
-
-				pl[nl].outlierTH = patternNum*setting_outlierTH;
-
-
 
 				nl++;
 				assert(nl <= npts);
 			}
 		}
-
-
 		numPoints[lvl]=nl;
 	}
+
 	delete[] statusMap;
 	delete[] statusMapB;
 
+	// 计算每个点的KNN及在上层的爸爸点
 	makeNN();
 
+	// 初始化一些变量
 	thisToNext=SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
 
+	// 初始化dGrads为0向量
 	for(int i=0;i<pyrLevelsUsed;i++)
 		dGrads[i].setZero();
 
@@ -962,9 +959,8 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 	}
 }
 
-
-
-
+// 搜索每个点的KNN点，记录点的idx和距离
+// 搜索每个点在上层金字塔的对应点，记为爸爸并 记录爸爸距离
 void CoarseInitializer::makeNN()
 {
 	const float NNDistFactor=0.05;
@@ -974,10 +970,11 @@ void CoarseInitializer::makeNN()
 			FLANNPointcloud,2> KDTree;
 
 	// build indices
-	FLANNPointcloud pcs[PYR_LEVELS];
 	KDTree* indexes[PYR_LEVELS];
+	FLANNPointcloud pcs[PYR_LEVELS];
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
+		// 每一层创建一个FLANN点云和KD树
 		pcs[i] = FLANNPointcloud(numPoints[i], points[i]);
 		indexes[i] = new KDTree(2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams(5) );
 		indexes[i]->buildIndex();
@@ -1001,11 +998,13 @@ void CoarseInitializer::makeNN()
 			//resultSet.init(pts[i].neighbours, pts[i].neighboursDist );
 			resultSet.init(ret_index, ret_dist);
 			Vec2f pt = Vec2f(pts[i].u,pts[i].v);
+			// 搜索N邻居，结果存储再resultSet中，pt是待搜索的点
 			indexes[lvl]->findNeighbors(resultSet, (float*)&pt, nanoflann::SearchParams());
 			int myidx=0;
 			float sumDF = 0;
 			for(int k=0;k<nn;k++)
 			{
+				// 记录每个点的邻居idx，距离=exp(-dist*factor)/sumDF*10
 				pts[i].neighbours[myidx]=ret_index[k];
 				float df = expf(-ret_dist[k]*NNDistFactor);
 				sumDF += df;
@@ -1020,9 +1019,10 @@ void CoarseInitializer::makeNN()
 			if(lvl < pyrLevelsUsed-1 )
 			{
 				resultSet1.init(ret_index, ret_dist);
-				pt = pt*0.5f-Vec2f(0.25f,0.25f);
+				pt = pt*0.5f-Vec2f(0.25f,0.25f);// 点在上层金字塔的位置
+				//查找点在上层金字塔中最接近的点
 				indexes[lvl+1]->findNeighbors(resultSet1, (float*)&pt, nanoflann::SearchParams());
-
+				// 保存为这个点的爸爸和爸爸距离
 				pts[i].parent = ret_index[0];
 				pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
 
@@ -1035,8 +1035,6 @@ void CoarseInitializer::makeNN()
 			}
 		}
 	}
-
-
 
 	// done.
 

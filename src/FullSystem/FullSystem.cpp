@@ -802,7 +802,6 @@ void FullSystem::flagPointsForRemoval()
 // slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
-	IOWrap::getOCVImg(image->image, image->w, image->h);
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
@@ -823,14 +822,17 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
 
+	// 初始化
 	if(!initialized)
 	{
 		// use initializer!
+		// 第一帧初始化
 		if(coarseInitializer->frameID<0)	// first frame set. fh is kept by coarseInitializer.
 		{
-
+			// 初始化梯度较大的点，并计算KNN
 			coarseInitializer->setFirst(&Hcalib, fh);
 		}
+		// 后续帧初始化，尝试track
 		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if SNAPPED
 		{
 
@@ -838,6 +840,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
 		}
+		// track失败，丢弃帧
 		else
 		{
 			// if still initializing
@@ -886,12 +889,8 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		}
 
 
-
-
         for(IOWrap::Output3DWrapper* ow : outputWrapper)
             ow->publishCamPose(fh->shell, &Hcalib);
-
-
 
 
 		lock.unlock();
@@ -899,6 +898,8 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		return;
 	}
 }
+
+
 void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 {
 

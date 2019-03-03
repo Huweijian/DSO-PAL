@@ -289,7 +289,6 @@ private:
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
 				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
 		delete minimg;
-		IOWrap::getOCVImg(ret2->image, ret2->w, ret2->h);	
 		return ret2;
 	}
 

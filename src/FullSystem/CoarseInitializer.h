@@ -91,8 +91,8 @@ public:
 	bool fixAffine;
 	bool printDebug;
 
-	Pnt* points[PYR_LEVELS];
-	int numPoints[PYR_LEVELS];
+	Pnt* points[PYR_LEVELS]; // 选中的点
+	int numPoints[PYR_LEVELS]; // 选中点的数目
 	AffLight thisToNext_aff;
 	SE3 thisToNext;
 

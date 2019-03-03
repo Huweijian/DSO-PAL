@@ -136,6 +136,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 }
 
+// density: 希望采集xx个点  recursionLeft：递归采集剩余次数（=1表示允许递归采集1次） thFactor:thresholdFactor 梯度阈值因子
+// 返回成功采集的点
 int PixelSelector::makeMaps(
 		const FrameHessian* const fh,
 		float* map_out, float density, int recursionsLeft, bool plot, float thFactor)
@@ -157,18 +159,17 @@ int PixelSelector::makeMaps(
 		// select!
 		// 根据阈值选择点
 		Eigen::Vector3i n = this->select(fh, map_out,currentPotential, thFactor);
-		IOWrap::getOCVImg(fh->dI, 640, 480);
-		// IOWrap::displayImage("hihihi", )
-
+		
 		// sub-select!
+		// 根据本次采集的点数重新估计网格大小(Potential 可以理解为采点的网格大小)
 		numHave = n[0]+n[1]+n[2];
-		quotia = numWant / numHave;
-
+		quotia = numWant / numHave; 
 		// by default we want to over-sample by 40% just to be sure.
 		float K = numHave * (currentPotential+1) * (currentPotential+1);
 		idealPotential = sqrtf(K/numWant)-1;	// round down.
 		if(idealPotential<1) idealPotential=1;
 
+		// 如果点数过多或者过少，都重新采集
 		if( recursionsLeft>0 && quotia > 1.25 && currentPotential>1)
 		{
 			//re-sample to get more points!
@@ -202,6 +203,7 @@ int PixelSelector::makeMaps(
 		}
 	}
 
+	// 如果采集的点还是略多，随机去掉一些点
 	int numHaveSub = numHave;
 	if(quotia < 0.95)
 	{
@@ -228,8 +230,8 @@ int PixelSelector::makeMaps(
 //			currentPotential,
 //			idealPotential,
 //			100*numHaveSub/(float)(wG[0]*hG[0]));
-	currentPotential = idealPotential;
 
+	currentPotential = idealPotential;
 
 	if(plot)
 	{
@@ -265,7 +267,7 @@ int PixelSelector::makeMaps(
 }
 
 
-
+// 选中的点,map_out = 1.0 没选中的点，map_out = 0.0
 Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 		float* map_out, int pot, float thFactor)
 {

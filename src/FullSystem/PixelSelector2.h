@@ -44,7 +44,7 @@ public:
 
 	PixelSelector(int w, int h);
 	~PixelSelector();
-	int currentPotential;
+	int currentPotential; //点采集器的网格大小？
 
 
 	bool allowFast;
