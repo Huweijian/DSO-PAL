@@ -21,7 +21,9 @@
 * along with DSO. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
+// 包括	AccumulatorXX AccumulatorX 
+//  	Accumulator11 Accumulator14 Accumulator9
+// 		AccumulatorApprox
 #pragma once
 #include "util/NumType.h"
 

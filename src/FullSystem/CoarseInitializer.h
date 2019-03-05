@@ -101,7 +101,7 @@ public:
 	FrameHessian* newFrame;
 private:
 	Mat33 K[PYR_LEVELS];
-	Mat33 Ki[PYR_LEVELS];
+	Mat33 Ki[PYR_LEVELS]; // K.inverse
 	double fx[PYR_LEVELS];
 	double fy[PYR_LEVELS];
 	double fxi[PYR_LEVELS];
