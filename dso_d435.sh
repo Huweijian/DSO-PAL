@@ -1,6 +1,8 @@
 #!/bin/bash
 ./build/bin/dso_dataset_rel \
-files=/home/hwj23/Dataset/D435/ceiling23 \
-calib=/home/hwj23/Dataset/D435/camera_dso.txt \
+files=/home/hwj23/Dataset/D435/s3/images \
+calib=/home/hwj23/Dataset/D435/camera.txt \
+gamma=/home/hwj23/Dataset/D435/pcalib.txt \
+vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png \
 preset=0 \
-mode=1
+mode=0

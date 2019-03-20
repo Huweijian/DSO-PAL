@@ -5,6 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/test",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
             "name": "DSO",
             "type": "cppdbg",
             "request": "launch",
@@ -16,6 +35,13 @@
                         "preset=0", 
                         "mode=0" 
                     ],
+            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
+            //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
+            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+            //             "preset=0", 
+            //             "mode=0" 
+            //         ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
@@ -29,5 +55,6 @@
                 }
             ]
         }
+
     ]
 }

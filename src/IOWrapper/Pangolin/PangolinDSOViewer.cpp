@@ -502,7 +502,7 @@ void PangolinDSOViewer::publishCamPose(FrameShell* frame,
 	allFramePoses.push_back(frame->camToWorld.translation().cast<float>());
 }
 
-
+// 显示原始图像
 void PangolinDSOViewer::pushLiveFrame(FrameHessian* image)
 {
 	if(!setting_render_displayVideo) return;

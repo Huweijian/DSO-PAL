@@ -59,7 +59,7 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 
 	frameID=-1;
 	fixAffine=true;
-	printDebug=false;
+	printDebug=true;
 
 	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
 	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
@@ -214,8 +214,10 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			if(accept)
 			{
 
-				if(resNew[1] == alphaK*numPoints[lvl])
+				if(resNew[1] == alphaK*numPoints[lvl]){
 					snapped = true;
+					printf("打断啦！！！frameID=%d\n", frameID);
+				}
 				H = H_new;
 				b = b_new;
 				Hsc = Hsc_new;
@@ -236,46 +238,40 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 				if(lambda > 10000) lambda = 10000;
 			}
 
+			// 退出优化的条件：连续拒绝2次 或 增量过小 或 迭代次数过多
 			bool quitOpt = false;
-
 			if(!(inc.norm() > eps) || iteration >= maxIterations[lvl] || fails >= 2)
 			{
 				Mat88f H,Hsc; Vec8f b,bsc;
-
 				quitOpt = true;
 			}
 
-
-			if(quitOpt) break;
+			if(quitOpt) 
+				break;
 			iteration++;
 		}
 		latestRes = resOld;
-
 	}
-
 
 
 	thisToNext = refToNew_current;
 	thisToNext_aff = refToNew_aff_current;
 
+	// 从更准确的底层金字塔向上传播，更新上层金字塔的iR和idepth
 	for(int i=0;i<pyrLevelsUsed-1;i++)
 		propagateUp(i);
 
-
-
-
 	frameID++;
-	if(!snapped) snappedAt=0;
+	
+	if(!snapped) 
+		snappedAt=0;
 
 	if(snapped && snappedAt==0)
 		snappedAt = frameID;
-
-
-
+	// 输出深度图
     debugPlot(0,wraps);
 
-
-
+	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;
 }
 
@@ -291,7 +287,7 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 
 	MinimalImageB3 iRImg(wl,hl);
-
+	// 取出图像的所有像素
 	for(int i=0;i<wl*hl;i++)
 		iRImg.at(i) = Vec3b(colorRef[i][0],colorRef[i][0],colorRef[i][0]);
 
@@ -311,18 +307,21 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	float fac = nid / sid;
 
 
-
+	int goodCnt = 0, badCnt = 0;
 	for(int i=0;i<npts;i++)
 	{
 		Pnt* point = points[lvl]+i;
 
-		if(!point->isGood)
+		if(!point->isGood){
+			badCnt ++;
 			iRImg.setPixel9(point->u+0.5f,point->v+0.5f,Vec3b(0,0,0));
+		}
 
-		else
+		else{
+			goodCnt ++;
 			iRImg.setPixel9(point->u+0.5f,point->v+0.5f,makeRainbow3B(point->iR*fac));
+		}
 	}
-
 
 	//IOWrap::displayImage("idepth-R", &iRImg, false);
     for(IOWrap::Output3DWrapper* ow : wraps)
@@ -330,8 +329,8 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 }
 
 // 计算某一层的残差，H 
-// 
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
+// 返回值：能量，alpha能量，点数
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
 		Mat88f &H_out_sc, Vec8f &b_out_sc,
@@ -437,14 +436,14 @@ Vec3f CoarseInitializer::calcResAndGS(
 			dp5[idx] = -v*dxInterp + u*dyInterp;				// ...
 			dp6[idx] = - hw*r2new_aff[0] * rlR;					// dE/d(e^(aj))
 			dp7[idx] = - hw*1;									// dE/d(bj)	
-			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
-			r[idx] = hw*residual;
+			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;		// dE/d(depth)
+			r[idx] = hw*residual;								// res
 
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			if(maxstep < point->maxstep) point->maxstep = maxstep;
 
-			// immediately compute dp*dd' and dd*dd' in JbBuffer1.
-			// 保存乘积结果到一个缓冲区中
+			// immediately compute dp*dd1' and dd*dd' in JbBuffer1.
+			// pattern的所有点当作一个点来计算梯度
 			JbBuffer_new[i][0] += dp0[idx]*dd[idx];
 			JbBuffer_new[i][1] += dp1[idx]*dd[idx];
 			JbBuffer_new[i][2] += dp2[idx]*dd[idx];
@@ -467,6 +466,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			continue;
 		}
 
+		// 计算完成pattern 8个点的误差，累计能量E，累计8个梯度到acc9中
 		// add into energy.
 		E.updateSingle(energy);
 		point->isGood_new = true;
@@ -503,11 +503,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 	for(int i=0;i<npts;i++)
 	{
 		Pnt* point = ptsl+i;
-		// 点不好，用旧的能量，点好，重新计算能量，是反深度的平方
+		// 点不好，用旧的能量
 		if(!point->isGood_new)
 		{
 			E.updateSingle((float)(point->energy[1]));
 		}
+		// 点好，重新计算能量，是反深度的平方
 		else
 		{
 			point->energy_new[1] = (point->idepth_new-1)*(point->idepth_new-1);
@@ -516,18 +517,24 @@ Vec3f CoarseInitializer::calcResAndGS(
 	}
 	EAlpha.finish();
 
-	// 计算alphaEnergy = alphaW * norm(t) * npts
+	// 计算alphaEnergy = alphaW * norm(t) * npts 
+	// 这个alpha能量似乎没卵用，只是一个用来表征当前估计的质量（位移越大，点数越多，质量越高）
+	// 	等于位移乘以点数
 	float alphaEnergy = alphaW*(EAlpha.A + refToNew.translation().squaredNorm() * npts);
 
 	// compute alpha opt.
 	float alphaOpt;
+	// 如果位移乘以点数足够大，也就是位移足够多(和点数无关)
 	if(alphaEnergy > alphaK*npts)
 	{
+		// 那么不进行alpha操作
 		alphaOpt = 0;
+		// alpha能量等于阈值
 		alphaEnergy = alphaK*npts;
 	}
 	else
 	{
+		// 位移不够大，需要进行alpha操作，值等于alphaW(150*150)
 		alphaOpt = alphaW;
 	}
 
@@ -542,9 +549,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 		point->lastHessian_new = JbBuffer_new[i][9];
 
+		// 更新JBuffer8和9
+		// 如果alphaOpt不等于0 （位移不够大）那么增加一点噪声(150*150)
 		JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
 		JbBuffer_new[i][9] += alphaOpt;
 
+		// 如果alphaOpt=0 (位移足够大) 也增加一点耦合噪声 couplingWeight=1
 		if(alphaOpt==0)
 		{
 			JbBuffer_new[i][8] += couplingWeight*(point->idepth_new - point->iR);
@@ -631,7 +641,9 @@ Vec3f CoarseInitializer::calcEC(int lvl)
 	return Vec3f(couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], E.num);
 }
 
-// 尝试初始化lvl层的iR。如果打断了，利用knn初始化，否则初始化为1
+// 平滑lvl层的iR。
+// 如果打断了，利用knn初始化，
+// 如果没打断，初始化为1
 void CoarseInitializer::optReg(int lvl)
 {
 	int npts = numPoints[lvl];
@@ -681,6 +693,7 @@ void CoarseInitializer::optReg(int lvl)
 
 
 
+// 从底层金字塔向上传播，更新上层金字塔的iR和idepth
 void CoarseInitializer::propagateUp(int srcLvl)
 {
 	assert(srcLvl+1<pyrLevelsUsed);
@@ -692,6 +705,7 @@ void CoarseInitializer::propagateUp(int srcLvl)
 	Pnt* ptst = points[srcLvl+1];
 
 	// set to zero.
+	// 初始化初始化高一层为0
 	for(int i=0;i<nptst;i++)
 	{
 		Pnt* parent = ptst+i;
@@ -699,26 +713,32 @@ void CoarseInitializer::propagateUp(int srcLvl)
 		parent->iRSumNum=0;
 	}
 
+	// 枚举当前层
 	for(int i=0;i<nptss;i++)
 	{
 		Pnt* point = ptss+i;
-		if(!point->isGood) continue;
-
+		if(!point->isGood) 
+			continue;
 		Pnt* parent = ptst + point->parent;
+		// 爸爸的iR等于孩子的点×海森
 		parent->iR += point->iR * point->lastHessian;
+		// 爸爸的RSumNum累加
 		parent->iRSumNum += point->lastHessian;
 	}
 
 	for(int i=0;i<nptst;i++)
 	{
 		Pnt* parent = ptst+i;
+		// 如果爸爸点之前更新过了
 		if(parent->iRSumNum > 0)
 		{
+			// 更新爸爸点的idepth和iR
 			parent->idepth = parent->iR = (parent->iR / parent->iRSumNum);
 			parent->isGood = true;
 		}
 	}
 
+	// 对爸爸层执行平滑
 	optReg(srcLvl+1);
 }
 

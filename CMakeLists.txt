@@ -134,3 +134,5 @@ else()
 	message("--- not building dso_dataset, since either don't have openCV or Pangolin.")
 endif()
 
+# test exe 
+add_executable(test ${PROJECT_SOURCE_DIR}/src/test.cpp)
