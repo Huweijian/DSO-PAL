@@ -57,6 +57,8 @@ set(dso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
   ${PROJECT_SOURCE_DIR}/src/util/Undistort.cpp
   ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
+  ${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
+  ${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
 )
 
 
@@ -135,4 +137,4 @@ else()
 endif()
 
 # test exe 
-add_executable(test ${PROJECT_SOURCE_DIR}/src/test.cpp)
+add_executable(test_dso ${PROJECT_SOURCE_DIR}/src/test.cpp)

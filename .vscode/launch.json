@@ -24,17 +24,11 @@
             ]
         },
         {
-            "name": "DSO",
+            "name": "DSO pin",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
-            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
-                        "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
-                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
-                        "preset=0", 
-                        "mode=0" 
-                    ],
+
             // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
             //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
             //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
@@ -42,6 +36,46 @@
             //             "preset=0", 
             //             "mode=0" 
             //         ],
+
+            "args": [   "files=/home/hwj23/Dataset/simu/movex_rotatez/color/", 
+                        "calib=/home/hwj23/Dataset/simu/camera.cfg", 
+                        "preset=0", 
+                        "mode=2" 
+                    ],
+
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "DSO PAL",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/bin/dso_dataset",
+
+            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
+            //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
+            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+            //             "preset=0", 
+            //             "mode=0" 
+            //         ],
+
+            "args": [   "files=/home/hwj23/Dataset/PAL/simu/s1/color/", 
+                        "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
+                        "preset=0", 
+                        "mode=2" 
+                    ],
+
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

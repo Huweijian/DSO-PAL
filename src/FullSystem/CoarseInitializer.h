@@ -161,7 +161,7 @@ private:
 
 	void makeGradients(Eigen::Vector3f** data);
 
-    void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
+    void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps, bool onlyCVImg = false);
 	void makeNN();
 };
 

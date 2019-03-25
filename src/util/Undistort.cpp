@@ -35,7 +35,7 @@
 #include "IOWrapper/ImageDisplay.h"
 #include "IOWrapper/ImageRW.h"
 #include "util/Undistort.h"
-
+#include "pal_interface.h"
 
 namespace dso
 {
@@ -315,11 +315,6 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
 			if(!u->isValid()) {delete u; return 0; }
 		}
 	}
-
-
-
-
-
     // clean model selection implementation.
     else if(std::sscanf(l1.c_str(), "KannalaBrandt %f %f %f %f %f %f %f %f",
             &ic[0], &ic[1], &ic[2], &ic[3],
@@ -366,8 +361,11 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
     }
 
 
-    else
-    {
+    else if(init_pal(configFilename)){
+		u = new UndistortPAL();
+	}
+
+	else{
         printf("could not read calib file! exit.");
         exit(1);
     }
@@ -1235,6 +1233,25 @@ void UndistortPinhole::distortCoordinates(float* in_x, float* in_y, float* out_x
 		iy = fy*iy+cy;
 		out_x[i] = ix;
 		out_y[i] = iy;
+	}
+}
+
+UndistortPAL::UndistortPAL()
+{
+	printf("Creating PAL undistorter\n");
+	valid = true;
+	w = wOrg = pal_model_g->width_;
+	h = hOrg = pal_model_g->height_;
+	K = dso::Mat33::Identity();	
+	passthrough = true;
+}
+
+void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
+{
+	for(int i=0;i<n;i++)
+	{
+		out_x[i] = in_x[i];
+		out_y[i] = in_y[i];
 	}
 }
 

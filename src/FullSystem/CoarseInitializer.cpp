@@ -36,6 +36,8 @@
 #include "FullSystem/PixelSelector.h"
 #include "FullSystem/PixelSelector2.h"
 #include "util/nanoflann.h"
+#include "util/pal_model.h"
+#include "util/pal_interface.h"
 
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
@@ -76,7 +78,6 @@ CoarseInitializer::~CoarseInitializer()
 	delete[] JbBuffer;
 	delete[] JbBuffer_new;
 }
-
 // 初始化的跟踪
 // 返回值：是否跟踪成功
 bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps)
@@ -86,6 +87,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
     for(IOWrap::Output3DWrapper* ow : wraps)
         ow->pushLiveFrame(newFrameHessian);
 
+	printf("\n - COARSE TRACK Frame %d \n", newFrame->idx);
+
 	int maxIterations[] = {5,5,10,30,50};
 
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
@@ -93,7 +96,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	regWeight = 0.8;//*freeDebugParam4;
 	couplingWeight = 1;//*freeDebugParam5;
 
-	// 如果没有跟踪成功，重置所有层的所有点的idpeth等于1
+	// 如果上一帧没有跟踪成功，重置所有层的所有点的idpeth等于1
 	if(!snapped)
 	{
 		thisToNext.translation().setZero();
@@ -140,17 +143,18 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 		if(printDebug)
 		{
-			printf("lvl %d, it %d (l=%f) %s: %.3f+%.5f -> %.3f+%.5f (%.3f->%.3f) (|inc| = %f)! \t",
+			printf("lvl %d, it %d (l=%f) %s: [%.3f->%.3f] %.3f+%.5f -> %.3f+%.5f  (|inc| = %f)! \n\t",
 					lvl, 0, lambda,
 					"INITIA",
+					(resOld[0]+resOld[1]) / resOld[2],
+					(resOld[0]+resOld[1]) / resOld[2],
 					sqrtf((float)(resOld[0] / resOld[2])),
 					sqrtf((float)(resOld[1] / resOld[2])),
 					sqrtf((float)(resOld[0] / resOld[2])),
 					sqrtf((float)(resOld[1] / resOld[2])),
-					(resOld[0]+resOld[1]) / resOld[2],
-					(resOld[0]+resOld[1]) / resOld[2],
 					0.0f);
 			std::cout << refToNew_current.log().transpose() << " AFF " << refToNew_aff_current.vec().transpose() <<"\n";
+			debugPlot(lvl, wraps, true); 
 		}
 
 		int iteration=0;
@@ -196,27 +200,28 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 			if(printDebug)
 			{
-				printf("lvl %d, it %d (l=%f) %s: %.5f + %.5f + %.5f -> %.5f + %.5f + %.5f (%.2f->%.2f) (|inc| = %f)! \t",
+				printf("lvl %d, it %d (l=%.5f) %s: [%.2f->%.2f] (%.3f + %.3f + %.3f -> %.3f + %.3f + %.3f) (|inc| = %f)! \n\t",
 						lvl, iteration, lambda,
 						(accept ? "ACCEPT" : "REJECT"),
+						eTotalOld / resNew[2],
+						eTotalNew / resNew[2],
 						sqrtf((float)(resOld[0] / resOld[2])),
 						sqrtf((float)(regEnergy[0] / regEnergy[2])),
 						sqrtf((float)(resOld[1] / resOld[2])),
 						sqrtf((float)(resNew[0] / resNew[2])),
 						sqrtf((float)(regEnergy[1] / regEnergy[2])),
 						sqrtf((float)(resNew[1] / resNew[2])),
-						eTotalOld / resNew[2],
-						eTotalNew / resNew[2],
 						inc.norm());
 				std::cout << refToNew_new.log().transpose() << " AFF " << refToNew_aff_new.vec().transpose() <<"\n";
+				debugPlot(lvl, wraps, true);
 			}
 
 			if(accept)
 			{
 
 				if(resNew[1] == alphaK*numPoints[lvl]){
+
 					snapped = true;
-					printf("打断啦！！！frameID=%d\n", frameID);
 				}
 				H = H_new;
 				b = b_new;
@@ -266,24 +271,35 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	if(!snapped) 
 		snappedAt=0;
 
-	if(snapped && snappedAt==0)
+	if(snapped && snappedAt==0){
 		snappedAt = frameID;
+	}
+	if(snapped){
+		printf("!!!!初始化成功(at %d)!!!! now %d\n", snappedAt, frameID);
+	}
 	// 输出深度图
     debugPlot(0,wraps);
+	cv::waitKey();
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;
 }
 
-void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps)
+void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps, bool onlyCVImg)
 {
-    bool needCall = false;
-    for(IOWrap::Output3DWrapper* ow : wraps)
-        needCall = needCall || ow->needPushDepthImage();
-    if(!needCall) return;
+	// 在不传入wraps的情况下强制输出到OpenCV Mat
+	if(wraps.size() != 0){
+		bool needCall = false;
+		for(IOWrap::Output3DWrapper* ow : wraps)
+			needCall = needCall || ow->needPushDepthImage();
+		if(!needCall) return;
+	}
+	else{
+		onlyCVImg = true;
+	}
 
 
-	int wl = w[lvl], hl = h[lvl];
+	int wl= w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 
 	MinimalImageB3 iRImg(wl,hl);
@@ -323,9 +339,13 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 		}
 	}
 
-	//IOWrap::displayImage("idepth-R", &iRImg, false);
-    for(IOWrap::Output3DWrapper* ow : wraps)
-        ow->pushDepthImage(&iRImg);
+	IOWrap::displayImage("idepth-R", &iRImg, true);
+
+	if(onlyCVImg)
+		return ;	
+
+	for(IOWrap::Output3DWrapper* ow : wraps)
+		ow->pushDepthImage(&iRImg);
 }
 
 // 计算某一层的残差，H 
@@ -341,6 +361,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f* colorNew = newFrame->dIp[lvl];
 
+	Mat33f R = refToNew.rotationMatrix().cast<float>();
 	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
@@ -392,24 +413,45 @@ Vec3f CoarseInitializer::calcResAndGS(
 		{
 			int dx = patternP[idx][0];
 			int dy = patternP[idx][1];
+
 			// pattern点变换到新帧的相机坐标系下(u, v) -> (Ku, Kv)
+#ifdef PAL
+			Vec3f pt = R * pal_model_g->cam2world(point->u+dx, point->v+dy) + t*point->idepth_new;
+			pt = pt / pt[2];
+			pt = R * pt/point->idepth_new + t;
+			Vec2f p2_pal = pal_model_g->world2cam(pt);
+			float u = pt[0]/pt[2];
+			float v = pt[1]/pt[2];
+			float Ku = p2_pal[0];
+			float Kv = p2_pal[1];
+			float new_idepth = 1.0f/pt[2];
+			// 如果新的点出界或者深度异常，那么点设置为无效
+			if(!(pal_check_in_range_g(Ku, Kv, 2, lvl) && new_idepth > 0))
+			{
+				isGood = false;
+				break;
+			}
+
+#else
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];
 			float Ku = fxl * u + cxl;
 			float Kv = fyl * v + cyl;
 			float new_idepth = point->idepth_new/pt[2];
-
 			// 如果新的点出界或者深度异常，那么点设置为无效
 			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
 			{
 				isGood = false;
 				break;
 			}
+#endif
+
 
 			// 亚像素梯度和亮度
-			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
-			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
+			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);  // 新帧的 [亮度 dx dy]
+			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl); // 参考帧亮度
+
 			// 如果亮度无效，gg
 			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
 			{
@@ -423,24 +465,48 @@ Vec3f CoarseInitializer::calcResAndGS(
 			energy += hw *residual*residual*(2-hw);
 
 			// 计算一系列导数，并储存
-			float dxdd = (t[0]-t[2]*u)/pt[2];
-			float dydd = (t[1]-t[2]*v)/pt[2];
 			if(hw < 1) hw = sqrtf(hw);
+			float dxdd = (t[0]-t[2]*u)/pt[2]; // \rho_2 / \rho1 * (tx - u'_2 * tz)
+			float dydd = (t[1]-t[2]*v)/pt[2]; // \rho_2 / \rho1 * (ty - v'_2 * tz)
+#ifdef PAL
+			dxdd = dxdd * point->idepth_new;
+			dydd = dydd * point->idepth_new;
+			Vec2f dr2dx2(hitColor[1]*hw, hitColor[2]*hw);
+			Eigen::Matrix<float, 2, 6> dx2dSE;
+			Eigen::Matrix<float, 2, 3> dx2dxyz;
+			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, dx2dxyz);
+			Vec6f dr2dSE = dr2dx2.transpose() * dx2dSE;	
+			dp0[idx] = dr2dSE[0];
+			dp1[idx] = dr2dSE[1];
+			dp2[idx] = dr2dSE[2];
+			dp3[idx] = dr2dSE[3];
+			dp4[idx] = dr2dSE[4];
+			dp5[idx] = dr2dSE[5];
+			Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
+
+			auto dd_scalar = dr2dx2.transpose() * dx2dxyz * dxyzdd; 
+			dd[idx] = dd_scalar[0];
+			// TODO maxstep 
+			float maxstep = 1.0f;
+
+#else
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
 			dp0[idx] = new_idepth*dxInterp;						// dE/d(SE1) = gx*fx/Z
 			dp1[idx] = new_idepth*dyInterp;						// dE/d(SE2) = gy*fy/Z
 			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);	// dE/d(SE3)
-			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;		// ...
-			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;			// ...
-			dp5[idx] = -v*dxInterp + u*dyInterp;				// ...
+			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;		// ...d(SE4)
+			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;			// ...d(SE5)
+			dp5[idx] = -v*dxInterp + u*dyInterp;				// ...d(SE6)
+			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;		// dE/d(depth)
+			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
+#endif
 			dp6[idx] = - hw*r2new_aff[0] * rlR;					// dE/d(e^(aj))
 			dp7[idx] = - hw*1;									// dE/d(bj)	
-			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;		// dE/d(depth)
 			r[idx] = hw*residual;								// res
 
-			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
-			if(maxstep < point->maxstep) point->maxstep = maxstep;
+			if(maxstep < point->maxstep) 
+				point->maxstep = maxstep;
 
 			// immediately compute dp*dd1' and dd*dd' in JbBuffer1.
 			// pattern的所有点当作一个点来计算梯度
@@ -826,7 +892,11 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	float densities[] = {0.03,0.05,0.15,0.5,1};
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
-
+#ifdef PAL
+		int r0 = pal_model_g->mask_radius[0];
+		int r1 = pal_model_g->mask_radius[1];
+		densities[lvl] *= 3.14*(r1*r1 - r0*r0) / w[0]*h[0];
+#endif
 		sel.currentPotential = 3;
 		int npts;
 		if(lvl == 0)
@@ -843,38 +913,45 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		int wl = w[lvl], hl = h[lvl];
 		Pnt* pl = points[lvl];
 		int nl = 0;
-		for(int y=patternPadding+1;y<hl-patternPadding-2;y++)
-		for(int x=patternPadding+1;x<wl-patternPadding-2;x++)
-		{
-			// 如果这个点被选中了
-			if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
+		for(int y=patternPadding+1;y<hl-patternPadding-2;y++){
+			for(int x=patternPadding+1;x<wl-patternPadding-2;x++)
 			{
-				// 初始化这个点的信息
-				pl[nl].u = x+0.1;
-				pl[nl].v = y+0.1;
-				pl[nl].idepth = 1;
-				pl[nl].iR = 1;
-				pl[nl].isGood=true;
-				pl[nl].energy.setZero();
-				pl[nl].lastHessian=0;
-				pl[nl].lastHessian_new=0;
-				pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
-				pl[nl].outlierTH = patternNum*setting_outlierTH;
-
-				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
-				float sumGrad2=0;// 所有pattern点的梯度和
-				for(int idx=0;idx<patternNum;idx++)
+				// 如果这个点被选中了
+				if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 				{
-					int dx = patternP[idx][0];
-					int dy = patternP[idx][1];
-					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm(); //pattern点的梯度绝对值
-					sumGrad2 += absgrad;
-				}
+				#ifdef PAL
+					if(!pal_check_in_range_g(x, y, patternPadding+1, lvl)){
+						continue;
+					}
+				#endif
+					// 初始化这个点的信息
+					pl[nl].u = x+0.1;
+					pl[nl].v = y+0.1;
+					pl[nl].idepth = 1;
+					pl[nl].iR = 1;
+					pl[nl].isGood=true;
+					pl[nl].energy.setZero();
+					pl[nl].lastHessian=0;
+					pl[nl].lastHessian_new=0;
+					pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
+					pl[nl].outlierTH = patternNum*setting_outlierTH;
 
-				nl++;
-				assert(nl <= npts);
+					Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
+					float sumGrad2=0;// 所有pattern点的梯度和
+					for(int idx=0;idx<patternNum;idx++)
+					{
+						int dx = patternP[idx][0];
+						int dy = patternP[idx][1];
+						float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm(); //pattern点的梯度绝对值
+						sumGrad2 += absgrad;
+					}
+
+					nl++;
+					assert(nl <= npts);
+				}
 			}
 		}
+
 		numPoints[lvl]=nl;
 	}
 
@@ -893,6 +970,10 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	for(int i=0;i<pyrLevelsUsed;i++)
 		dGrads[i].setZero();
 
+	// 可视化 pal 点选择结果 
+	// std::vector<IOWrap::Output3DWrapper*> place_holder;
+	// debugPlot(0, place_holder, true);
+	// cv::waitKey();
 }
 
 // 重置某层点的误差 and idepth_new，
