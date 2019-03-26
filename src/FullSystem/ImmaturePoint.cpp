@@ -26,33 +26,38 @@
 #include "FullSystem/ImmaturePoint.h"
 #include "util/FrameShell.h"
 #include "FullSystem/ResidualProjections.h"
+#include "pal_interface.h"
 
 namespace dso
 {
+//计算总梯度海森，每个pattern点的权重，计算能量阈值
 ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib)
 : u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED)
 {
-
+	// 梯度海森？？	
 	gradH.setZero();
 
+	//枚举每个pattern点
 	for(int idx=0;idx<patternNum;idx++)
 	{
 		int dx = patternP[idx][0];
 		int dy = patternP[idx][1];
 
+		//插值的点
         Vec3f ptc = getInterpolatedElement33BiLin(host->dI, u+dx, v+dy,wG[0]);
 
-
-
 		color[idx] = ptc[0];
-		if(!std::isfinite(color[idx])) {energyTH=NAN; return;}
-
+		if(!std::isfinite(color[idx])){
+			energyTH=NAN; 
+			return;
+		}
 
 		gradH += ptc.tail<2>()  * ptc.tail<2>().transpose();
 
 		weights[idx] = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + ptc.tail<2>().squaredNorm()));
 	}
 
+	// 能量阈值(和pattern点数有关)
 	energyTH = patternNum*setting_outlierTH;
 	energyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
 
@@ -74,10 +79,11 @@ ImmaturePoint::~ImmaturePoint()
  */
 ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f& hostToFrame_affine, CalibHessian* HCalib, bool debugPrint)
 {
-	if(lastTraceStatus == ImmaturePointStatus::IPS_OOB) return lastTraceStatus;
-
+	if(lastTraceStatus == ImmaturePointStatus::IPS_OOB) 
+		return lastTraceStatus;
 
 	debugPrint = false;//rand()%100==0;
+	// 最大极线长度
 	float maxPixSearch = (wG[0]+hG[0])*setting_maxPixSearch;
 
 	if(debugPrint)
@@ -94,6 +100,23 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 //	const float slackInterval = 0.8;			// if pixel-interval is smaller than this, leave it be.
 //	const float minImprovementFactor = 2;		// if pixel-interval is smaller than this, leave it be.
 	// ============== project min and max. return if one of them is OOB ===================
+#ifdef PAL
+	Vec3f pr = hostToFrame_KRKi * pal_model_g->cam2world(u, v);
+	Vec3f ptpMin = pr + hostToFrame_Kt*idepth_min;
+	Vec2f ptpMin2D = pal_model_g->world2cam(ptpMin);
+	float uMin = ptpMin2D[0];
+	float vMin = ptpMin2D[1];
+
+	if(!(pal_check_in_range_g(uMin, vMin, 5))){
+		if(debugPrint) 
+			printf("OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
+				u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
+		lastTraceUV = Vec2f(-1,-1);
+		lastTracePixelInterval=0;
+		return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+	}
+
+#else
 	Vec3f pr = hostToFrame_KRKi * Vec3f(u,v, 1);
 	Vec3f ptpMin = pr + hostToFrame_Kt*idepth_min;
 	float uMin = ptpMin[0] / ptpMin[2];
@@ -107,6 +130,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		lastTracePixelInterval=0;
 		return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 	}
+#endif
 
 	float dist;
 	float uMax;
@@ -115,9 +139,24 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	if(std::isfinite(idepth_max))
 	{
 		ptpMax = pr + hostToFrame_Kt*idepth_max;
+
+#ifndef PAL
+		Vec2f ptpMax2D = pal_model_g->world2cam(ptpMax);
+		uMax = ptpMax2D[0];
+		vMax = ptpMax2D[1];
+
+		if(!(pal_check_in_range_g(uMax, vMax, 5)))
+		{
+			if(debugPrint) 
+				printf("OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
+					u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
+			lastTraceUV = Vec2f(-1,-1);
+			lastTracePixelInterval=0;
+			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
+		}
+#else
 		uMax = ptpMax[0] / ptpMax[2];
 		vMax = ptpMax[1] / ptpMax[2];
-
 
 		if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
 		{
@@ -126,9 +165,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
+#endif
 
-
-
+		// TODO 该这里了
 		// ============== check their distance. everything below 2px is OK (-> skip). ===================
 		dist = (uMin-uMax)*(uMin-uMax) + (vMin-vMax)*(vMin-vMax);
 		dist = sqrtf(dist);

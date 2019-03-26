@@ -94,9 +94,12 @@ PALCamera::~PALCamera()
 }
 
 /// Project from pixels to world coordiantes. Returns a bearing vector of unit length.
-Vector3f
-PALCamera::cam2world(const double &x, const double &y) const
+Vector3f PALCamera::cam2world(double x, double y, int lvl) const
 {
+    int multi = (int)1 << lvl;
+    x = (x+0.5) * multi - 0.5; // 亚像素精度
+    y = (y+0.5) * multi - 0.5;  
+
     Vector3f xyz_f;
     double invdet = 1 / (c_ - d_ * e_); // 1/det(A), where A = [c,d;e,1] as in the Matlab file
 
@@ -126,14 +129,12 @@ PALCamera::cam2world(const double &x, const double &y) const
     return xyz_f;
 }
 
-Vector3f
-PALCamera::cam2world(const Vector2f &px) const
+Vector3f PALCamera::cam2world(const Vector2f &px, int lvl) const
 {
-    return cam2world(px[0], px[1]);
+    return cam2world(px[0], px[1], lvl);
 }
 
-Vector2f
-PALCamera::world2cam(const Vector3f &xyz_c) 
+Vector2f PALCamera::world2cam(const Vector3f &xyz_c, int lvl) 
 {
     Vector3f p_world = xyz_c;
     // 修改pal坐标系和针孔相机模型一致
@@ -171,6 +172,10 @@ PALCamera::world2cam(const Vector3f &xyz_c)
         px[0] = xc_;
         px[1] = yc_;
     }
+    
+    float multi = int(1)<<lvl;
+    px = px / multi;
+
     return px;
 }
 

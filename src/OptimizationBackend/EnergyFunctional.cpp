@@ -46,8 +46,10 @@ bool EFDeltaValid = false;
 void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 {
 
-	if(adHost != 0) delete[] adHost;
-	if(adTarget != 0) delete[] adTarget;
+	if(adHost != 0) 
+		delete[] adHost;
+	if(adTarget != 0) 
+		delete[] adTarget;
 	adHost = new Mat88[nFrames*nFrames];
 	adTarget = new Mat88[nFrames*nFrames];
 
@@ -426,6 +428,8 @@ EFResidual* EnergyFunctional::insertResidual(PointFrameResidual* r)
 	r->efResidual = efr;
 	return efr;
 }
+
+// 本函数没有用到Hcalib参数
 EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 {
 	EFFrame* eff = new EFFrame(fh);
@@ -446,10 +450,11 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 	EFAdjointsValid=false;
 	EFDeltaValid=false;
 
+	// TODO 看不懂
 	setAdjointsF(Hcalib);
 	makeIDX();
 
-
+	// 填充连接性表
 	for(EFFrame* fh2 : frames)
 	{
         connectivityMap[(((uint64_t)eff->frameID) << 32) + ((uint64_t)fh2->frameID)] = Eigen::Vector2i(0,0);
@@ -462,7 +467,10 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 EFPoint* EnergyFunctional::insertPoint(PointHessian* ph)
 {
 	EFPoint* efp = new EFPoint(ph, ph->host->efFrame);
+
+	// 初始化efp的idx
 	efp->idxInPoints = ph->host->efFrame->points.size();
+
 	ph->host->efFrame->points.push_back(efp);
 
 	nPoints++;
@@ -911,6 +919,8 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 
 
 }
+
+// 1. 重新整理idx  2. 把所有帧的所有点添加到allPoints中，并更新点的hostindex
 void EnergyFunctional::makeIDX()
 {
 	for(unsigned int idx=0;idx<frames.size();idx++)

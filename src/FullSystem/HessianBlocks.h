@@ -225,6 +225,7 @@ struct FrameHessian
 		initial_state[6] = aff_g2l.a;
 		initial_state[7] = aff_g2l.b;
 		this->worldToCam_evalPT = worldToCam_evalPT;
+
 		setStateScaled(initial_state);
 		setStateZero(this->get_state());
 	};
@@ -269,7 +270,8 @@ struct FrameHessian
 		{
 			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
 			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
-			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) p.head<6>().setZero();
+			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) 
+				p.head<6>().setZero();
 
 			p[6] = setting_initialAffAPrior;
 			p[7] = setting_initialAffBPrior;

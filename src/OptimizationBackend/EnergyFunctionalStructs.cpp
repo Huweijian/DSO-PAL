@@ -48,7 +48,7 @@ void EFResidual::takeDataF()
 	JpJdF.segment<2>(6) = J->JabJIdx*J->Jpdd;
 }
 
-
+// 从hession中获得一些数据
 void EFFrame::takeData()
 {
 	prior = data->getPrior().head<8>();

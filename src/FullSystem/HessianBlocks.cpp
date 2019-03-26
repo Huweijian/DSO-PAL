@@ -50,7 +50,7 @@ PointHessian::PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hc
 
 	my_type = rawPoint->my_type;
 
-	setIdepthScaled((rawPoint->idepth_max + rawPoint->idepth_min)*0.5);
+	setIdepthScaled((rawPoint->idepth_max + rawPoint->idepth_min)*0.5); //这句没用
 	setPointStatus(PointHessian::INACTIVE);
 
 	int n = patternNum;
@@ -206,7 +206,12 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 	PRE_tTll = (leftToLeft.translation()).cast<float>();
 	distanceLL = leftToLeft.translation().norm();
 
-
+// TODO: pal fix
+#ifdef PAL
+	PRE_KRKiTll = Mat33f::Identity();
+	PRE_RKiTll = Mat33f::Identity();
+	PRE_KtTll = Vec3f::Zero(); 
+#else
 	Mat33f K = Mat33f::Zero();
 	K(0,0) = HCalib->fxl();
 	K(1,1) = HCalib->fyl();
@@ -216,6 +221,7 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 	PRE_KRKiTll = K * PRE_RTll * K.inverse();
 	PRE_RKiTll = PRE_RTll * K.inverse();
 	PRE_KtTll = K * PRE_tTll;
+#endif
 
 
 	PRE_aff_mode = AffLight::fromToVecExposure(host->ab_exposure, target->ab_exposure, host->aff_g2l(), target->aff_g2l()).cast<float>();

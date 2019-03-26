@@ -38,25 +38,20 @@ public:
   ~PALCamera();
 
   /// Project from pixels to world coordiantes. Returns a bearing vector of unit length.
-  virtual Vector3f
-  cam2world(const double &x, const double &y) const;
+  virtual Vector3f cam2world(double x, double y, int lvl = 0) const;
 
   /// Project from pixels to world coordiantes. Returns a bearing vector of unit length.
-  virtual Vector3f
-  cam2world(const Vector2f &px) const;
+  virtual Vector3f cam2world(const Vector2f &px, int lvl =0) const;
 
-  virtual Vector2f
-  world2cam(const Vector3f &xyz_c);
+  virtual Vector2f world2cam(const Vector3f &xyz_c, int lvl = 0);
 
   /// projects unit plane coordinates to camera coordinates
   // virtual Vector2f
   // world2cam(const Vector2f &uv) const;
 
-  virtual double
-  errorMultiplier2() const;
+  virtual double errorMultiplier2() const;
 
-  virtual double
-  errorMultiplier() const;
+  virtual double errorMultiplier() const;
 
   /// Frame jacobian for projection of 3D point in (f)rame coordinate to
   /// unit plane coordinates uv (focal length = 1).

@@ -171,6 +171,7 @@ struct AffLight
 	// Affine Parameters:
 	double a,b;	// I_frame = exp(a)*I_global + b. // I_global = exp(-a)*(I_frame - b).
 
+	// 利用两帧的曝光和Aff系数 求 两个图像的光度变化关系
 	static Vec2 fromToVecExposure(float exposureF, float exposureT, AffLight g2F, AffLight g2T)
 	{
 		if(exposureF==0 || exposureT==0)

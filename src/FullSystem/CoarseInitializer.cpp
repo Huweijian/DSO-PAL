@@ -366,10 +366,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
 
+#ifndef PAL
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
+#endif
 
 	Accumulator11 E;
 	acc9.initialize();
@@ -416,21 +418,29 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 			// pattern点变换到新帧的相机坐标系下(u, v) -> (Ku, Kv)
 #ifdef PAL
-			Vec3f pt = R * pal_model_g->cam2world(point->u+dx, point->v+dy) + t*point->idepth_new;
-			pt = pt / pt[2];
-			pt = R * pt/point->idepth_new + t;
-			Vec2f p2_pal = pal_model_g->world2cam(pt);
-			float u = pt[0]/pt[2];
-			float v = pt[1]/pt[2];
-			float Ku = p2_pal[0];
+			Vec3f pt = R * pal_model_g->cam2world(point->u+dx, point->v+dy, lvl) + t*point->idepth_new;
+			Vec2f p2_pal = pal_model_g->world2cam(pt, lvl);
+			float u = pt[0]/pt[2];	// u v 归一化平面坐标
+			float v = pt[1]/pt[2];	
+			float Ku = p2_pal[0];	// Ku Kv 像素平面坐标
 			float Kv = p2_pal[1];
-			float new_idepth = 1.0f/pt[2];
+			float new_idepth = point->idepth_new/pt[2];
 			// 如果新的点出界或者深度异常，那么点设置为无效
 			if(!(pal_check_in_range_g(Ku, Kv, 2, lvl) && new_idepth > 0))
 			{
 				isGood = false;
+
+				// PAL debug output 
+				// printf("lvl %d point %d pattern %d fail \t", lvl, i, idx);
+				// if(new_idepth < 0)
+				// 	printf("idep = %f\n", new_idepth);
+				// else
+				// 	printf("[%d, %d] u=%.2f v=%.2f\n", wl, hl, Ku, Kv);
+
 				break;
 			}
+
+			// printf("  success\n");
 
 #else
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
@@ -486,8 +496,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 			auto dd_scalar = dr2dx2.transpose() * dx2dxyz * dxyzdd; 
 			dd[idx] = dd_scalar[0];
-			// TODO maxstep 
-			float maxstep = 1.0f;
+			// FIXME: possible bug
+			float maxstep = 1.0f/ dxyzdd.norm();
 
 #else
 			float dxInterp = hw*hitColor[1]*fxl;
@@ -520,7 +530,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			JbBuffer_new[i][7] += dp7[idx]*dd[idx];
 			JbBuffer_new[i][8] += r[idx]*dd[idx];
 			JbBuffer_new[i][9] += dd[idx]*dd[idx];
-		}
+		} //枚举一个点的所有pattern
 
 		// 如果跟踪点挂了，或者误差过大
 		if(!isGood || energy > point->outlierTH*20)
@@ -556,7 +566,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 					(float)dp0[i],(float)dp1[i],(float)dp2[i],(float)dp3[i],
 					(float)dp4[i],(float)dp5[i],(float)dp6[i],(float)dp7[i],
 					(float)r[i]);
-	}
+	} // 枚举所有点
 
 	E.finish();
 	acc9.finish();
@@ -583,8 +593,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 	}
 	EAlpha.finish();
 
+	// 这个Ealpha似乎没用，恒等于0，
 	// 计算alphaEnergy = alphaW * norm(t) * npts 
-	// 这个alpha能量似乎没卵用，只是一个用来表征当前估计的质量（位移越大，点数越多，质量越高）
+	// AlphaEnergy用来表征当前估计的质量（位移越大，点数越多，质量越高）
 	// 	等于位移乘以点数
 	float alphaEnergy = alphaW*(EAlpha.A + refToNew.translation().squaredNorm() * npts);
 
@@ -651,10 +662,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 	b_out[0] += tlog[0]*alphaOpt*npts;
 	b_out[1] += tlog[1]*alphaOpt*npts;
 	b_out[2] += tlog[2]*alphaOpt*npts;
-
-
-
-
 
 	return Vec3f(E.A, alphaEnergy ,E.num);
 }
@@ -892,7 +899,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	float densities[] = {0.03,0.05,0.15,0.5,1};
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
-#ifdef PAL
+#ifdef PAL //修改点的密度
 		int r0 = pal_model_g->mask_radius[0];
 		int r1 = pal_model_g->mask_radius[1];
 		densities[lvl] *= 3.14*(r1*r1 - r0*r0) / w[0]*h[0];
@@ -919,11 +926,11 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 				// 如果这个点被选中了
 				if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 				{
-				#ifdef PAL
+#ifdef PAL // 排除外部的点
 					if(!pal_check_in_range_g(x, y, patternPadding+1, lvl)){
 						continue;
 					}
-				#endif
+#endif
 					// 初始化这个点的信息
 					pl[nl].u = x+0.1;
 					pl[nl].v = y+0.1;
@@ -933,7 +940,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 					pl[nl].energy.setZero();
 					pl[nl].lastHessian=0;
 					pl[nl].lastHessian_new=0;
-					pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
+					pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl]; //高层金字塔，type=1,底层金字塔，type= 1 ?????
 					pl[nl].outlierTH = patternNum*setting_outlierTH;
 
 					Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];

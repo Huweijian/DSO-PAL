@@ -461,29 +461,33 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
 }
 
+// 让关键帧中的不成熟的点利用当前帧成熟起来
 void FullSystem::traceNewCoarse(FrameHessian* fh)
 {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	int trace_total=0, trace_good=0, trace_oob=0, trace_out=0, trace_skip=0, trace_badcondition=0, trace_uninitialized=0;
 
+#ifndef PAL
 	Mat33f K = Mat33f::Identity();
 	K(0,0) = Hcalib.fxl();
 	K(1,1) = Hcalib.fyl();
 	K(0,2) = Hcalib.cxl();
 	K(1,2) = Hcalib.cyl();
+#endif
 
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
-
+		// 当前帧到历史帧的位姿
 		SE3 hostToNew = fh->PRE_worldToCam * host->PRE_camToWorld;
 		Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
 		Vec3f Kt = K * hostToNew.translation().cast<float>();
-
 		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->aff_g2l(), fh->aff_g2l()).cast<float>();
 
+		// 枚举所有关键帧的所有未熟点
 		for(ImmaturePoint* ph : host->immaturePoints)
 		{
+			// 利用fh的信息提高ph的精度
 			ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false );
 
 			if(ph->lastTraceStatus==ImmaturePointStatus::IPS_GOOD) trace_good++;
@@ -906,6 +910,7 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 
 	if(linearizeOperation)
 	{
+		// 判断要不要单步运行
 		if(goStepByStep && lastRefStopID != coarseTracker->refFrameID)
 		{
 			MinimalImageF3 img(wG[0], hG[0], fh->dI);
@@ -918,12 +923,13 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 			}
 			lastRefStopID = coarseTracker->refFrameID;
 		}
-		else handleKey( IOWrap::waitKey(1) );
+		else 
+			handleKey( IOWrap::waitKey(1) );
 
-
-
-		if(needKF) makeKeyFrame(fh);
-		else makeNonKeyFrame(fh);
+		if(needKF) 
+			makeKeyFrame(fh);
+		else 
+			makeNonKeyFrame(fh);
 	}
 	else
 	{
@@ -1037,13 +1043,16 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 	delete fh;
 }
 
+// fh 当前帧
 void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
 	// needs to be set by mapping thread
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
+		//更新当前帧的全局位姿
 		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
+		// TODO: 看不懂
 		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 	}
 
@@ -1200,22 +1209,21 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// add firstframe.
+	// 添加第一帧到ef中
 	FrameHessian* firstFrame = coarseInitializer->firstFrame;
 	firstFrame->idx = frameHessians.size();
 	frameHessians.push_back(firstFrame);
 	firstFrame->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(firstFrame->shell);
 	ef->insertFrame(firstFrame, &Hcalib);
-	setPrecalcValues();
+	setPrecalcValues(); //提前设置一些值(旋转乘以K等)
 
-	//int numPointsTotal = makePixelStatus(firstFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
-	//int numPointsTotal = pixelSelector->makeMaps(firstFrame->dIp, selectionMap,setting_desiredDensity);
-
+	// 预留总点数的20%的空间
 	firstFrame->pointHessians.reserve(wG[0]*hG[0]*0.2f);
 	firstFrame->pointHessiansMarginalized.reserve(wG[0]*hG[0]*0.2f);
 	firstFrame->pointHessiansOut.reserve(wG[0]*hG[0]*0.2f);
 
-
+	// 累加金字塔顶层的反深度，计算归一化稀疏
 	float sumID=1e-5, numID=1e-5;
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
@@ -1225,38 +1233,47 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	float rescaleFactor = 1 / (sumID / numID);
 
 	// randomly sub-select the points I need.
+	// 随机选一些点初始化
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];
-
     if(!setting_debugout_runquiet)
         printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100*keepPercentage,
                 (int)(setting_desiredPointDensity), coarseInitializer->numPoints[0] );
 
+	// 枚举每个点
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
-		if(rand()/(float)RAND_MAX > keepPercentage) continue;
+		// 运气不好 拜拜
+		if(rand()/(float)RAND_MAX > keepPercentage) 
+			continue;
 
+		// 运气还行，初始化点海森
+
+		// 尝试初始化未熟点
 		Pnt* point = coarseInitializer->points[0]+i;
-		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f,point->v+0.5f,firstFrame,point->my_type, &Hcalib);
+		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f, point->v+0.5f, firstFrame, point->my_type, &Hcalib);
+		if(!std::isfinite(pt->energyTH)) 
+			{ delete pt; continue; }
 
-		if(!std::isfinite(pt->energyTH)) { delete pt; continue; }
 
-
+		// 尝试初始化点海森
 		pt->idepth_max=pt->idepth_min=1;
 		PointHessian* ph = new PointHessian(pt, &Hcalib);
+		// 蛤？ 直接诶删掉未熟点？
 		delete pt;
 		if(!std::isfinite(ph->energyTH)) {delete ph; continue;}
 
+		// 设置点海森，激活
 		ph->setIdepthScaled(point->iR*rescaleFactor);
 		ph->setIdepthZero(ph->idepth);
 		ph->hasDepthPrior=true;
 		ph->setPointStatus(PointHessian::ACTIVE);
 
+		// 点海森添加到帧海森中
 		firstFrame->pointHessians.push_back(ph);
 		ef->insertPoint(ph);
 	}
 
-
-
+	// 位移缩放
 	SE3 firstToNew = coarseInitializer->thisToNext;
 	firstToNew.translation() /= rescaleFactor;
 
@@ -1310,12 +1327,15 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 }
 
 
-
+// 任意两个相邻帧之间设置预计算（和相机参数相关）
 void FullSystem::setPrecalcValues()
 {
+
+	// fh 枚举帧
 	for(FrameHessian* fh : frameHessians)
 	{
 		fh->targetPrecalc.resize(frameHessians.size());
+		// 再次枚举帧
 		for(unsigned int i=0;i<frameHessians.size();i++)
 			fh->targetPrecalc[i].set(fh, frameHessians[i], &Hcalib);
 	}
