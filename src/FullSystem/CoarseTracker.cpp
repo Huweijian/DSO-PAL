@@ -36,6 +36,7 @@
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 #include "IOWrapper/ImageRW.h"
 #include <algorithm>
+#include "util/pal_interface.h"
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
 #include "SSE2NEON.h"
@@ -865,11 +866,12 @@ CoarseDistanceMap::~CoarseDistanceMap()
 
 
 
-
+//把关键帧的点投影到当前帧，计算距离图
 void CoarseDistanceMap::makeDistanceMap(
 		std::vector<FrameHessian*> frameHessians,
 		FrameHessian* frame)
 {
+	//!! 第1层金字塔
 	int w1 = w[1];
 	int h1 = h[1];
 	int wh1 = w1*h1;
@@ -880,21 +882,35 @@ void CoarseDistanceMap::makeDistanceMap(
 	// make coarse tracking templates for latstRef.
 	int numItems = 0;
 
+	// 枚举所有除了frame的帧
 	for(FrameHessian* fh : frameHessians)
 	{
-		if(frame == fh) continue;
+		if(frame == fh) 
+			continue;
 
+		// 获取位姿
 		SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_camToWorld;
 		Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
 		Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
 
+		// 把所有老帧上的点投影到frame上
 		for(PointHessian* ph : fh->pointHessians)
 		{
 			assert(ph->status == PointHessian::ACTIVE);
+#ifndef PAL
+			Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
+			Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
+			int u = ptp_pal2D[0];
+			int v = ptp_pal2D[1];
+			if(!pal_check_in_range_g(u, v, 0, 1))
+				continue;
+#else
 			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
 			int u = ptp[0] / ptp[2] + 0.5f;
 			int v = ptp[1] / ptp[2] + 0.5f;
-			if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) continue;
+			if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
+				continue;
+#endif
 			fwdWarpedIDDistFinal[u+w1*v]=0;
 			bfsList1[numItems] = Eigen::Vector2i(u,v);
 			numItems++;
@@ -913,7 +929,7 @@ void CoarseDistanceMap::makeInlierVotes(std::vector<FrameHessian*> frameHessians
 }
 
 
-
+// 利用BFS计算所有点到最近的有深度点的距离
 void CoarseDistanceMap::growDistBFS(int bfsNum)
 {
 	assert(w[0] != 0);
@@ -930,7 +946,8 @@ void CoarseDistanceMap::growDistBFS(int bfsNum)
 			{
 				int x = bfsList2[i][0];
 				int y = bfsList2[i][1];
-				if(x==0 || y== 0 || x==w1-1 || y==h1-1) continue;
+				if(x==0 || y== 0 || x==w1-1 || y==h1-1) 
+					continue;
 				int idx = x + y * w1;
 
 				if(fwdWarpedIDDistFinal[idx+1] > k)
@@ -961,7 +978,8 @@ void CoarseDistanceMap::growDistBFS(int bfsNum)
 			{
 				int x = bfsList2[i][0];
 				int y = bfsList2[i][1];
-				if(x==0 || y== 0 || x==w1-1 || y==h1-1) continue;
+				if(x==0 || y== 0 || x==w1-1 || y==h1-1) 
+					continue;
 				int idx = x + y * w1;
 
 				if(fwdWarpedIDDistFinal[idx+1] > k)
@@ -1010,10 +1028,11 @@ void CoarseDistanceMap::growDistBFS(int bfsNum)
 	}
 }
 
-
+// 在距离图中添加一个新的点
 void CoarseDistanceMap::addIntoDistFinal(int u, int v)
 {
-	if(w[0] == 0) return;
+	if(w[0] == 0) 
+		return;
 	bfsList1[0] = Eigen::Vector2i(u,v);
 	fwdWarpedIDDistFinal[u+w[1]*v] = 0;
 	growDistBFS(1);

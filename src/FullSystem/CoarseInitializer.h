@@ -72,7 +72,7 @@ public:
 	int neighbours[10];
 	float neighboursDist[10];
 
-	float my_type;
+	float my_type; //第n轮选中的点
 	float outlierTH;
 };
 

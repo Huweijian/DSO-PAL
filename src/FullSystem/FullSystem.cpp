@@ -54,7 +54,7 @@
 #include "IOWrapper/ImageDisplay.h"
 
 #include "util/ImageAndExposure.h"
-
+#include "util/pal_interface.h"
 #include <cmath>
 
 namespace dso
@@ -461,15 +461,15 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
 }
 
-// 让关键帧中的不成熟的点利用当前帧成熟起来
+// 新帧和所有关键帧的未成熟点进行极线匹配，
 void FullSystem::traceNewCoarse(FrameHessian* fh)
 {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	int trace_total=0, trace_good=0, trace_oob=0, trace_out=0, trace_skip=0, trace_badcondition=0, trace_uninitialized=0;
 
-#ifndef PAL
 	Mat33f K = Mat33f::Identity();
+#ifndef PAL
 	K(0,0) = Hcalib.fxl();
 	K(1,1) = Hcalib.fyl();
 	K(0,2) = Hcalib.cxl();
@@ -511,25 +511,27 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 
 
 
-
+// 激活未熟点
 void FullSystem::activatePointsMT_Reductor(
-		std::vector<PointHessian*>* optimized,
+		std::vector<PointHessian*>* optimized, 
 		std::vector<ImmaturePoint*>* toOptimize,
 		int min, int max, Vec10* stats, int tid)
 {
 	ImmaturePointTemporaryResidual* tr = new ImmaturePointTemporaryResidual[frameHessians.size()];
 	for(int k=min;k<max;k++)
 	{
+		//尝试对第k个点进行激活
 		(*optimized)[k] = optimizeImmaturePoint((*toOptimize)[k],1,tr);
 	}
 	delete[] tr;
 }
 
 
-
+// 多线程激活
 void FullSystem::activatePointsMT()
 {
 
+	// 点数不足或者过多，就适当减小MinActDist
 	if(ef->nPoints < setting_desiredPointDensity*0.66)
 		currentMinActDist -= 0.8;
 	if(ef->nPoints < setting_desiredPointDensity*0.8)
@@ -556,26 +558,26 @@ void FullSystem::activatePointsMT()
                 currentMinActDist, (int)(setting_desiredPointDensity), ef->nPoints);
 
 
-
+	// 取出最新的帧
 	FrameHessian* newestHs = frameHessians.back();
 
 	// make dist map.
+	// 建立距离图（到成熟点的距离）
 	coarseDistanceMap->makeK(&Hcalib);
 	coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
 
-	//coarseTracker->debugPlotDistMap("distMap");
+	std::vector<ImmaturePoint*> toOptimize; 
+	toOptimize.reserve(20000);
 
-	std::vector<ImmaturePoint*> toOptimize; toOptimize.reserve(20000);
-
-
+	//枚举老帧上的未熟点， 如果这些未熟点还行，并且投影到老帧上距离其他成熟点较远，那么加入toOptimize队列，准备优化
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
-		if(host == newestHs) continue;
+		if(host == newestHs) 
+			continue;
 
 		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
 		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
-
 
 		for(unsigned int i=0;i<host->immaturePoints.size();i+=1)
 		{
@@ -585,13 +587,13 @@ void FullSystem::activatePointsMT()
 			// delete points that have never been traced successfully, or that are outlier on the last trace.
 			if(!std::isfinite(ph->idepth_max) || ph->lastTraceStatus == IPS_OUTLIER)
 			{
-//				immature_invalid_deleted++;
 				// remove point.
 				delete ph;
 				host->immaturePoints[i]=0;
 				continue;
 			}
 
+			//激活未熟点的条件：上次跟踪还行 & 上次跟踪极线误差较小 & 上次跟踪质量还行（最佳匹配/二佳匹配）& 上次跟踪大于零
 			// can activate only if this is true.
 			bool canActivate = (ph->lastTraceStatus == IPS_GOOD
 					|| ph->lastTraceStatus == IPS_SKIPPED
@@ -618,17 +620,31 @@ void FullSystem::activatePointsMT()
 
 
 			// see if we need to activate point due to distance map.
+			// 未成熟点投影到某一老关键帧上
+#ifdef PAL
+			Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
+			Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal);
+			int u = ptp_pal2D[0];
+			int v = ptp_pal2D[1];
+			if(pal_check_in_range_g(u, v, 0, 1))
+#else
 			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
 			int u = ptp[0] / ptp[2] + 0.5f;
 			int v = ptp[1] / ptp[2] + 0.5f;
 
 			if((u > 0 && v > 0 && u < wG[1] && v < hG[1]))
+#endif
 			{
 
+				// 距离附近成熟点的距离
 				float dist = coarseDistanceMap->fwdWarpedIDDistFinal[u+wG[1]*v] + (ptp[0]-floorf((float)(ptp[0])));
 
-				if(dist>=currentMinActDist* ph->my_type)
+				// type是点在被选择时候的顺序，分别为1 2 4 
+				// currentMinActDist 是和点的数目相关的变量，初始等于2, 点数越少，变量越小
+				// dist 是当前点uv投影到老帧之后 到最近特征点的距离，如果这个距离比较大，
+				if(dist >= currentMinActDist * ph->my_type)
 				{
+					// 扩展距离图
 					coarseDistanceMap->addIntoDistFinal(u,v);
 					toOptimize.push_back(ph);
 				}
@@ -645,11 +661,11 @@ void FullSystem::activatePointsMT()
 //	printf("ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, marg-skip %d)\n",
 //			(int)toOptimize.size(), immature_deleted, immature_notReady, immature_needMarg, immature_want, immature_margskip);
 
-	std::vector<PointHessian*> optimized; optimized.resize(toOptimize.size());
+	std::vector<PointHessian*> optimized; 
+	optimized.resize(toOptimize.size());
 
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&FullSystem::activatePointsMT_Reductor, this, &optimized, &toOptimize, _1, _2, _3, _4), 0, toOptimize.size(), 50);
-
 	else
 		activatePointsMT_Reductor(&optimized, &toOptimize, 0, toOptimize.size(), 0, 0);
 
@@ -840,9 +856,9 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if SNAPPED
 		{
 
-			initializeFromInitializer(fh);
+			initializeFromInitializer(fh); //初始第一帧加入fh
 			lock.unlock();
-			deliverTrackedFrame(fh, true);
+			deliverTrackedFrame(fh, true); //当前帧也加入fh
 		}
 		// track失败，丢弃帧
 		else
@@ -1061,10 +1077,12 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// =========================== Flag Frames to be Marginalized. =========================
+	// 标记要Mag掉的帧
 	flagFramesForMarginalization(fh);
 
 
 	// =========================== add New Frame to Hessian Struct. =========================
+	// 添加初始化的最后一帧到fh
 	fh->idx = frameHessians.size();
 	frameHessians.push_back(fh);
 	fh->frameID = allKeyFramesHistory.size();
@@ -1073,13 +1091,14 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	setPrecalcValues();
 
-
-
 	// =========================== add new residuals for old points =========================
 	int numFwdResAdde=0;
+	// 枚举所有老帧
 	for(FrameHessian* fh1 : frameHessians)		// go through all active frames
 	{
-		if(fh1 == fh) continue;
+		if(fh1 == fh) 
+			continue;
+		// 枚举老帧的所有点, 新建老点和新帧的残差，并加入到ef
 		for(PointHessian* ph : fh1->pointHessians)
 		{
 			PointFrameResidual* r = new PointFrameResidual(ph, fh1, fh);
@@ -1093,14 +1112,9 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	}
 
 
-
-
 	// =========================== Activate Points (& flag for marginalization). =========================
 	activatePointsMT();
-	ef->makeIDX();
-
-
-
+	ef->makeIDX() ;
 
 	// =========================== OPTIMIZE ALL =========================
 
@@ -1133,7 +1147,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 
-    if(isLost) return;
+    if(isLost) 
+		return;
 
 
 
@@ -1340,6 +1355,7 @@ void FullSystem::setPrecalcValues()
 			fh->targetPrecalc[i].set(fh, frameHessians[i], &Hcalib);
 	}
 
+	// TODO: 看不懂
 	ef->setDeltaF(&Hcalib);
 }
 

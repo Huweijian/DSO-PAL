@@ -93,7 +93,7 @@ PALCamera::~PALCamera()
 {
 }
 
-/// Project from pixels to world coordiantes. Returns a bearing vector of unit length.
+/// Project from pixels to world coordiantes. Returns a bearing vector on z=1.
 Vector3f PALCamera::cam2world(double x, double y, int lvl) const
 {
     int multi = (int)1 << lvl;
@@ -118,7 +118,10 @@ Vector3f PALCamera::cam2world(double x, double y, int lvl) const
     }
 
     //normalize to unit norm
-    double invnorm = 1 / sqrt(xp * xp + yp * yp + zp * zp);
+    // double invnorm = 1 / sqrt(xp * xp + yp * yp + zp * zp);
+
+    //normalize to z=1;
+    double invnorm = 1 / abs(zp);
 
     xyz_f[0] = invnorm * xp;
     xyz_f[1] = invnorm * yp;

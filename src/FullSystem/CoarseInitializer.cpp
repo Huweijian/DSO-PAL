@@ -279,7 +279,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	}
 	// 输出深度图
     debugPlot(0,wraps);
-	cv::waitKey();
+	cv::waitKey(1000);
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;

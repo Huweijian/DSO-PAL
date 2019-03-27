@@ -169,14 +169,14 @@ EnergyFunctional::~EnergyFunctional()
 
 
 
-
 void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 {
-	if(adHTdeltaF != 0) delete[] adHTdeltaF;
+	if(adHTdeltaF != 0) 
+		delete[] adHTdeltaF;
 	adHTdeltaF = new Mat18f[nFrames*nFrames];
+
 	for(int h=0;h<nFrames;h++)
-		for(int t=0;t<nFrames;t++)
-		{
+		for(int t=0;t<nFrames;t++){
 			int idx = h+t*nFrames;
 			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adHostF[idx]
 					        +frames[t]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adTargetF[idx];

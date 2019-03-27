@@ -47,12 +47,13 @@ namespace dso
 {
 
 
-
+// 尝试优化未熟点point，优化成功返回ph，否则返回0
 PointHessian* FullSystem::optimizeImmaturePoint(
 		ImmaturePoint* point, int minObs,
 		ImmaturePointTemporaryResidual* residuals)
 {
 	int nres = 0;
+	// 枚举关键帧，初始化关键帧到当前未熟点的残差对象
 	for(FrameHessian* fh : frameHessians)
 	{
 		if(fh != point->host)
@@ -71,13 +72,10 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	float lastEnergy = 0;
 	float lastHdd=0;
 	float lastbd=0;
-	float currentIdepth=(point->idepth_max+point->idepth_min)*0.5f;
+	float currentIdepth = (point->idepth_max+point->idepth_min)*0.5f;
 
 
-
-
-
-
+	// TODO: 看到这里了
 	for(int i=0;i<nres;i++)
 	{
 		lastEnergy += point->linearizeResidual(&Hcalib, 1000, residuals+i,lastHdd, lastbd, currentIdepth);

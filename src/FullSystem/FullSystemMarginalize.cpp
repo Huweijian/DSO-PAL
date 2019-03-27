@@ -54,11 +54,15 @@ namespace dso
 {
 
 
-
+// newFH（变量没用）
+// 从FH中标记需要边缘化的
 void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 {
+	// TODO: 没看懂 不知道什么时候会发生， 加一个断言把
 	if(setting_minFrameAge > setting_maxFrames)
 	{
+		printf("hwj strange things happens ^_^\n");
+		assert(0);
 		for(int i=setting_maxFrames;i<(int)frameHessians.size();i++)
 		{
 			FrameHessian* fh = frameHessians[i-setting_maxFrames];
@@ -68,19 +72,20 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 	}
 
 
-	int flagged = 0;
 	// marginalize all frames that have not enough points.
+	int flagged = 0;
+	// 枚举所有FH，标记需要删除的（老帧优先）
 	for(int i=0;i<(int)frameHessians.size();i++)
 	{
 		FrameHessian* fh = frameHessians[i];
 		int in = fh->pointHessians.size() + fh->immaturePoints.size();
 		int out = fh->pointHessiansMarginalized.size() + fh->pointHessiansOut.size();
 
-
+		// FH中最后一帧到当前fh的亮度变化
 		Vec2 refToFh=AffLight::fromToVecExposure(frameHessians.back()->ab_exposure, fh->ab_exposure,
 				frameHessians.back()->aff_g2l(), fh->aff_g2l());
 
-
+		// （ 如果有效的点太少 || 亮度差太大 ） && （也不能删太多FH，还得保留一点）
 		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow)
 				&& ((int)frameHessians.size())-flagged > setting_minFrames)
 		{
@@ -105,28 +110,35 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 	}
 
 	// marginalize one.
+	// 如果现在FH中帧数过多
 	if((int)frameHessians.size()-flagged >= setting_maxFrames)
 	{
 		double smallestScore = 1;
 		FrameHessian* toMarginalize=0;
 		FrameHessian* latest = frameHessians.back();
 
-
+		// 枚举所有帧
 		for(FrameHessian* fh : frameHessians)
 		{
-			if(fh->frameID > latest->frameID-setting_minFrameAge || fh->frameID == 0) continue;
-			//if(fh==frameHessians.front() == 0) continue;
+			// 如果当前帧和最新帧比 还不算太老，或者当前帧是首帧，那么继续
+			if(fh->frameID > latest->frameID-setting_minFrameAge || fh->frameID == 0) 
+				continue;
 
 			double distScore = 0;
+			
+			// 枚举和当前帧相关的其他帧
 			for(FrameFramePrecalc &ffh : fh->targetPrecalc)
 			{
-				if(ffh.target->frameID > latest->frameID-setting_minFrameAge+1 || ffh.target == ffh.host) continue;
+				// 如果其他帧和最新帧还新，或者 ？？？ 就不管了
+				if(ffh.target->frameID > latest->frameID-setting_minFrameAge+1 || ffh.target == ffh.host) 
+					continue;
+				// 否则距离分增加
 				distScore += 1/(1e-5+ffh.distanceLL);
 
 			}
 			distScore *= -sqrtf(fh->targetPrecalc.back().distanceLL);
 
-
+			// 找出距离得分最小的，mar掉
 			if(distScore < smallestScore)
 			{
 				smallestScore = distScore;
