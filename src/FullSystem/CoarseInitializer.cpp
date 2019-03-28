@@ -479,13 +479,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float dxdd = (t[0]-t[2]*u)/pt[2]; // \rho_2 / \rho1 * (tx - u'_2 * tz)
 			float dydd = (t[1]-t[2]*v)/pt[2]; // \rho_2 / \rho1 * (ty - v'_2 * tz)
 #ifdef PAL
-			dxdd = dxdd * point->idepth_new;
-			dydd = dydd * point->idepth_new;
-			Vec2f dr2dx2(hitColor[1]*hw, hitColor[2]*hw);
+			Vec2f dr2duv2(hitColor[1]*hw, hitColor[2]*hw);
 			Eigen::Matrix<float, 2, 6> dx2dSE;
-			Eigen::Matrix<float, 2, 3> dx2dxyz;
-			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, dx2dxyz);
-			Vec6f dr2dSE = dr2dx2.transpose() * dx2dSE;	
+			Eigen::Matrix<float, 2, 3> duv2dxyz;
+			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+			Vec6f dr2dSE = dr2duv2.transpose() * dx2dSE;	
 			dp0[idx] = dr2dSE[0];
 			dp1[idx] = dr2dSE[1];
 			dp2[idx] = dr2dSE[2];
@@ -494,7 +492,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			dp5[idx] = dr2dSE[5];
 			Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
 
-			auto dd_scalar = dr2dx2.transpose() * dx2dxyz * dxyzdd; 
+			auto dd_scalar = dr2duv2.transpose() * duv2dxyz * dxyzdd; 
 			dd[idx] = dd_scalar[0];
 			// FIXME: possible bug
 			float maxstep = 1.0f/ dxyzdd.norm();

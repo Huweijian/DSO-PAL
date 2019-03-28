@@ -527,7 +527,10 @@ void FullSystem::activatePointsMT_Reductor(
 }
 
 
-// 多线程激活
+// 多线程激活未熟点
+// 1. 根据距离图选择要激活的未熟点
+// 2. 尝试多线程激活(投影到所有关键帧，计算残差，如果残差还行的话 再进一步优化反深度，最终成熟)
+// 3. 删除激活失败的未熟点
 void FullSystem::activatePointsMT()
 {
 
@@ -661,6 +664,7 @@ void FullSystem::activatePointsMT()
 //	printf("ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, marg-skip %d)\n",
 //			(int)toOptimize.size(), immature_deleted, immature_notReady, immature_needMarg, immature_want, immature_margskip);
 
+	// 开始多线程激活未熟点
 	std::vector<PointHessian*> optimized; 
 	optimized.resize(toOptimize.size());
 
@@ -675,14 +679,18 @@ void FullSystem::activatePointsMT()
 		PointHessian* newpoint = optimized[k];
 		ImmaturePoint* ph = toOptimize[k];
 
+		// 如果点已经激活成功，ph被成功初始化
 		if(newpoint != 0 && newpoint != (PointHessian*)((long)(-1)))
 		{
+			// 你已经长大了，从未熟点队列移出，转移到ph队列中
 			newpoint->host->immaturePoints[ph->idxInImmaturePoints]=0;
 			newpoint->host->pointHessians.push_back(newpoint);
+			// 插入ef
 			ef->insertPoint(newpoint);
 			for(PointFrameResidual* r : newpoint->residuals)
 				ef->insertResidual(r);
 			assert(newpoint->efPoint != 0);
+			// 彻底摆脱不熟的自己
 			delete ph;
 		}
 		else if(newpoint == (PointHessian*)((long)(-1)) || ph->lastTraceStatus==IPS_OOB)
@@ -697,6 +705,7 @@ void FullSystem::activatePointsMT()
 	}
 
 
+	// 排除帧中的所有处理过的未熟点
 	for(FrameHessian* host : frameHessians)
 	{
 		for(int i=0;i<(int)host->immaturePoints.size();i++)
@@ -709,8 +718,6 @@ void FullSystem::activatePointsMT()
 			}
 		}
 	}
-
-
 }
 
 
@@ -1120,8 +1127,6 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	fh->frameEnergyTH = frameHessians.back()->frameEnergyTH;
 	float rmse = optimize(setting_maxOptIterations);
-
-
 
 
 

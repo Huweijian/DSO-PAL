@@ -74,15 +74,16 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	float lastbd=0;
 	float currentIdepth = (point->idepth_max+point->idepth_min)*0.5f;
 
-
-	// TODO: 看到这里了
+	// 计算点投影到每一帧之后的误差和雅克比，并累计总能量
 	for(int i=0;i<nres;i++)
 	{
 		lastEnergy += point->linearizeResidual(&Hcalib, 1000, residuals+i,lastHdd, lastbd, currentIdepth);
+		// 更新残差状态
 		residuals[i].state_state = residuals[i].state_NewState;
 		residuals[i].state_energy = residuals[i].state_NewEnergy;
 	}
 
+	// 如果总能量炸了，或者Hdd不足(??? Hdd什么意思)，成熟失败 gg
 	if(!std::isfinite(lastEnergy) || lastHdd < setting_minIdepthH_act)
 	{
 		if(print)
@@ -91,15 +92,20 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 		return 0;
 	}
 
-	if(print) printf("Activate point. %d residuals. H=%f. Initial Energy: %f. Initial Id=%f\n" ,
+	// 你成熟了！
+	if(print) 
+		printf("Activate point. %d residuals. H=%f. Initial Energy: %f. Initial Id=%f\n" ,
 			nres, lastHdd,lastEnergy,currentIdepth);
 
+	// 优化深度
 	float lambda = 0.1;
 	for(int iteration=0;iteration<setting_GNItsOnPointActivation;iteration++)
 	{
 		float H = lastHdd;
 		H *= 1+lambda;
+		// idepth前进步长
 		float step = (1.0/H) * lastbd;
+		// 应用步长
 		float newIdepth = currentIdepth - step;
 
 		float newHdd=0; float newbd=0; float newEnergy=0;
@@ -122,6 +128,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 				"",
 				lastEnergy, newEnergy, newIdepth);
 
+		// 前进成功
 		if(newEnergy < lastEnergy)
 		{
 			currentIdepth = newIdepth;
@@ -145,28 +152,35 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			break;
 	}
 
+	// 重大bug反馈
 	if(!std::isfinite(currentIdepth))
 	{
 		printf("MAJOR ERROR! point idepth is nan after initialization (%f).\n", currentIdepth);
 		return (PointHessian*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
-
+	// 统计成熟一个点产生了几个有效的残差
 	int numGoodRes=0;
 	for(int i=0;i<nres;i++)
-		if(residuals[i].state_state == ResState::IN) numGoodRes++;
+		if(residuals[i].state_state == ResState::IN) 
+			numGoodRes++;
 
+	// 有效残差数目不足,可惜了,gg
 	if(numGoodRes < minObs)
 	{
-		if(print) printf("OptPoint: OUTLIER!\n");
+		if(print) 
+			printf("OptPoint: OUTLIER!\n"); 
 		return (PointHessian*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
-
-
+	// 你已经几乎是一个成熟的点了	
 	PointHessian* p = new PointHessian(point, &Hcalib);
-	if(!std::isfinite(p->energyTH)) {delete p; return (PointHessian*)((long)(-1));}
+	if(!std::isfinite(p->energyTH)){
+		delete p; 
+		return (PointHessian*)((long)(-1));
+	}
 
+	// 初始化一堆成熟点应有的样子
 	p->lastResiduals[0].first = 0;
 	p->lastResiduals[0].second = ResState::OOB;
 	p->lastResiduals[1].first = 0;
@@ -175,6 +189,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	p->setIdepth(currentIdepth);
 	p->setPointStatus(PointHessian::ACTIVE);
 
+	// 初始化点帧残差
 	for(int i=0;i<nres;i++)
 		if(residuals[i].state_state == ResState::IN)
 		{
@@ -182,6 +197,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			r->state_NewEnergy = r->state_energy = 0;
 			r->state_NewState = ResState::OUTLIER;
 			r->setState(ResState::IN);
+			// 残差加入点的队列
 			p->residuals.push_back(r);
 
 			if(r->target == frameHessians.back())
@@ -196,7 +212,9 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			}
 		}
 
-	if(print) printf("point activated!\n");
+	// 成熟宣言
+	if(print) 
+		printf("point activated!\n");
 
 	statistics_numActivatedPoints++;
 	return p;

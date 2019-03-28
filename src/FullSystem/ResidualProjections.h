@@ -28,6 +28,7 @@
 #include "FullSystem/FullSystem.h"
 #include "FullSystem/HessianBlocks.h"
 #include "util/settings.h"
+#include "util/pal_interface.h"
 
 namespace dso
 {
@@ -42,6 +43,23 @@ EIGEN_STRONG_INLINE float derive_idepth(
 			+ dyInterp*drescale * (t[1]-t[2]*v))*SCALE_IDEPTH;
 }
 
+EIGEN_STRONG_INLINE float derive_idepth_pal(
+		const Vec3f &t, 
+		const float &u, const float &v, const float idepth,
+		const float &gx,const float &gy, 
+		const float &drescale)
+{
+	Vec3f pt = pal_model_g->cam2world(u, v)/idepth;
+	Eigen::Matrix<float, 2, 3> duvdxyz;
+	Eigen::Matrix<float, 2, 6> duvdSE;
+	pal_model_g->jacobian_xyz2uv(pt, duvdSE, duvdxyz);
+
+	Vec3f dxyzdd = Vec3f((t[0]-t[2]*u)*SCALE_IDEPTH, (t[1]-t[2]*v)*SCALE_IDEPTH, 0);
+
+	auto dd_scalar= Vec2f(gx, gy).transpose() * duvdxyz * dxyzdd; 	
+
+	return dd_scalar[0] * drescale;
+}
 
 
 EIGEN_STRONG_INLINE bool projectPoint(
@@ -57,36 +75,60 @@ EIGEN_STRONG_INLINE bool projectPoint(
 }
 
 
-
+// 把点投影到零一帧，并判断是否在图像内
 EIGEN_STRONG_INLINE bool projectPoint(
 		const float &u_pt,const float &v_pt,
 		const float &idepth,
 		const int &dx, const int &dy,
 		CalibHessian* const &HCalib,
 		const Mat33f &R, const Vec3f &t,
+		// ---------以下为返回值-----------
 		float &drescale, float &u, float &v,
 		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)
 {
+#ifdef PAL
+	Vec3f P1 = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
+	Vec3f P2 = R * p1 + t;
+	new_idepth = 1.0 / P2[2];
+	drescale = new_idepth / idepth;
+	
+	// TODO: uv 可能有问题
+	u = P2[0] * drescale;
+	v = P2[1] * drescale;
+	Vec2f KP2 = pal_model_g->world2cam(P2);
+	Ku = KP2[0];
+	Kv = KP2[1];
+
+	return pal_check_in_range_g(Ku, Kv, 2);
+
+#else
+	// K*P
 	KliP = Vec3f(
 			(u_pt+dx-HCalib->cxl())*HCalib->fxli(),
 			(v_pt+dy-HCalib->cyl())*HCalib->fyli(),
 			1);
 
+	// RKP + t/d
 	Vec3f ptp = R * KliP + t*idepth;
+	
+	// ptp[2] = d2/d1
+	// drescale = d1/d2 = id2/id1;
 	drescale = 1.0f/ptp[2];
 	new_idepth = idepth*drescale;
 
-	if(!(drescale>0)) return false;
+	if(!(drescale>0)) 
+		return false;
 
+	// 按照深度缩放后再投影到图像上
 	u = ptp[0] * drescale;
 	v = ptp[1] * drescale;
 	Ku = u*HCalib->fxl() + HCalib->cxl();
 	Kv = v*HCalib->fyl() + HCalib->cyl();
 
+	// 返回投影后的点是否在图像内
 	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+#endif
 }
-
-
 
 
 }

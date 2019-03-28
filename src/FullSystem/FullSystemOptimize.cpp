@@ -139,6 +139,8 @@ void FullSystem::setNewFrameEnergyTH()
 //			meanElement, nthElement, sqrtf(newFrame->frameEnergyTH),
 //			good, bad);
 }
+
+// 线性化
 Vec3 FullSystem::linearizeAll(bool fixLinearization)
 {
 	double lastEnergyP = 0;
@@ -147,7 +149,8 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 
 
 	std::vector<PointFrameResidual*> toRemove[NUM_THREADS];
-	for(int i=0;i<NUM_THREADS;i++) toRemove[i].clear();
+	for(int i=0;i<NUM_THREADS;i++) 
+		toRemove[i].clear();
 
 	if(multiThreading)
 	{
@@ -407,22 +410,17 @@ void FullSystem::printOptRes(const Vec3 &res, double resL, double resM, double r
 
 float FullSystem::optimize(int mnumOptIts)
 {
-
 	if(frameHessians.size() < 2) return 0;
 	if(frameHessians.size() < 3) mnumOptIts = 20;
 	if(frameHessians.size() < 4) mnumOptIts = 15;
 
-
-
-
-
-
 	// get statistics and active residuals.
 
+	// 添加残差项到队列
 	activeResiduals.clear();
 	int numPoints = 0;
 	int numLRes = 0;
-	for(FrameHessian* fh : frameHessians)
+	for(FrameHessian* fh : frameHessians){
 		for(PointHessian* ph : fh->pointHessians)
 		{
 			for(PointFrameResidual* r : ph->residuals)
@@ -437,11 +435,13 @@ float FullSystem::optimize(int mnumOptIts)
 			}
 			numPoints++;
 		}
+	}
 
     if(!setting_debugout_runquiet)
         printf("OPTIMIZE %d pts, %d active res, %d lin res!\n",ef->nPoints,(int)activeResiduals.size(), numLRes);
 
 
+	// TODO: 这里真的很难，该看这里了
 	Vec3 lastEnergy = linearizeAll(false);
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();

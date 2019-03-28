@@ -558,29 +558,36 @@ float ImmaturePoint::calcResidual(
 }
 
 
-
-
+// 计算未熟点和某帧的残差，帧的信息存储再tmpRes中
+// tmpRes 最终残差输出的地方
+// outlierTHSlack 外点阈值
 double ImmaturePoint::linearizeResidual(
 		CalibHessian *  HCalib, const float outlierTHSlack,
 		ImmaturePointTemporaryResidual* tmpRes,
 		float &Hdd, float &bd,
 		float idepth)
 {
+	// 如果残差是OOB类型，那么就直接返回
 	if(tmpRes->state_state == ResState::OOB)
-		{ tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy; }
+	{ 
+		tmpRes->state_NewState = ResState::OOB; 
+		return tmpRes->state_energy; 
+	}
 
+	// 获取未熟点所在帧和当前要计算误差的帧的precalc值
 	FrameFramePrecalc* precalc = &(host->targetPrecalc[tmpRes->target->idx]);
 
 	// check OOB due to scale angle change.
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target->dI;
+	const Eigen::Vector3f* dIl = tmpRes->target->dI; // 目标帧的图像
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 	//const float * const Il = tmpRes->target->I;
 
 	Vec2f affLL = precalc->PRE_aff_mode;
 
+	// 对于每个pattern点，投影到关键帧，计算亮度误差
 	for(int idx=0;idx<patternNum;idx++)
 	{
 		int dx = patternP[idx][0];
@@ -590,23 +597,38 @@ double ImmaturePoint::linearizeResidual(
 		float Ku, Kv;
 		Vec3f KliP;
 
-		if(!projectPoint(this->u,this->v, idepth, dx, dy,HCalib,
-				PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
-			{tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy;}
+		if(!projectPoint(this->u,this->v, idepth, dx, dy,HCalib,PRE_RTll,PRE_tTll,  // 输入
+			drescale, u, v, Ku, Kv, KliP, new_idepth))	// 输出
+			{
+			tmpRes->state_NewState = ResState::OOB; 
+			return tmpRes->state_energy;
+		}
 
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
 
-		if(!std::isfinite((float)hitColor[0])) {tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy;}
-		float residual = hitColor[0] - (affLL[0] * color[idx] + affLL[1]);
+		if(!std::isfinite((float)hitColor[0])) 
+		{
+			tmpRes->state_NewState = ResState::OOB;
+			return tmpRes->state_energy;
+		}
 
+		// 计算亮度误差，累计能量
+		float residual = hitColor[0] - (affLL[0] * color[idx] + affLL[1]);
 		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
 		energyLeft += weights[idx]*weights[idx]*hw *residual*residual*(2-hw);
 
 		// depth derivatives.
+		// 对点的深度求导
+#ifdef PAL
+		float gx = hitColor[1];
+		float gy = hitColor[2];
+		float d_idepth = derive_idepth_pal(PRE_tTll, u, v, idepth, gx, gy, drescale);
+#else
 		float dxInterp = hitColor[1]*HCalib->fxl();
 		float dyInterp = hitColor[2]*HCalib->fyl();
 		float d_idepth = derive_idepth(PRE_tTll, u, v, dx, dy, dxInterp, dyInterp, drescale);
+#endif
 
 		hw *= weights[idx]*weights[idx];
 
@@ -614,7 +636,7 @@ double ImmaturePoint::linearizeResidual(
 		bd += (hw*residual)*d_idepth;
 	}
 
-
+	// 误差还行，记为内点，否则记为外点
 	if(energyLeft > energyTH*outlierTHSlack)
 	{
 		energyLeft = energyTH*outlierTHSlack;

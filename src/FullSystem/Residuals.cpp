@@ -74,14 +74,17 @@ PointFrameResidual::PointFrameResidual(PointHessian* point_, FrameHessian* host_
 
 
 
-
+// 残差项的线性化(求导)
 double PointFrameResidual::linearize(CalibHessian* HCalib)
 {
 	state_NewEnergyWithOutlier=-1;
 
-	if(state_state == ResState::OOB)
-		{ state_NewState = ResState::OOB; return state_energy; }
+	if(state_state == ResState::OOB){ 
+		state_NewState = ResState::OOB; 
+		return state_energy;
+	}
 
+	// 取出一些信息：帧图像，KR Kt R t 点亮度，权重
 	FrameFramePrecalc* precalc = &(host->targetPrecalc[target->idx]);
 	float energyLeft=0;
 	const Eigen::Vector3f* dIl = target->dI;
@@ -105,12 +108,14 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		float Ku, Kv;
 		Vec3f KliP;
 
-		if(!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0,HCalib,
-				PRE_RTll_0,PRE_tTll_0, drescale, u, v, Ku, Kv, KliP, new_idepth))
-			{ state_NewState = ResState::OOB; return state_energy; }
+		if(!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0,HCalib, PRE_RTll_0,PRE_tTll_0,  // 输入
+			drescale, u, v, Ku, Kv, KliP, new_idepth)){ 	//输出
+			state_NewState = ResState::OOB;
+			return state_energy;
+		}
 
+		// 对应帧坐标系下的点
 		centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
-
 
 		// diff d_idepth
 		d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
@@ -154,20 +159,16 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		d_xi_y[3] = -(1+v*v)*HCalib->fyl();
 		d_xi_y[4] = u*v*HCalib->fyl();
 		d_xi_y[5] = u*HCalib->fyl();
-	}
+	} // none
 
+	J->Jpdxi[0] = d_xi_x;
+	J->Jpdxi[1] = d_xi_y;
 
-	{
-		J->Jpdxi[0] = d_xi_x;
-		J->Jpdxi[1] = d_xi_y;
+	J->Jpdc[0] = d_C_x;
+	J->Jpdc[1] = d_C_y;
 
-		J->Jpdc[0] = d_C_x;
-		J->Jpdc[1] = d_C_y;
-
-		J->Jpdd[0] = d_d_x;
-		J->Jpdd[1] = d_d_y;
-
-	}
+	J->Jpdd[0] = d_d_x;
+	J->Jpdd[1] = d_d_y;
 
 
 

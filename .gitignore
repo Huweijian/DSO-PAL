@@ -9,3 +9,4 @@ build-*
 *.so.*
 thirdparty/libzip-1.1.1*
 result.txt
+.vscode/ipch/*

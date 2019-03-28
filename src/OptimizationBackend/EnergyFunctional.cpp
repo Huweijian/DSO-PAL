@@ -414,12 +414,13 @@ double EnergyFunctional::calcLEnergyF_MT()
 	return E+red->stats[0];
 }
 
-
-
+// 在ef中插入一个残差项
 EFResidual* EnergyFunctional::insertResidual(PointFrameResidual* r)
 {
+	// 初始化一个EF残差类型
 	EFResidual* efr = new EFResidual(r, r->point->efPoint, r->host->efFrame, r->target->efFrame);
 	efr->idxInAll = r->point->efPoint->residualsAll.size();
+	// 残差项也保留好efr对象
 	r->point->efPoint->residualsAll.push_back(efr);
 
     connectivityMap[(((uint64_t)efr->host->frameID) << 32) + ((uint64_t)efr->target->frameID)][0]++;
@@ -471,6 +472,7 @@ EFPoint* EnergyFunctional::insertPoint(PointHessian* ph)
 	// 初始化efp的idx
 	efp->idxInPoints = ph->host->efFrame->points.size();
 
+	// 加入能量帧的点队列中
 	ph->host->efFrame->points.push_back(efp);
 
 	nPoints++;
