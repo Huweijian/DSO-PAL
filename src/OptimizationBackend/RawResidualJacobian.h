@@ -39,23 +39,30 @@ struct RawResidualJacobian
 	Vec6f Jpdxi[2];			// 2x6
 
 	// the two rows of d[x,y]/d[C].
+	// 对相机内参的导数
 	VecCf Jpdc[2];			// 2x4
 
 	// the two rows of d[x,y]/d[idepth].
 	Vec2f Jpdd;				// 2x1
 
 	// the two columns of d[r]/d[x,y].
+	// 梯度
 	VecNRf JIdx[2];			// 9x2
 
 	// = the two columns of d[r] / d[ab]
+	// 光度
 	VecNRf JabF[2];			// 9x2
 
-
 	// = JIdx^T * JIdx (inner product). Only as a shorthand.
+	// 梯度.T * 梯度
 	Mat22f JIdx2;				// 2x2
+
 	// = Jab^T * JIdx (inner product). Only as a shorthand.
+	// 光度.T * 梯度 
 	Mat22f JabJIdx;			// 2x2
+
 	// = Jab^T * Jab (inner product). Only as a shorthand.
+	// 光度.T * 光度
 	Mat22f Jab2;			// 2x2
 
 };

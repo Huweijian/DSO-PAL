@@ -1,30 +1,29 @@
 #include <iostream>
-#include <cstring>
+#include <string>
 #include <Eigen/Core>
-// #include <MatrixAccumulators.h>
+#include <util/pal_model.h>
+#include <util/pal_interface.h>
 #include <OptimizationBackend/MatrixAccumulators.h>
 
 using namespace std;
 using namespace Eigen;
 using namespace dso;
 
-using namespace std;
-
-class A{
-    public:
-    int x, y;
-};
-
-istream  & operator >> (istream &is, A &a){
-    is >> a.x >> a.y;
-}
-
-
 int main(void){
-    A a;
-    cin >> a;
-    cout << a.x << " " << a.y << endl;
+    init_pal("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 
 
+	Eigen::Matrix<float, 2, 6> dx2dSE;
+	Eigen::Matrix<float, 2, 3> duv2dxyz;
+
+    auto p = pal_model_g->cam2world(100, 200);
+	pal_model_g->jacobian_xyz2uv(p, dx2dSE, duv2dxyz);
+    cout << "p1 = " << p.transpose() << endl;
+    cout << duv2dxyz << endl;
+
+    p = p * 10;
+	pal_model_g->jacobian_xyz2uv(p, dx2dSE, duv2dxyz);
+    cout << "p2 = " << p.transpose() << endl;
+    cout << duv2dxyz << endl;
 
     return 0;
 }

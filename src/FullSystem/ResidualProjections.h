@@ -54,7 +54,7 @@ EIGEN_STRONG_INLINE float derive_idepth_pal(
 	Eigen::Matrix<float, 2, 6> duvdSE;
 	pal_model_g->jacobian_xyz2uv(pt, duvdSE, duvdxyz);
 
-	Vec3f dxyzdd = Vec3f((t[0]-t[2]*u)*SCALE_IDEPTH, (t[1]-t[2]*v)*SCALE_IDEPTH, 0);
+	Vec3f dxyzdd = Vec3f((t[0]-t[2]*u), (t[1]-t[2]*v), 0);
 
 	auto dd_scalar= Vec2f(gx, gy).transpose() * duvdxyz * dxyzdd; 	
 
@@ -62,37 +62,48 @@ EIGEN_STRONG_INLINE float derive_idepth_pal(
 }
 
 
+// 传入像素坐标系的点和反深度 和 SE3，判断再投影回来是否出界
 EIGEN_STRONG_INLINE bool projectPoint(
-		const float &u_pt,const float &v_pt,
-		const float &idepth,
+		const float &u_pt, const float &v_pt, const float &idepth,
 		const Mat33f &KRKi, const Vec3f &Kt,
+		// -----------------------------------
 		float &Ku, float &Kv)
 {
+#ifndef PAL
+
+	Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
+	Vec2f ptp_2d = pal_model_g->world2cam(ptp);
+	Ku = ptp_2d[0];
+	Kv = ptp_2d[1];
+	return  pal_check_in_range_g(Ku, Kv, 2);
+
+#else
+
 	Vec3f ptp = KRKi * Vec3f(u_pt,v_pt, 1) + Kt*idepth;
 	Ku = ptp[0] / ptp[2];
 	Kv = ptp[1] / ptp[2];
 	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+#endif
 }
 
 
 // 把点投影到零一帧，并判断是否在图像内
 EIGEN_STRONG_INLINE bool projectPoint(
-		const float &u_pt,const float &v_pt,
-		const float &idepth,
+		const float &u_pt, const float &v_pt, const float &idepth,
 		const int &dx, const int &dy,
 		CalibHessian* const &HCalib,
 		const Mat33f &R, const Vec3f &t,
 		// ---------以下为返回值-----------
-		float &drescale, float &u, float &v,
-		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)
+		float &drescale, float &u, float &v, // z变化比例系数；归一化坐标系的值；
+		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)	// 像素坐标系的值；原始归一化坐标系的值；
 {
 #ifdef PAL
-	Vec3f P1 = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
-	Vec3f P2 = R * p1 + t;
+	KliP = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
+	Vec3f P2 = R * KliP + t;
 	new_idepth = 1.0 / P2[2];
 	drescale = new_idepth / idepth;
 	
-	// TODO: uv 可能有问题
+	// TODO: uv 可能有问题(PAL的归一化坐标系没意义)
 	u = P2[0] * drescale;
 	v = P2[1] * drescale;
 	Vec2f KP2 = pal_model_g->world2cam(P2);
@@ -120,6 +131,7 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		return false;
 
 	// 按照深度缩放后再投影到图像上
+	// u v 是归一化坐标系的坐标
 	u = ptp[0] * drescale;
 	v = ptp[1] * drescale;
 	Ku = u*HCalib->fxl() + HCalib->cxl();

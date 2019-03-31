@@ -101,9 +101,9 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 
 
 	Vec6f d_xi_x, d_xi_y;
-	Vec4f d_C_x, d_C_y;
+	Vec4f d_C_x = Vec4f::Zero(), d_C_y = Vec4f::Zero();
 	float d_d_x, d_d_y;
-{
+
 	float drescale, u, v, new_idepth;
 	float Ku, Kv;
 	Vec3f KliP;
@@ -114,8 +114,31 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		return state_energy;
 	}
 
-	// 对应帧坐标系下的点
+	// 对应帧坐标系下的点(像素坐标+反深度)
 	centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
+
+	// 计算这个残差项对深度，相机参数，位姿的导数
+#ifndef PAL
+
+	Eigen::Matrix<float, 2, 6> dx2dSE;
+	Eigen::Matrix<float, 2, 3> duv2dxyz;
+	pal_model_g->jacobian_xyz2uv(Vec3f(u, v, SCALE_IDEPTH*drescale), dx2dSE, duv2dxyz);
+
+	const Vec3f &t = PRE_tTll_0;
+	float dxdd = (t[0]-t[2]*u) ; // \rho_2 / \rho1 * (tx - u'_2 * tz)
+	float dydd = (t[1]-t[2]*v) ; // \rho_2 / \rho1 * (ty - v'_2 * tz)
+	Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
+
+	Vec2f dpdd = duv2dxyz * dxyzdd; 
+
+	d_d_x = dpdd[0] ;
+	d_d_y = dpdd[1] ;
+
+	// drdSE3
+	d_xi_x = dx2dSE.row(0);
+	d_xi_y = dx2dSE.row(1);
+
+#else
 
 	// diff d_idepth
 	d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
@@ -143,7 +166,6 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
 
 	// drdSE3
-
 	d_xi_x[0] = new_idepth*HCalib->fxl();
 	d_xi_x[1] = 0;
 	d_xi_x[2] = -new_idepth*u*HCalib->fxl();
@@ -157,7 +179,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	d_xi_y[3] = -(1+v*v)*HCalib->fyl();
 	d_xi_y[4] = u*v*HCalib->fyl();
 	d_xi_y[5] = u*HCalib->fyl();
-} // none
+#endif
 
 	J->Jpdxi[0] = d_xi_x;
 	J->Jpdxi[1] = d_xi_y;
@@ -169,78 +191,84 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	J->Jpdd[1] = d_d_y;
 
 
-
-
-
-
+	// 计算每个pattern点的误差相对于 xxxx 的导数
 	float JIdxJIdx_00=0, JIdxJIdx_11=0, JIdxJIdx_10=0;
 	float JabJIdx_00=0, JabJIdx_01=0, JabJIdx_10=0, JabJIdx_11=0;
 	float JabJab_00=0, JabJab_01=0, JabJab_11=0;
-
 	float wJI2_sum = 0;
 
 	for(int idx=0;idx<patternNum;idx++)
 	{
+		// 判断这个pattern点投影到帧上是否出界
 		float Ku, Kv;
-		if(!projectPoint(point->u+patternP[idx][0], point->v+patternP[idx][1], point->idepth_scaled, PRE_KRKiTll, PRE_KtTll, Ku, Kv))
-			{ state_NewState = ResState::OOB; return state_energy; }
+		if(!projectPoint(point->u+patternP[idx][0], point->v+patternP[idx][1], point->idepth_scaled, PRE_KRKiTll, PRE_KtTll, Ku, Kv)){ 
+			state_NewState = ResState::OOB; 
+			return state_energy; 
+		}
 
 		projectedTo[idx][0] = Ku;
 		projectedTo[idx][1] = Kv;
 
-
+		// 获取帧的亮度和梯度
         Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
         float residual = hitColor[0] - (float)(affLL[0] * color[idx] + affLL[1]);
-
-
-
+		if(!std::isfinite((float)hitColor[0])){ 
+			state_NewState = ResState::OOB;
+			return state_energy;
+		}
 		float drdA = (color[idx]-b0);
-		if(!std::isfinite((float)hitColor[0]))
-		{ state_NewState = ResState::OOB; return state_energy; }
 
-
+		// 计算权重
 		float w = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + hitColor.tail<2>().squaredNorm()));
         w = 0.5f*(w + weights[idx]);
-
-
-
 		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
 		energyLeft += w*w*hw *residual*residual*(2-hw);
 
-		{
-			if(hw < 1) hw = sqrtf(hw);
-			hw = hw*w;
+		if(hw < 1) 
+			hw = sqrtf(hw);
+		hw = hw*w;
 
-			hitColor[1]*=hw;
-			hitColor[2]*=hw;
+		// TODO: 改到这里了
+#ifdef PAL
+		
 
-			J->resF[idx] = residual*hw;
+#else
+		hitColor[1]*=hw;
+		hitColor[2]*=hw;
 
-			J->JIdx[0][idx] = hitColor[1];
-			J->JIdx[1][idx] = hitColor[2];
-			J->JabF[0][idx] = drdA*hw;
-			J->JabF[1][idx] = hw;
+		// 残差
+		J->resF[idx] = residual*hw;
 
-			JIdxJIdx_00+=hitColor[1]*hitColor[1];
-			JIdxJIdx_11+=hitColor[2]*hitColor[2];
-			JIdxJIdx_10+=hitColor[1]*hitColor[2];
+		// 梯度
+		J->JIdx[0][idx] = hitColor[1];
+		J->JIdx[1][idx] = hitColor[2];
 
-			JabJIdx_00+= drdA*hw * hitColor[1];
-			JabJIdx_01+= drdA*hw * hitColor[2];
-			JabJIdx_10+= hw * hitColor[1];
-			JabJIdx_11+= hw * hitColor[2];
+		// dr / d[a b]
+		J->JabF[0][idx] = drdA*hw;
+		J->JabF[1][idx] = hw;
 
-			JabJab_00+= drdA*drdA*hw*hw;
-			JabJab_01+= drdA*hw*hw;
-			JabJab_11+= hw*hw;
+		// 
+		JIdxJIdx_00+=hitColor[1]*hitColor[1];
+		JIdxJIdx_11+=hitColor[2]*hitColor[2];
+		JIdxJIdx_10+=hitColor[1]*hitColor[2];
 
+		JabJIdx_00+= drdA*hw * hitColor[1];
+		JabJIdx_01+= drdA*hw * hitColor[2];
+		JabJIdx_10+= hw * hitColor[1];
+		JabJIdx_11+= hw * hitColor[2];
 
-			wJI2_sum += hw*hw*(hitColor[1]*hitColor[1]+hitColor[2]*hitColor[2]);
+		JabJab_00+= drdA*drdA*hw*hw;
+		JabJab_01+= drdA*hw*hw;
+		JabJab_11+= hw*hw;
 
-			if(setting_affineOptModeA < 0) J->JabF[0][idx]=0;
-			if(setting_affineOptModeB < 0) J->JabF[1][idx]=0;
+		wJI2_sum += hw*hw*(hitColor[1]*hitColor[1]+hitColor[2]*hitColor[2]);
 
-		}
+		if(setting_affineOptModeA < 0) 
+			J->JabF[0][idx]=0;
+		if(setting_affineOptModeB < 0) 
+			J->JabF[1][idx]=0;
+#endif
+
 	}
 
 	J->JIdx2(0,0) = JIdxJIdx_00;

@@ -450,21 +450,18 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float Kv = fyl * v + cyl;
 			float new_idepth = point->idepth_new/pt[2];
 			// 如果新的点出界或者深度异常，那么点设置为无效
-			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
-			{
+			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0)){
 				isGood = false;
 				break;
 			}
 #endif
-
 
 			// 亚像素梯度和亮度
 			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);  // 新帧的 [亮度 dx dy]
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl); // 参考帧亮度
 
 			// 如果亮度无效，gg
-			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
-			{
+			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0])){
 				isGood = false;
 				break;
 			}
@@ -476,13 +473,13 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 			// 计算一系列导数，并储存
 			if(hw < 1) hw = sqrtf(hw);
-			float dxdd = (t[0]-t[2]*u)/pt[2]; // \rho_2 / \rho1 * (tx - u'_2 * tz)
-			float dydd = (t[1]-t[2]*v)/pt[2]; // \rho_2 / \rho1 * (ty - v'_2 * tz)
 #ifdef PAL
+			float dxdd = (t[0]-t[2]*u); // \rho_2 / \rho1 * (tx - u'_2 * tz)
+			float dydd = (t[1]-t[2]*v); // \rho_2 / \rho1 * (ty - v'_2 * tz)
 			Vec2f dr2duv2(hitColor[1]*hw, hitColor[2]*hw);
 			Eigen::Matrix<float, 2, 6> dx2dSE;
 			Eigen::Matrix<float, 2, 3> duv2dxyz;
-			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+			pal_model_g->jacobian_xyz2uv(pt/point->idepth_new, dx2dSE, duv2dxyz);
 			Vec6f dr2dSE = dr2duv2.transpose() * dx2dSE;	
 			dp0[idx] = dr2dSE[0];
 			dp1[idx] = dr2dSE[1];
@@ -498,6 +495,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float maxstep = 1.0f/ dxyzdd.norm();
 
 #else
+			float dxdd = (t[0]-t[2]*u)/pt[2]; // \rho_2 / \rho1 * (tx - u'_2 * tz)
+			float dydd = (t[1]-t[2]*v)/pt[2]; // \rho_2 / \rho1 * (ty - v'_2 * tz)
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
 			dp0[idx] = new_idepth*dxInterp;						// dE/d(SE1) = gx*fx/Z
@@ -509,6 +508,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;		// dE/d(depth)
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 #endif
+
 			dp6[idx] = - hw*r2new_aff[0] * rlR;					// dE/d(e^(aj))
 			dp7[idx] = - hw*1;									// dE/d(bj)	
 			r[idx] = hw*residual;								// res

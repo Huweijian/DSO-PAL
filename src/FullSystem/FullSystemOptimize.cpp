@@ -45,9 +45,6 @@
 namespace dso
 {
 
-
-
-
 // 多线程线性化
 void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointFrameResidual*>* toRemove, int min, int max, Vec10* stats, int tid)
 {

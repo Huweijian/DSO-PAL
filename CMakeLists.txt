@@ -5,8 +5,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 #set(BUILD_TYPE RelWithDebInfo)
 
-set(BUILD_TYPE Release)
-# set(BUILD_TYPE Debug)
+# set(BUILD_TYPE Release)
+set(BUILD_TYPE Debug)
 
 if(${BUILD_TYPE} MATCHES "Debug")
 	message("!!!Debug mode!!!")
@@ -137,4 +137,9 @@ else()
 endif()
 
 # test exe 
-add_executable(test_dso ${PROJECT_SOURCE_DIR}/src/test.cpp)
+add_executable(test_dso 
+	${PROJECT_SOURCE_DIR}/src/test.cpp
+	${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
+	${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
+	)
+target_link_libraries(test_dso  ${OpenCV_LIBS})
