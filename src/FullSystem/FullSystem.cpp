@@ -1120,6 +1120,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 	// =========================== Activate Points (& flag for marginalization). =========================
+	// 尝试把未熟点激活
 	activatePointsMT();
 	ef->makeIDX() ;
 

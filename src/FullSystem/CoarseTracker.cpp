@@ -897,7 +897,7 @@ void CoarseDistanceMap::makeDistanceMap(
 		for(PointHessian* ph : fh->pointHessians)
 		{
 			assert(ph->status == PointHessian::ACTIVE);
-#ifndef PAL
+#ifdef PAL
 			Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
 			Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
 			int u = ptp_pal2D[0];

@@ -103,63 +103,61 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	Vec6f d_xi_x, d_xi_y;
 	Vec4f d_C_x, d_C_y;
 	float d_d_x, d_d_y;
-	{
-		float drescale, u, v, new_idepth;
-		float Ku, Kv;
-		Vec3f KliP;
+{
+	float drescale, u, v, new_idepth;
+	float Ku, Kv;
+	Vec3f KliP;
 
-		if(!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0,HCalib, PRE_RTll_0,PRE_tTll_0,  // 输入
-			drescale, u, v, Ku, Kv, KliP, new_idepth)){ 	//输出
-			state_NewState = ResState::OOB;
-			return state_energy;
-		}
+	if(!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0,HCalib, PRE_RTll_0,PRE_tTll_0,  // 输入
+		drescale, u, v, Ku, Kv, KliP, new_idepth)){ 	//输出
+		state_NewState = ResState::OOB;
+		return state_energy;
+	}
 
-		// 对应帧坐标系下的点
-		centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
+	// 对应帧坐标系下的点
+	centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
 
-		// diff d_idepth
-		d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
-		d_d_y = drescale * (PRE_tTll_0[1]-PRE_tTll_0[2]*v)*SCALE_IDEPTH*HCalib->fyl();
+	// diff d_idepth
+	d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
+	d_d_y = drescale * (PRE_tTll_0[1]-PRE_tTll_0[2]*v)*SCALE_IDEPTH*HCalib->fyl();
 
+	// diff calib
+	d_C_x[2] = drescale*(PRE_RTll_0(2,0)*u-PRE_RTll_0(0,0));
+	d_C_x[3] = HCalib->fxl() * drescale*(PRE_RTll_0(2,1)*u-PRE_RTll_0(0,1)) * HCalib->fyli();
+	d_C_x[0] = KliP[0]*d_C_x[2];
+	d_C_x[1] = KliP[1]*d_C_x[3];
 
+	d_C_y[2] = HCalib->fyl() * drescale*(PRE_RTll_0(2,0)*v-PRE_RTll_0(1,0)) * HCalib->fxli();
+	d_C_y[3] = drescale*(PRE_RTll_0(2,1)*v-PRE_RTll_0(1,1));
+	d_C_y[0] = KliP[0]*d_C_y[2];
+	d_C_y[1] = KliP[1]*d_C_y[3];
 
+	d_C_x[0] = (d_C_x[0]+u)*SCALE_F;
+	d_C_x[1] *= SCALE_F;
+	d_C_x[2] = (d_C_x[2]+1)*SCALE_C;
+	d_C_x[3] *= SCALE_C;
 
-		// diff calib
-		d_C_x[2] = drescale*(PRE_RTll_0(2,0)*u-PRE_RTll_0(0,0));
-		d_C_x[3] = HCalib->fxl() * drescale*(PRE_RTll_0(2,1)*u-PRE_RTll_0(0,1)) * HCalib->fyli();
-		d_C_x[0] = KliP[0]*d_C_x[2];
-		d_C_x[1] = KliP[1]*d_C_x[3];
+	d_C_y[0] *= SCALE_F;
+	d_C_y[1] = (d_C_y[1]+v)*SCALE_F;
+	d_C_y[2] *= SCALE_C;
+	d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
 
-		d_C_y[2] = HCalib->fyl() * drescale*(PRE_RTll_0(2,0)*v-PRE_RTll_0(1,0)) * HCalib->fxli();
-		d_C_y[3] = drescale*(PRE_RTll_0(2,1)*v-PRE_RTll_0(1,1));
-		d_C_y[0] = KliP[0]*d_C_y[2];
-		d_C_y[1] = KliP[1]*d_C_y[3];
+	// drdSE3
 
-		d_C_x[0] = (d_C_x[0]+u)*SCALE_F;
-		d_C_x[1] *= SCALE_F;
-		d_C_x[2] = (d_C_x[2]+1)*SCALE_C;
-		d_C_x[3] *= SCALE_C;
+	d_xi_x[0] = new_idepth*HCalib->fxl();
+	d_xi_x[1] = 0;
+	d_xi_x[2] = -new_idepth*u*HCalib->fxl();
+	d_xi_x[3] = -u*v*HCalib->fxl();
+	d_xi_x[4] = (1+u*u)*HCalib->fxl();
+	d_xi_x[5] = -v*HCalib->fxl();
 
-		d_C_y[0] *= SCALE_F;
-		d_C_y[1] = (d_C_y[1]+v)*SCALE_F;
-		d_C_y[2] *= SCALE_C;
-		d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
-
-
-		d_xi_x[0] = new_idepth*HCalib->fxl();
-		d_xi_x[1] = 0;
-		d_xi_x[2] = -new_idepth*u*HCalib->fxl();
-		d_xi_x[3] = -u*v*HCalib->fxl();
-		d_xi_x[4] = (1+u*u)*HCalib->fxl();
-		d_xi_x[5] = -v*HCalib->fxl();
-
-		d_xi_y[0] = 0;
-		d_xi_y[1] = new_idepth*HCalib->fyl();
-		d_xi_y[2] = -new_idepth*v*HCalib->fyl();
-		d_xi_y[3] = -(1+v*v)*HCalib->fyl();
-		d_xi_y[4] = u*v*HCalib->fyl();
-		d_xi_y[5] = u*HCalib->fyl();
-	} // none
+	d_xi_y[0] = 0;
+	d_xi_y[1] = new_idepth*HCalib->fyl();
+	d_xi_y[2] = -new_idepth*v*HCalib->fyl();
+	d_xi_y[3] = -(1+v*v)*HCalib->fyl();
+	d_xi_y[4] = u*v*HCalib->fyl();
+	d_xi_y[5] = u*HCalib->fyl();
+} // none
 
 	J->Jpdxi[0] = d_xi_x;
 	J->Jpdxi[1] = d_xi_y;

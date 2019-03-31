@@ -206,7 +206,6 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 	PRE_tTll = (leftToLeft.translation()).cast<float>();
 	distanceLL = leftToLeft.translation().norm();
 
-// TODO: pal fix
 	Mat33f K = Mat33f::Identity();
 #ifndef PAL // PA下 K=I
 	K(0,0) = HCalib->fxl();

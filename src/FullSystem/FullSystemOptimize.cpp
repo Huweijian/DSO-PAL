@@ -48,12 +48,14 @@ namespace dso
 
 
 
-
+// 多线程线性化
 void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointFrameResidual*>* toRemove, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
 	{
+		// 枚举滑动窗口中的每个残差项
 		PointFrameResidual* r = activeResiduals[k];
+		// 线性化
 		(*stats)[0] += r->linearize(&Hcalib);
 
 		if(fixLinearization)
@@ -407,7 +409,7 @@ void FullSystem::printOptRes(const Vec3 &res, double resL, double resM, double r
 
 }
 
-
+// 滑动窗口优化
 float FullSystem::optimize(int mnumOptIts)
 {
 	if(frameHessians.size() < 2) return 0;
@@ -442,6 +444,7 @@ float FullSystem::optimize(int mnumOptIts)
 
 
 	// TODO: 这里真的很难，该看这里了
+	// 线性化全部变量
 	Vec3 lastEnergy = linearizeAll(false);
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();
