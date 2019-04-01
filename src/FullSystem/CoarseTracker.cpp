@@ -132,7 +132,7 @@ void CoarseTracker::makeK(CalibHessian* HCalib)
 }
 
 
-
+// TODO: 这个没细看，回头再说
 void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 {
 	// make coarse tracking templates for latstRef.
@@ -523,12 +523,16 @@ void CoarseTracker::setCoarseTrackingRef(
 		std::vector<FrameHessian*> frameHessians)
 {
 	assert(frameHessians.size()>0);
+	// 设置最新关键帧为Ref
 	lastRef = frameHessians.back();
+
+	// 构造深度图
 	makeCoarseDepthL0(frameHessians);
 
-
-
+	// 设置参考ID
 	refFrameID = lastRef->shell->id;
+
+	// 获取光度ab
 	lastRef_aff_g2l = lastRef->aff_g2l();
 
 	firstCoarseRMSE=-1;

@@ -36,16 +36,23 @@ namespace dso
 {
 
 
+// TODO 不太懂
 void EFResidual::takeDataF()
 {
+	// 把data->J 保存到J中
 	std::swap<RawResidualJacobian*>(J, data->J);
 
+	// 梯度.T * 梯度 * d[x,y]/dd
 	Vec2f JI_JI_Jd = J->JIdx2 * J->Jpdd;
 
+	// 赋值JpJdf的前6个元素
+	// JI_JI_Jd (1*2) * jpdxi (2*6) = (1*6)
 	for(int i=0;i<6;i++)
-		JpJdF[i] = J->Jpdxi[0][i]*JI_JI_Jd[0] + J->Jpdxi[1][i] * JI_JI_Jd[1];
+		JpJdF[i] = J->Jpdxi[0][i] * JI_JI_Jd[0] + J->Jpdxi[1][i] * JI_JI_Jd[1];
 
-	JpJdF.segment<2>(6) = J->JabJIdx*J->Jpdd;
+	// 赋值Jpjdf的最后两个元素
+	// 光度 × 梯度 × 深度
+	JpJdF.segment<2>(6) = J->JabJIdx * J->Jpdd;
 }
 
 // 从hession中获得一些数据

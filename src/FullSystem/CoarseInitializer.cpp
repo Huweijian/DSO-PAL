@@ -277,9 +277,11 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	if(snapped){
 		printf("!!!!初始化成功(at %d)!!!! now %d\n", snappedAt, frameID);
 	}
+
 	// 输出深度图
-    debugPlot(0,wraps);
-	cv::waitKey(1000);
+	// HWJDEBUG
+    // debugPlot(0,wraps);
+	// cv::waitKey(1000);
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;

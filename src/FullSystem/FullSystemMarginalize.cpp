@@ -159,8 +159,6 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 }
 
 
-
-
 void FullSystem::marginalizeFrame(FrameHessian* frame)
 {
 	// marginalize or remove all this frames points.

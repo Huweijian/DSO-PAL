@@ -118,7 +118,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
 
 	// 计算这个残差项对深度，相机参数，位姿的导数
-#ifndef PAL
+#ifdef PAL
 
 	Eigen::Matrix<float, 2, 6> dx2dSE;
 	Eigen::Matrix<float, 2, 3> duv2dxyz;
@@ -216,7 +216,6 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 			state_NewState = ResState::OOB;
 			return state_energy;
 		}
-		float drdA = (color[idx]-b0);
 
 		// 计算权重
 		float w = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + hitColor.tail<2>().squaredNorm()));
@@ -228,9 +227,45 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 			hw = sqrtf(hw);
 		hw = hw*w;
 
-		// TODO: 改到这里了
+		float drdA = (color[idx]-b0);
 #ifdef PAL
-		
+		hitColor[1]*=hw;
+		hitColor[2]*=hw;
+
+		// 残差
+		J->resF[idx] = residual*hw;
+
+		// 梯度
+		J->JIdx[0][idx] = hitColor[1];
+		J->JIdx[1][idx] = hitColor[2];
+
+		// dr / d[a b]
+		J->JabF[0][idx] = drdA*hw;
+		J->JabF[1][idx] = hw;
+
+		// 梯度 × 地图
+		JIdxJIdx_00+=hitColor[1]*hitColor[1];
+		JIdxJIdx_11+=hitColor[2]*hitColor[2];
+		JIdxJIdx_10+=hitColor[1]*hitColor[2];
+
+		// 光度 × 梯度
+		JabJIdx_00+= drdA*hw * hitColor[1];
+		JabJIdx_01+= drdA*hw * hitColor[2];
+		JabJIdx_10+= hw * hitColor[1];
+		JabJIdx_11+= hw * hitColor[2];
+
+		// 光度 × 光度
+		JabJab_00+= drdA*drdA*hw*hw;
+		JabJab_01+= drdA*hw*hw;
+		JabJab_11+= hw*hw;
+
+		// 加权梯度平方和
+		wJI2_sum += hw*hw*(hitColor[1]*hitColor[1]+hitColor[2]*hitColor[2]);
+
+		if(setting_affineOptModeA < 0) 
+			J->JabF[0][idx]=0;
+		if(setting_affineOptModeB < 0) 
+			J->JabF[1][idx]=0;	
 
 #else
 		hitColor[1]*=hw;
@@ -329,9 +364,8 @@ void PointFrameResidual::debugPlot()
 }
 
 
-
-void PointFrameResidual::applyRes(bool copyJacobians)
-{
+// 更新状态和能量，拷贝J到EF残差中
+void PointFrameResidual::applyRes(bool copyJacobians){
 	if(copyJacobians)
 	{
 		if(state_state == ResState::OOB)
@@ -339,9 +373,12 @@ void PointFrameResidual::applyRes(bool copyJacobians)
 			assert(!efResidual->isActiveAndIsGoodNEW);
 			return;	// can never go back from OOB
 		}
+
+		// 如果残差项是OK的
 		if(state_NewState == ResState::IN)// && )
 		{
 			efResidual->isActiveAndIsGoodNEW=true;
+			// 拷贝一些导数 从PFRes -> EFRes
 			efResidual->takeDataF();
 		}
 		else
@@ -350,6 +387,7 @@ void PointFrameResidual::applyRes(bool copyJacobians)
 		}
 	}
 
+	// new states / energy   ->   states states/energy
 	setState(state_NewState);
 	state_energy = state_NewEnergy;
 }

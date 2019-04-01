@@ -65,7 +65,7 @@ public:
 	double state_energy;
 	ResState state_NewState;
 	double state_NewEnergy;
-	double state_NewEnergyWithOutlier;
+	double state_NewEnergyWithOutlier; // 线性化过程中计算的残差和（只有所有pattern都正确计算的情况下才会被赋值，是线性化成功的标志
 
 
 	void setState(ResState s) {state_state = s;}
@@ -88,7 +88,7 @@ public:
 	PointFrameResidual(PointHessian* point_, FrameHessian* host_, FrameHessian* target_);
 	double linearize(CalibHessian* HCalib);
 
-
+	// state_state = IN  new_state = OUT 
 	void resetOOB()
 	{
 		state_NewEnergy = state_energy = 0;

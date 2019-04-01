@@ -143,6 +143,7 @@ private:
 	Mat88f* adTargetF;
 
 
+	// 相机相关的参数(Camera)
 	VecC cPrior;
 	VecCf cDeltaF;
 	VecCf cPriorF;

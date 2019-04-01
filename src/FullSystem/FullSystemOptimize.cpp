@@ -52,9 +52,10 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 	{
 		// 枚举滑动窗口中的每个残差项
 		PointFrameResidual* r = activeResiduals[k];
-		// 线性化
+		// 线性化一些导数
 		(*stats)[0] += r->linearize(&Hcalib);
 
+		// 如果是fix，那么额外做一些操作
 		if(fixLinearization)
 		{
 			r->applyRes(true);
@@ -86,17 +87,24 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 
 void FullSystem::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid)
 {
+	// 对每个残差项
 	for(int k=min;k<max;k++)
 		activeResiduals[k]->applyRes(true);
 }
+
+// 设置新帧的能量阈值
 void FullSystem::setNewFrameEnergyTH()
 {
-
 	// collect all residuals and make decision on TH.
+	// 重置allResVec变量
 	allResVec.clear();
 	allResVec.reserve(activeResiduals.size()*2);
+
+	// 最新的关键帧
 	FrameHessian* newFrame = frameHessians.back();
 
+	// 枚举所有残差，如果线性化有效 并且 残差的帧是最新关键帧
+	// 就把这个残差加入allResVec
 	for(PointFrameResidual* r : activeResiduals)
 		if(r->state_NewEnergyWithOutlier >= 0 && r->target == newFrame)
 		{
@@ -104,32 +112,29 @@ void FullSystem::setNewFrameEnergyTH()
 
 		}
 
+	// 如果没有一个残差和最新关键帧有关，阈值设置为一个默认的阈值
 	if(allResVec.size()==0)
 	{
 		newFrame->frameEnergyTH = 12*12*patternNum;
 		return;		// should never happen, but lets make sure.
 	}
 
-
-	int nthIdx = setting_frameEnergyTHN*allResVec.size();
-
+	// 统计残差的一些信息
+	// 70%点的大小
+	int nthIdx = setting_frameEnergyTHN*allResVec.size(); 
 	assert(nthIdx < (int)allResVec.size());
 	assert(setting_frameEnergyTHN < 1);
 
+	// 计算70%分位点
 	std::nth_element(allResVec.begin(), allResVec.begin()+nthIdx, allResVec.end());
 	float nthElement = sqrtf(allResVec[nthIdx]);
 
-
-
-
-
-
+	// 进行一些操作，计算阈值
+	// th = (20*weitht + Res_nth*fac*(1-weight))^2 * overallWight^2;
     newFrame->frameEnergyTH = nthElement*setting_frameEnergyTHFacMedian;
 	newFrame->frameEnergyTH = 26.0f*setting_frameEnergyTHConstWeight + newFrame->frameEnergyTH*(1-setting_frameEnergyTHConstWeight);
 	newFrame->frameEnergyTH = newFrame->frameEnergyTH*newFrame->frameEnergyTH;
 	newFrame->frameEnergyTH *= setting_overallEnergyTHWeight*setting_overallEnergyTHWeight;
-
-
 
 //
 //	int good=0,bad=0;
@@ -137,6 +142,7 @@ void FullSystem::setNewFrameEnergyTH()
 //	printf("EnergyTH: mean %f, median %f, result %f (in %d, out %d)! \n",
 //			meanElement, nthElement, sqrtf(newFrame->frameEnergyTH),
 //			good, bad);
+
 }
 
 // 线性化
@@ -147,10 +153,12 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 	double num = 0;
 
 
+	// 清空toremov变量
 	std::vector<PointFrameResidual*> toRemove[NUM_THREADS];
 	for(int i=0;i<NUM_THREADS;i++) 
 		toRemove[i].clear();
 
+	// 多线程线性化
 	if(multiThreading)
 	{
 		treadReduce.reduce(boost::bind(&FullSystem::linearizeAll_Reductor, this, fixLinearization, toRemove, _1, _2, _3, _4), 0, activeResiduals.size(), 0);
@@ -163,10 +171,11 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 		lastEnergyP = stats[0];
 	}
 
-
+	// 设置最新关键帧的阈值
 	setNewFrameEnergyTH();
 
 
+	// 如果固定线性化，多做一些操作
 	if(fixLinearization)
 	{
 
@@ -208,18 +217,14 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 
 	}
 
+	// 返回总能量（只有第一个返回值有用）
 	return Vec3(lastEnergyP, lastEnergyR, num);
 }
 
 
-
-
 // applies step to linearization point.
-bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacA,float stepfacD)
+bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR, float stepfacA, float stepfacD)
 {
-//	float meanStepC=0,meanStepP=0,meanStepD=0;
-//	meanStepC += Hcalib.step.norm();
-
 	Vec10 pstepfac;
 	pstepfac.segment<3>(0).setConstant(stepfacT);
 	pstepfac.segment<3>(3).setConstant(stepfacR);
@@ -230,6 +235,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 
 	float sumNID=0;
 
+	// 这个if默认不执行
 	if(setting_solverMode & SOLVER_MOMENTUM)
 	{
 		Hcalib.setValue(Hcalib.value_backup + Hcalib.step);
@@ -256,6 +262,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			}
 		}
 	}
+	// 默认是这个
 	else
 	{
 		Hcalib.setValue(Hcalib.value_backup + stepfacC*Hcalib.step);
@@ -286,8 +293,6 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	sumID /= numID;
 	sumNID /= numID;
 
-
-
     if(!setting_debugout_runquiet)
         printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f. \t",
                 sqrtf(sumA) / (0.0005*setting_thOptIterations),
@@ -305,9 +310,10 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			sqrtf(sumB) < 0.00005*setting_thOptIterations &&
 			sqrtf(sumR) < 0.00005*setting_thOptIterations &&
 			sqrtf(sumT)*sumNID < 0.00005*setting_thOptIterations;
-//
+
 //	printf("mean steps: %f %f %f!\n",
 //			meanStepC, meanStepP, meanStepD);
+
 }
 
 
@@ -315,6 +321,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 // sets linearization point.
 void FullSystem::backupState(bool backupLastStep)
 {
+	// 默认的设定不是MOMENTUM，所以这段默认是不执行的
 	if(setting_solverMode & SOLVER_MOMENTUM)
 	{
 		if(backupLastStep)
@@ -350,7 +357,9 @@ void FullSystem::backupState(bool backupLastStep)
 	}
 	else
 	{
+		// 保存Hcalib的值
 		Hcalib.value_backup = Hcalib.value;
+		// 保存所有的关键帧和关键点的状态(位姿，光度ab， 点深度)
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->state_backup = fh->get_state();
@@ -384,12 +393,10 @@ void FullSystem::loadSateBackup()
 
 double FullSystem::calcMEnergy()
 {
-	if(setting_forceAceptStep) return 0;
-	// calculate (x-x0)^T * [2b + H * (x-x0)] for everything saved in L.
-	//ef->makeIDX();
-	//ef->setDeltaF(&Hcalib);
-	return ef->calcMEnergyF();
+	if(setting_forceAceptStep) 
+		return 0;
 
+	return ef->calcMEnergyF();
 }
 
 
@@ -440,71 +447,66 @@ float FullSystem::optimize(int mnumOptIts)
         printf("OPTIMIZE %d pts, %d active res, %d lin res!\n",ef->nPoints,(int)activeResiduals.size(), numLRes);
 
 
-	// TODO: 这里真的很难，该看这里了
-	// 线性化全部变量
+	// 线性化全部变量(false)，并计算能量
 	Vec3 lastEnergy = linearizeAll(false);
+	// 计算帧和点的L能量和M能量
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();
 
-
-
-
-
+	// 把最新的状态和能量应用到PFRes变量中
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 	else
 		applyRes_Reductor(true,0,activeResiduals.size(),0,0);
 
-
+	// 输出调试信息
     if(!setting_debugout_runquiet)
     {
         printf("Initial Error       \t");
         printOptRes(lastEnergy, lastEnergyL, lastEnergyM, 0, 0, frameHessians.back()->aff_g2l().a, frameHessians.back()->aff_g2l().b);
     }
-
+	// 画图
 	debugPlotTracking();
 
-
-
+	// 开始优化哭
 	double lambda = 1e-1;
 	float stepsize=1;
 	VecX previousX = VecX::Constant(CPARS+ 8*frameHessians.size(), NAN);
 	for(int iteration=0;iteration<mnumOptIts;iteration++)
 	{
 		// solve!
+		// 保存当前状态
 		backupState(iteration!=0);
-		//solveSystemNew(0);
+
+		//TODO: 这个真的巨难，看完我要死了，先空下
 		solveSystem(iteration, lambda);
+		
+		// incDirChange = (A, B) / (|A||B|)
 		double incDirChange = (1e-20 + previousX.dot(ef->lastX)) / (1e-20 + previousX.norm() * ef->lastX.norm());
 		previousX = ef->lastX;
 
-
+		// 不是动量方法，默认不执行
 		if(std::isfinite(incDirChange) && (setting_solverMode & SOLVER_STEPMOMENTUM))
 		{
 			float newStepsize = exp(incDirChange*1.4);
-			if(incDirChange<0 && stepsize>1) stepsize=1;
+			if(incDirChange<0 && stepsize>1) 
+				stepsize=1;
 
 			stepsize = sqrtf(sqrtf(newStepsize*stepsize*stepsize*stepsize));
 			if(stepsize > 2) stepsize=2;
 			if(stepsize <0.25) stepsize=0.25;
 		}
 
+		// 提前跳出
 		bool canbreak = doStepFromBackup(stepsize,stepsize,stepsize,stepsize,stepsize);
 
-
-
-
-
-
-
 		// eval new energy!
+		// 计算新能量
 		Vec3 newEnergy = linearizeAll(false);
 		double newEnergyL = calcLEnergy();
 		double newEnergyM = calcMEnergy();
 
-
-
-
+		// 调试输出
         if(!setting_debugout_runquiet)
         {
             printf("%s %d (L %.2f, dir %.2f, ss %.1f): \t",
@@ -517,10 +519,11 @@ float FullSystem::optimize(int mnumOptIts)
             printOptRes(newEnergy, newEnergyL, newEnergyM , 0, 0, frameHessians.back()->aff_g2l().a, frameHessians.back()->aff_g2l().b);
         }
 
+		// 默认强制前进=true
+		// 强制接收 || 能量减小了
 		if(setting_forceAceptStep || (newEnergy[0] +  newEnergy[1] +  newEnergyL + newEnergyM <
 				lastEnergy[0] + lastEnergy[1] + lastEnergyL + lastEnergyM))
 		{
-
 			if(multiThreading)
 				treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 			else
@@ -529,7 +532,6 @@ float FullSystem::optimize(int mnumOptIts)
 			lastEnergy = newEnergy;
 			lastEnergyL = newEnergyL;
 			lastEnergyM = newEnergyM;
-
 			lambda *= 0.25;
 		}
 		else
@@ -541,39 +543,37 @@ float FullSystem::optimize(int mnumOptIts)
 			lambda *= 1e2;
 		}
 
-
-		if(canbreak && iteration >= setting_minOptIterations) break;
+		// 退出条件判断
+		if(canbreak && iteration >= setting_minOptIterations) 
+			break;
 	}
 
-
-
+	// 最新的状态
 	Vec10 newStateZero = Vec10::Zero();
+	// 拷贝最新关键帧的光度ab
 	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
-
+	// 更新最新关键帧的一些信息
 	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam,
 			newStateZero);
+
+	// TODO: 这一坨暂时不懂
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
 	ef->setAdjointsF(&Hcalib);
 	setPrecalcValues();
 
-
-
-
+	//据说是外点剔除和计算FEJ 
 	lastEnergy = linearizeAll(true);
 
-
-
-
+	// 如果能量无穷大了，判断为lost
 	if(!std::isfinite((double)lastEnergy[0]) || !std::isfinite((double)lastEnergy[1]) || !std::isfinite((double)lastEnergy[2]))
     {
         printf("KF Tracking failed: LOST!\n");
 		isLost=true;
     }
-
-
 	statistics_lastFineTrackRMSE = sqrtf((float)(lastEnergy[0] / (patternNum*ef->resInA)));
 
+	// 输出标定信息
 	if(calibLog != 0)
 	{
 		(*calibLog) << Hcalib.value_scaled.transpose() <<
@@ -583,6 +583,7 @@ float FullSystem::optimize(int mnumOptIts)
 		calibLog->flush();
 	}
 
+	// 更新关键帧的外壳
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		for(FrameHessian* fh : frameHessians)
@@ -593,18 +594,13 @@ float FullSystem::optimize(int mnumOptIts)
 	}
 
 
-
-
 	debugPlotTracking();
 
 	return sqrtf((float)(lastEnergy[0] / (patternNum*ef->resInA)));
 
 }
 
-
-
-
-
+// 求解系统
 void FullSystem::solveSystem(int iteration, double lambda)
 {
 	ef->lastNullspaces_forLogging = getNullspaces(
@@ -616,11 +612,11 @@ void FullSystem::solveSystem(int iteration, double lambda)
 	ef->solveSystemF(iteration, lambda,&Hcalib);
 }
 
-
-
+// 计算L能量
 double FullSystem::calcLEnergy()
 {
-	if(setting_forceAceptStep) return 0;
+	if(setting_forceAceptStep) 
+		return 0;
 
 	double Ef = ef->calcLEnergyF_MT();
 	return Ef;
@@ -631,24 +627,36 @@ double FullSystem::calcLEnergy()
 void FullSystem::removeOutliers()
 {
 	int numPointsDropped=0;
+	// 枚举所有帧上的所有点海森，如果没有误差项用到它了，就把它移除
 	for(FrameHessian* fh : frameHessians)
 	{
 		for(unsigned int i=0;i<fh->pointHessians.size();i++)
 		{
 			PointHessian* ph = fh->pointHessians[i];
-			if(ph==0) continue;
+			if(ph==0) 
+				continue;
 
+			// 如果这个点还活着，然而没有帧和它关联了
 			if(ph->residuals.size() == 0)
 			{
+				// 把它保存到out海森队列
 				fh->pointHessiansOut.push_back(ph);
-				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
+
+				// 从正常ph队列中删除
 				fh->pointHessians[i] = fh->pointHessians.back();
 				fh->pointHessians.pop_back();
+
+				// 标记为drop（在接下来的EF的操作步骤中会移除） 
+				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
+
+				// 这里太骚了，居然改了循环变量，不过也能用
 				i--;
 				numPointsDropped++;
 			}
 		}
 	}
+	
+	// 从ef中移除所有被标记为drop的点
 	ef->dropPointsF();
 }
 

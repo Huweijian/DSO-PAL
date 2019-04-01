@@ -737,46 +737,56 @@ void FullSystem::flagPointsForRemoval()
 	std::vector<FrameHessian*> fhsToKeepPoints;
 	std::vector<FrameHessian*> fhsToMargPoints;
 
-	//if(setting_margPointVisWindow>0)
-	{
-		for(int i=((int)frameHessians.size())-1;i>=0 && i >= ((int)frameHessians.size());i--)
-			if(!frameHessians[i]->flaggedForMarginalization) fhsToKeepPoints.push_back(frameHessians[i]);
-
-		for(int i=0; i< (int)frameHessians.size();i++)
-			if(frameHessians[i]->flaggedForMarginalization) fhsToMargPoints.push_back(frameHessians[i]);
+	// 从队列中倒数帧(根本不会执行！！)
+	for(int i=((int)frameHessians.size())-1; i>=0 && i >= ((int)frameHessians.size());i--){
+		printf("here i = %d\n", i);
+		if(!frameHessians[i]->flaggedForMarginalization) 
+			fhsToKeepPoints.push_back(frameHessians[i]);
 	}
+	// hwj add 认为这个没卵用，恒等于0
+	assert(fhsToKeepPoints.size() == 0);
+
+	// 把需要mag的帧存入变量
+	for(int i=0; i< (int)frameHessians.size();i++)
+		if(frameHessians[i]->flaggedForMarginalization) 
+			fhsToMargPoints.push_back(frameHessians[i]);
 
 
-
-	//ef->setAdjointsF();
-	//ef->setDeltaF(&Hcalib);
 	int flag_oob=0, flag_in=0, flag_inin=0, flag_nores=0;
-
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
 		for(unsigned int i=0;i<host->pointHessians.size();i++)
 		{
 			PointHessian* ph = host->pointHessians[i];
-			if(ph==0) continue;
+			if(ph==0) 
+				continue;
 
+			// 如果点的深度是负数，或者点没有有效的残差，标记为drop
 			if(ph->idepth_scaled < 0 || ph->residuals.size()==0)
 			{
+				// 算作out点，标记为drop
 				host->pointHessiansOut.push_back(ph);
 				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
 				host->pointHessians[i]=0;
 				flag_nores++;
 			}
+			// 否则如果出界了，或者宿主被mag掉了
 			else if(ph->isOOB(fhsToKeepPoints, fhsToMargPoints) || host->flaggedForMarginalization)
 			{
 				flag_oob++;
+				// 点依然是内点，重置状态
 				if(ph->isInlierNew())
 				{
 					flag_in++;
 					int ngoodRes=0;
+					// 枚举pfr
 					for(PointFrameResidual* r : ph->residuals)
 					{
+						// 重置OOB的状态	
 						r->resetOOB();
+						// 重新线性化
 						r->linearize(&Hcalib);
+						// 后面的有点晕了
 						r->efResidual->isLinearized = false;
 						r->applyRes(true);
 						if(r->efResidual->isActive())
@@ -799,6 +809,7 @@ void FullSystem::flagPointsForRemoval()
 
 
 				}
+				// 真的要out了
 				else
 				{
 					host->pointHessiansOut.push_back(ph);
@@ -812,7 +823,7 @@ void FullSystem::flagPointsForRemoval()
 			}
 		}
 
-
+		// 把标记为0的点删掉
 		for(int i=0;i<(int)host->pointHessians.size();i++)
 		{
 			if(host->pointHessians[i]==0)
@@ -1126,12 +1137,14 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	// =========================== OPTIMIZE ALL =========================
 
+	// 滑动窗口优化
 	fh->frameEnergyTH = frameHessians.back()->frameEnergyTH;
 	float rmse = optimize(setting_maxOptIterations);
 
 
 
 	// =========================== Figure Out if INITIALIZATION FAILED =========================
+	// 判断初始化是否成功
 	if(allKeyFramesHistory.size() <= 4)
 	{
 		if(allKeyFramesHistory.size()==2 && rmse > 20*benchmark_initializerSlackFactor)
@@ -1151,55 +1164,45 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		}
 	}
 
-
-
     if(isLost) 
 		return;
-
-
-
 
 	// =========================== REMOVE OUTLIER =========================
 	removeOutliers();
 
-
-
-
 	{
 		boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
+		// 把新的calib用于tracker
 		coarseTracker_forNewKF->makeK(&Hcalib);
+		// 新的关键帧队列用于tracker
 		coarseTracker_forNewKF->setCoarseTrackingRef(frameHessians);
-
-
 
         coarseTracker_forNewKF->debugPlotIDepthMap(&minIdJetVisTracker, &maxIdJetVisTracker, outputWrapper);
         coarseTracker_forNewKF->debugPlotIDepthMapFloat(outputWrapper);
 	}
 
-
 	debugPlot("post Optimize");
 
-
-
-
-
-
 	// =========================== (Activate-)Marginalize Points =========================
+
+	// 标记外点
 	flagPointsForRemoval();
+	// 再次移除外点
 	ef->dropPointsF();
+	// 获取零空间
 	getNullspaces(
 			ef->lastNullspaces_pose,
 			ef->lastNullspaces_scale,
 			ef->lastNullspaces_affA,
 			ef->lastNullspaces_affB);
+
+	// TODO: 边缘化点，待看。。
+	// 边缘化
 	ef->marginalizePointsF();
 
-
-
 	// =========================== add new Immature points & new residuals =========================
+	// 增加新的未熟点
 	makeNewTraces(fh, 0);
-
-
 
 
 
@@ -1215,13 +1218,13 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	for(unsigned int i=0;i<frameHessians.size();i++)
 		if(frameHessians[i]->flaggedForMarginalization)
-			{marginalizeFrame(frameHessians[i]); i=0;}
-
-
+		{
+			// TODO: 边缘化,待看
+			marginalizeFrame(frameHessians[i]); 
+			i=0;
+		}
 
 	printLogLine();
-    //printEigenValLine();
-
 }
 
 
@@ -1320,29 +1323,41 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
 }
 
+// 选择未熟点，添加到队列
 void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 {
 	pixelSelector->allowFast = true;
 	//int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
 	int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
 
+	// 预留一些空间
 	newFrame->pointHessians.reserve(numPointsTotal*1.2f);
-	//fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
 	newFrame->pointHessiansMarginalized.reserve(numPointsTotal*1.2f);
 	newFrame->pointHessiansOut.reserve(numPointsTotal*1.2f);
 
 
-	for(int y=patternPadding+1;y<hG[0]-patternPadding-2;y++)
-	for(int x=patternPadding+1;x<wG[0]-patternPadding-2;x++)
-	{
-		int i = x+y*wG[0];
-		if(selectionMap[i]==0) continue;
+	for(int y=patternPadding+1;y<hG[0]-patternPadding-2;y++){
+		for(int x=patternPadding+1;x<wG[0]-patternPadding-2;x++)
+		{
 
-		ImmaturePoint* impt = new ImmaturePoint(x,y,newFrame, selectionMap[i], &Hcalib);
-		if(!std::isfinite(impt->energyTH)) delete impt;
-		else newFrame->immaturePoints.push_back(impt);
+#ifdef PAL // 排除外部的点
+			if(!pal_check_in_range_g(x, y, patternPadding+1)){
+				continue;
+			}
+#endif
+			int i = x+y*wG[0];
+			if(selectionMap[i]==0) 
+				continue;
 
+			ImmaturePoint* impt = new ImmaturePoint(x,y,newFrame, selectionMap[i], &Hcalib);
+			if(!std::isfinite(impt->energyTH)) 
+				delete impt;
+			else 
+				newFrame->immaturePoints.push_back(impt);
+
+		}
 	}
+
 	//printf("MADE %d IMMATURE POINTS!\n", (int)newFrame->immaturePoints.size());
 
 }

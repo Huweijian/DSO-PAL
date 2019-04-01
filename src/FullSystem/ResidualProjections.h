@@ -69,7 +69,7 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		// -----------------------------------
 		float &Ku, float &Kv)
 {
-#ifndef PAL
+#ifdef PAL
 
 	Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
 	Vec2f ptp_2d = pal_model_g->world2cam(ptp);

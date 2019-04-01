@@ -318,19 +318,23 @@ void EnergyFunctional::resubstituteFPt(
 	}
 }
 
-
+// 计算M能量
 double EnergyFunctional::calcMEnergyF()
 {
-
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
+	// 获取相机+所有帧的delta组成的向量
 	VecX delta = getStitchedDeltaF();
+	
+	// 所有delta点乘 2*bM+HM*delta
 	return delta.dot(2*bM + HM*delta);
 }
 
 
+// TODO: 没看懂
+// 累计点能量
 void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 {
 
@@ -338,19 +342,21 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 	E.initialize();
 	VecCf dc = cDeltaF;
 
+	// 枚举所有点
 	for(int i=min;i<max;i++)
 	{
 		EFPoint* p = allPoints[i];
 		float dd = p->deltaF;
 
+		// 枚举点的所有残差
 		for(EFResidual* r : p->residualsAll)
 		{
-			if(!r->isLinearized || !r->isActive()) continue;
+			if(!r->isLinearized || !r->isActive()) 
+				continue;
 
 			Mat18f dp = adHTdeltaF[r->hostIDX+nFrames*r->targetIDX];
+
 			RawResidualJacobian* rJ = r->J;
-
-
 
 			// compute Jp*delta
 			float Jp_delta_x_1 =  rJ->Jpdxi[0].dot(dp.head<6>())
@@ -395,22 +401,28 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 
 
 
-
+// 计算L能量
+// TODO: 没看懂
 double EnergyFunctional::calcLEnergyF_MT()
 {
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
+	// 计算帧能量
 	double E = 0;
+	// E+= delta_prior 元素乘 prior 点乘 delta_prior
+	// 枚举所有关键帧，帧能量等于 delta先验 元素乘 先验 点乘 delta先验
 	for(EFFrame* f : frames)
         E += f->delta_prior.cwiseProduct(f->prior).dot(f->delta_prior);
-
+	// 帧能量再处理一下（没看懂）
 	E += cDeltaF.cwiseProduct(cPriorF).dot(cDeltaF);
 
+	// 计算点能量
 	red->reduce(boost::bind(&EnergyFunctional::calcLEnergyPt,
 			this, _1, _2, _3, _4), 0, allPoints.size(), 50);
 
+	// 返回帧和点的总能量
 	return E+red->stats[0];
 }
 
@@ -483,28 +495,31 @@ EFPoint* EnergyFunctional::insertPoint(PointHessian* ph)
 	return efp;
 }
 
-
+// 抛弃残差（一些残差的帧被抛弃了，所以点也不能独立存在，需要被抛弃）
 void EnergyFunctional::dropResidual(EFResidual* r)
 {
+	// 从点中剥离这个残差
 	EFPoint* p = r->point;
 	assert(r == p->residualsAll[r->idxInAll]);
-
 	p->residualsAll[r->idxInAll] = p->residualsAll.back();
 	p->residualsAll[r->idxInAll]->idxInAll = r->idxInAll;
 	p->residualsAll.pop_back();
 
-
+	// 修改shell的统计数据	
 	if(r->isActive())
 		r->host->data->shell->statistics_goodResOnThis++;
 	else
 		r->host->data->shell->statistics_outlierResOnThis++;
 
-
+	// 删除连接性表
     connectivityMap[(((uint64_t)r->host->frameID) << 32) + ((uint64_t)r->target->frameID)][0]--;
 	nResiduals--;
+
+	// 删除efr
 	r->data->efResidual=0;
 	delete r;
 }
+
 void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 {
 
@@ -619,9 +634,6 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	delete fh;
 }
 
-
-
-
 void EnergyFunctional::marginalizePointsF()
 {
 	assert(EFDeltaValid);
@@ -687,13 +699,13 @@ void EnergyFunctional::marginalizePointsF()
 
 void EnergyFunctional::dropPointsF()
 {
-
-
+	// 枚举所有帧所有点
 	for(EFFrame* f : frames)
 	{
 		for(int i=0;i<(int)f->points.size();i++)
 		{
 			EFPoint* p = f->points[i];
+			// 如果被标记为drop,就移除点
 			if(p->stateFlag == EFPointStatus::PS_DROP)
 			{
 				removePoint(p);
@@ -709,19 +721,22 @@ void EnergyFunctional::dropPointsF()
 
 void EnergyFunctional::removePoint(EFPoint* p)
 {
+	// 移除和点相关的efr
 	for(EFResidual* r : p->residualsAll)
 		dropResidual(r);
 
+	// 从宿主帧中删除这个点
 	EFFrame* h = p->host;
 	h->points[p->idxInPoints] = h->points.back();
 	h->points[p->idxInPoints]->idxInPoints = p->idxInPoints;
 	h->points.pop_back();
-
 	nPoints--;
+
+	// 从对应的ph中删除这个点
 	p->data->efPoint = 0;
 
+	// idx无效
 	EFIndicesValid = false;
-
 	delete p;
 }
 
@@ -782,10 +797,13 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 }
 
 
+// 求解系统
 void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
 {
-	if(setting_solverMode & SOLVER_USE_GN) lambda=0;
-	if(setting_solverMode & SOLVER_FIX_LAMBDA) lambda = 1e-5;
+	if(setting_solverMode & SOLVER_USE_GN) 
+		lambda=0;
+	if(setting_solverMode & SOLVER_FIX_LAMBDA) 
+		lambda = 1e-5;
 
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
@@ -794,23 +812,13 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 	MatXX HL_top, HA_top, H_sc;
 	VecX  bL_top, bA_top, bM_top, b_sc;
 
-	accumulateAF_MT(HA_top, bA_top,multiThreading);
+	accumulateAF_MT(HA_top, bA_top, multiThreading);
 
+	accumulateLF_MT(HL_top, bL_top, multiThreading);
 
-	accumulateLF_MT(HL_top, bL_top,multiThreading);
-
-
-
-	accumulateSCF_MT(H_sc, b_sc,multiThreading);
-
-
+	accumulateSCF_MT(H_sc, b_sc, multiThreading);
 
 	bM_top = (bM+ HM * getStitchedDeltaF());
-
-
-
-
-
 
 
 	MatXX HFinal_top;
@@ -902,8 +910,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
 	}
 
-
-
 	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
 	{
 		VecX xOld = x;
@@ -948,8 +954,16 @@ void EnergyFunctional::makeIDX()
 
 VecX EnergyFunctional::getStitchedDeltaF() const
 {
-	VecX d = VecX(CPARS+nFrames*8); d.head<CPARS>() = cDeltaF.cast<double>();
-	for(int h=0;h<nFrames;h++) d.segment<8>(CPARS+8*h) = frames[h]->delta;
+	VecX d = VecX(CPARS+nFrames*8);
+
+	//取出相机DeltaF
+	d.head<CPARS>() = cDeltaF.cast<double>();
+
+	// 取出每一帧的delta
+	for(int h=0;h<nFrames;h++) 
+		d.segment<8>(CPARS+8*h) = frames[h]->delta;
+	
+	// 返回所有的delta
 	return d;
 }
 

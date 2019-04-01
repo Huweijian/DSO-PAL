@@ -179,11 +179,12 @@ struct FrameHessian
 
 
 	void setStateZero(const Vec10 &state_zero);
+
 	inline void setState(const Vec10 &state)
 	{
 
 		this->state = state;
-		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
+		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0); //位移乘以0.5？？
 		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
 		state_scaled[6] = SCALE_A * state[6];
 		state_scaled[7] = SCALE_B * state[7];
@@ -192,8 +193,8 @@ struct FrameHessian
 
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
-		//setCurrentNullspace();
 	};
+
 	inline void setStateScaled(const Vec10 &state_scaled)
 	{
 
@@ -209,10 +210,14 @@ struct FrameHessian
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	};
+
+
+	// 设置位姿和状态
 	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state)
 	{
-
 		this->worldToCam_evalPT = worldToCam_evalPT;
+
+		// TODO: 这里有点复杂，回头再看看。
 		setState(state);
 		setStateZero(state);
 	};
@@ -243,9 +248,8 @@ struct FrameHessian
 
 		}
 
-
-
-		if(debugImage != 0) delete debugImage;
+		if(debugImage != 0) 
+			delete debugImage;
 	};
 	inline FrameHessian()
 	{
@@ -467,32 +471,39 @@ struct PointHessian
 	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
     inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;}
 
-
+	// toKeep变量没用
 	inline bool isOOB(const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg) const
 	{
-
 		int visInToMarg = 0;
+		// 如果这个点的pfr的状态不是IN，那么看看它的target是不是需要被mag的帧,如果是，visIntoMag++
 		for(PointFrameResidual* r : residuals)
 		{
-			if(r->state_state != ResState::IN) continue;
+			if(r->state_state != ResState::IN) 
+				continue;
 			for(FrameHessian* k : toMarg)
-				if(r->target == k) visInToMarg++;
+				if(r->target == k) 
+					visInToMarg++;
 		}
+
+		// 这个点的残差数目够多，但是减去mag后的数目不够多 并且 好的残差数目很多（感觉这个不会生效啊！）
 		if((int)residuals.size() >= setting_minGoodActiveResForMarg &&
 				numGoodResiduals > setting_minGoodResForMarg+10 &&
 				(int)residuals.size()-visInToMarg < setting_minGoodActiveResForMarg)
+		{
+			// hwj认为第二个条件不会成立
+			printf("numGoodResiduals = %d\n", numGoodResiduals);
+			assert(0);
 			return true;
+		}
 
-
-
-
-
-		if(lastResiduals[0].second == ResState::OOB) return true;
-		if(residuals.size() < 2) return false;
-		if(lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER) return true;
+		if(lastResiduals[0].second == ResState::OOB) 
+			return true;
+		if(residuals.size() < 2) 
+			return false;
+		if(lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER) 
+			return true;
 		return false;
 	}
-
 
 	inline bool isInlierNew()
 	{

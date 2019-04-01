@@ -47,12 +47,12 @@
 
 namespace dso
 {
-
-
 	void FullSystem::debugPlotTracking()
 	{
-		if(disableAllDisplay) return;
-		if(!setting_render_plotTrackingFull) return;
+		if(disableAllDisplay) 
+			return;
+		if(!setting_render_plotTrackingFull) 
+			return;
 		int wh = hG[0]*wG[0];
 
 		int idx=0;
