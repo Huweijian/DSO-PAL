@@ -4,7 +4,7 @@
 #include "pal_model.h"
 #include <string>
 
-// #define PAL
+#define PAL
 const int pal_max_level = 6;
 extern cv::Mat pal_mask_g[pal_max_level];
 extern pal::PALCamera* pal_model_g;
@@ -30,3 +30,15 @@ bool pal_check_in_range_g(float u, float v, float padding, int level = 0);
 bool pal_check_in_range_g(int idx, int lvl = 0);
 
 bool init_pal(std::string calibFile);
+
+inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Matrix3f &R, const Eigen::Vector3f t, 
+    float &u, float &v, float &Ku, float &Kv)
+    {
+    Eigen::Vector3f pt = R * pal_model_g->cam2world(u_ori, v_ori) + t*idepth;
+    u = pt[0] / pt[2];
+    v = pt[1] / pt[2];
+
+    Eigen::Vector2f Kpt = pal_model_g->world2cam(pt);
+    Ku = Kpt[0];
+    Kv = Kpt[1];
+}

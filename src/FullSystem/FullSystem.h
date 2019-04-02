@@ -156,7 +156,7 @@ public:
 	bool isLost;
 	bool initFailed;
 	bool initialized;
-	bool linearizeOperation;
+	bool linearizeOperation = true;
 
 
 	void setGammaFunction(float* BInv);

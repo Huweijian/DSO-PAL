@@ -86,13 +86,13 @@ CoarseTracker::CoarseTracker(int ww, int hh) : lastRef_aff_g2l(0,0)
     buf_warped_weight = allocAligned<4,float>(ww*hh, ptrToDelete);
     buf_warped_refColor = allocAligned<4,float>(ww*hh, ptrToDelete);
 
-
 	newFrame = 0;
 	lastRef = 0;
 	debugPlot = debugPrint = true;
 	w[0]=h[0]=0;
 	refFrameID=-1;
 }
+
 CoarseTracker::~CoarseTracker()
 {
     for(float* ptr : ptrToDelete)
@@ -131,34 +131,37 @@ void CoarseTracker::makeK(CalibHessian* HCalib)
 	}
 }
 
-
-// TODO: 这个没细看，回头再说
+// 设置深度图
 void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 {
 	// make coarse tracking templates for latstRef.
 	memset(idepth[0], 0, sizeof(float)*w[0]*h[0]);
 	memset(weightSums[0], 0, sizeof(float)*w[0]*h[0]);
 
+	// 枚举关键帧内的所有的ph，如果还是内点，就
 	for(FrameHessian* fh : frameHessians)
 	{
 		for(PointHessian* ph : fh->pointHessians)
 		{
 			if(ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN)
 			{
+				// 获取ph到最新关键帧的pfr
 				PointFrameResidual* r = ph->lastResiduals[0].first;
 				assert(r->efResidual->isActive() && r->target == lastRef);
+				// ph投影到最新关键帧的坐标
 				int u = r->centerProjectedTo[0] + 0.5f;
 				int v = r->centerProjectedTo[1] + 0.5f;
 				float new_idepth = r->centerProjectedTo[2];
 				float weight = sqrtf(1e-3 / (ph->efPoint->HdiF+1e-12));
 
-				idepth[0][u+w[0]*v] += new_idepth *weight;
+				// 保存到深度图和权重图
+				idepth[0][u+w[0]*v] += new_idepth * weight;
 				weightSums[0][u+w[0]*v] += weight;
 			}
 		}
 	}
 
-
+	// 枚举高层金字塔,计算深度图和误差图
 	for(int lvl=1; lvl<pyrLevelsUsed; lvl++)
 	{
 		int lvlm1 = lvl-1;
@@ -186,12 +189,12 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 			}
 	}
 
-
+	// 对0-2层金字塔膨胀一次权重图
+	// 下面这两段好像没用
     // dilate idepth by 1.
 	for(int lvl=0; lvl<2; lvl++)
 	{
 		int numIts = 1;
-
 
 		for(int it=0;it<numIts;it++)
 		{
@@ -202,8 +205,11 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 			memcpy(weightSumsl_bak, weightSumsl, w[lvl]*h[lvl]*sizeof(float));
 			float* idepthl = idepth[lvl];	// dotnt need to make a temp copy of depth, since I only
 											// read values with weightSumsl>0, and write ones with weightSumsl<=0.
+
+			// 枚举所有weightSumsl_bak点
 			for(int i=w[lvl];i<wh;i++)
 			{
+				// 如果没有赋值过，用周围值的平均值填充这一点
 				if(weightSumsl_bak[i] <= 0)
 				{
 					float sum=0, num=0, numn=0;
@@ -211,13 +217,16 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 					if(weightSumsl_bak[i-1-wl] > 0) { sum += idepthl[i-1-wl]; num+=weightSumsl_bak[i-1-wl]; numn++;}
 					if(weightSumsl_bak[i+wl-1] > 0) { sum += idepthl[i+wl-1]; num+=weightSumsl_bak[i+wl-1]; numn++;}
 					if(weightSumsl_bak[i-wl+1] > 0) { sum += idepthl[i-wl+1]; num+=weightSumsl_bak[i-wl+1]; numn++;}
-					if(numn>0) {idepthl[i] = sum/numn; weightSumsl[i] = num/numn;}
+					if(numn>0) {
+						idepthl[i] = sum/numn;
+						weightSumsl[i] = num/numn;
+					}
 				}
 			}
 		}
 	}
 
-
+	// 对金字塔2层以上的深度图膨胀
 	// dilate idepth by 1 (2 on lower levels).
 	for(int lvl=2; lvl<pyrLevelsUsed; lvl++)
 	{
@@ -237,13 +246,19 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 				if(weightSumsl_bak[i-1] > 0) { sum += idepthl[i-1]; num+=weightSumsl_bak[i-1]; numn++;}
 				if(weightSumsl_bak[i+wl] > 0) { sum += idepthl[i+wl]; num+=weightSumsl_bak[i+wl]; numn++;}
 				if(weightSumsl_bak[i-wl] > 0) { sum += idepthl[i-wl]; num+=weightSumsl_bak[i-wl]; numn++;}
-				if(numn>0) {idepthl[i] = sum/numn; weightSumsl[i] = num/numn;}
+				if(numn>0) 
+				{
+					idepthl[i] = sum/numn; 
+					weightSumsl[i] = num/numn;
+				}
 			}
 		}
 	}
 
-
 	// normalize idepths and weights.
+	// 归一化深度
+	// 枚举每一层，每一个点，idep /= weight(之前深度是加权深度，这里再除以权重，变成真正的深度)
+	// 把结果赋值导pc_xxx 变量
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
 		float* weightSumsl = weightSums[lvl];
@@ -258,7 +273,6 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 		float* lpc_idepth = pc_idepth[lvl];
 		float* lpc_color = pc_color[lvl];
 
-
 		for(int y=2;y<hl-2;y++)
 			for(int x=2;x<wl-2;x++)
 			{
@@ -271,8 +285,6 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 					lpc_v[lpc_n] = y;
 					lpc_idepth[lpc_n] = idepthl[i];
 					lpc_color[lpc_n] = dIRefl[i][0];
-
-
 
 					if(!std::isfinite(lpc_color[lpc_n]) || !(idepthl[i]>0))
 					{
@@ -292,17 +304,17 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 
 }
 
-
-
+// SSE计算梯度
 void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l)
 {
 	acc.initialize();
-
+	// SSE准备
+#ifndef PAL
 	__m128 fxl = _mm_set1_ps(fx[lvl]);
 	__m128 fyl = _mm_set1_ps(fy[lvl]);
+#endif
 	__m128 b0 = _mm_set1_ps(lastRef_aff_g2l.b);
 	__m128 a = _mm_set1_ps((float)(AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l)[0]));
-
 	__m128 one = _mm_set1_ps(1);
 	__m128 minusOne = _mm_set1_ps(-1);
 	__m128 zero = _mm_set1_ps(0);
@@ -311,28 +323,57 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 	assert(n%4==0);
 	for(int i=0;i<n;i+=4)
 	{
+#ifdef PAL
+		float buf_drdSE3[6][4];
+		for(int k=0; k<4; k++){
+			Vec3f pt = pal_model_g->cam2world(buf_warped_u[i+k], buf_warped_v[i+k]) / buf_warped_idepth[i+k];
+			Eigen::Matrix<float, 2, 6> dx2dSE;
+			Eigen::Matrix<float, 2, 3> duv2dxyz;
+			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+			Vec6f drdSE3 = Vec2f(buf_warped_dx[i+k], buf_warped_dy[i+k]).transpose() * dx2dSE ;
+			for(int idx=0; idx<6; idx++){
+				buf_drdSE3[idx][k] = drdSE3[idx];	
+			}
+		}
+
+		// 对SE的导数就是基本的直接法导数
+		acc.updateSSE_weighted(
+			_mm_load_ps(buf_drdSE3[0]),
+			_mm_load_ps(buf_drdSE3[1]),
+			_mm_load_ps(buf_drdSE3[2]),
+			_mm_load_ps(buf_drdSE3[3]),
+			_mm_load_ps(buf_drdSE3[4]),
+			_mm_load_ps(buf_drdSE3[5]),
+			_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
+			minusOne,																			// 光度b -1 
+			_mm_load_ps(buf_warped_residual+i),													// res
+			_mm_load_ps(buf_warped_weight+i)													// weight
+		);
+
+#else
 		__m128 dx = _mm_mul_ps(_mm_load_ps(buf_warped_dx+i), fxl);
 		__m128 dy = _mm_mul_ps(_mm_load_ps(buf_warped_dy+i), fyl);
 		__m128 u = _mm_load_ps(buf_warped_u+i);
 		__m128 v = _mm_load_ps(buf_warped_v+i);
 		__m128 id = _mm_load_ps(buf_warped_idepth+i);
 
-
-		acc.updateSSE_eighted(
-				_mm_mul_ps(id,dx),
-				_mm_mul_ps(id,dy),
-				_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))),
-				_mm_sub_ps(zero, _mm_add_ps(
+		// 对SE的导数就是基本的直接法导数
+		acc.updateSSE_weighted(
+				_mm_mul_ps(id,dx),																	// SE0 idep * gx * fx 
+				_mm_mul_ps(id,dy),																	// SE1 idep * gy * fy
+				_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))), 	// SE2 -idepth * (u*gx*fx + v*gy*fy)
+				_mm_sub_ps(zero, _mm_add_ps(														// SE3 -(u*v*gx*fx + gy*fy*(1+v^2))	
 						_mm_mul_ps(_mm_mul_ps(u,v),dx),
 						_mm_mul_ps(dy,_mm_add_ps(one, _mm_mul_ps(v,v))))),
-				_mm_add_ps(
+				_mm_add_ps(																			// SE4 u*v*gy*fy + gx*fx*(1+u^2)
 						_mm_mul_ps(_mm_mul_ps(u,v),dy),
 						_mm_mul_ps(dx,_mm_add_ps(one, _mm_mul_ps(u,u)))),
-				_mm_sub_ps(_mm_mul_ps(u,dy), _mm_mul_ps(v,dx)),
-				_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),
-				minusOne,
-				_mm_load_ps(buf_warped_residual+i),
-				_mm_load_ps(buf_warped_weight+i));
+				_mm_sub_ps(_mm_mul_ps(u,dy), _mm_mul_ps(v,dx)),										// SE5 u*gy*fy - v*gx*fx
+				_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
+				minusOne,																			// 光度b -1 
+				_mm_load_ps(buf_warped_residual+i),													// res
+				_mm_load_ps(buf_warped_weight+i));													// weight
+#endif
 	}
 
 	acc.finish();
@@ -355,7 +396,7 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 
 
 
-
+// 返回值： 0：总能量 1：能量的数目 2,3,4:纯旋转和旋转位移下的像素平移量 5:残差大于阈值的百分比
 Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH)
 {
 	float E = 0;
@@ -366,24 +407,27 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 	int wl = w[lvl];
 	int hl = h[lvl];
 	Eigen::Vector3f* dINewl = newFrame->dIp[lvl];
+	
+#ifndef PAL
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
+#endif
 
-
+	// 准备变量
 	Mat33f RKi = (refToNew.rotationMatrix().cast<float>() * Ki[lvl]);
 	Vec3f t = (refToNew.translation()).cast<float>();
 	Vec2f affLL = AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l).cast<float>();
-
 
 	float sumSquaredShiftT=0;
 	float sumSquaredShiftRT=0;
 	float sumSquaredShiftNum=0;
 
-	float maxEnergy = 2*setting_huberTH*cutoffTH-setting_huberTH*setting_huberTH;	// energy for r=setting_coarseCutoffTH.
+	// maxEnergy = 2*huberTH*cutoffTH - huberTH^2
+	float maxEnergy = 2*setting_huberTH*cutoffTH - setting_huberTH*setting_huberTH;	// energy for r=setting_coarseCutoffTH.
 
-
+	// debug图像
     MinimalImageB3* resImage = 0;
 	if(debugPlot)
 	{
@@ -397,22 +441,47 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 	float* lpc_idepth = pc_idepth[lvl];
 	float* lpc_color = pc_color[lvl];
 
-
+	// 枚举最新关键帧的所有点云
 	for(int i=0;i<nl;i++)
 	{
 		float id = lpc_idepth[i];
 		float x = lpc_u[i];
 		float y = lpc_v[i];
-
+#ifdef PAL
+		Vec3f pt = RKi * pal_model_g->cam2world(x, y) + t*id;
+		float u = pt[0] / pt[2];
+		float v = pt[1] / pt[2];
+		Vec2f Kpt = pal_model_g->world2cam(pt);
+		float Ku = Kpt[0];
+		float Kv = Kpt[1];
+#else
 		Vec3f pt = RKi * Vec3f(x, y, 1) + t*id;
 		float u = pt[0] / pt[2];
 		float v = pt[1] / pt[2];
 		float Ku = fxl * u + cxl;
 		float Kv = fyl * v + cyl;
+#endif
+
 		float new_idepth = id/pt[2];
 
+		// 对于第0层
 		if(lvl==0 && i%32==0)
 		{
+#ifdef PAL
+			// translation only (positive)
+			float uT, vT, KuT, KvT; 
+			pal_project(x, y, id, Mat33f::Identity(), t, uT, vT, KuT, KvT);
+
+			// translation only (negative)
+			float uT2, vT2, KuT2, KvT2; 
+			pal_project(x, y, id, Mat33f::Identity(), -t, uT2, vT2, KuT2, KvT2);
+
+			//translation and rotation (negative)
+			float u3, v3, Ku3, Kv3; 
+			pal_project(x, y, id, RKi, -t, u3, v3, Ku3, Kv3);
+
+#else
+
 			// translation only (positive)
 			Vec3f ptT = Ki[lvl] * Vec3f(x, y, 1) + t*id;
 			float uT = ptT[0] / ptT[2];
@@ -436,35 +505,48 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 
 			//translation and rotation (positive)
 			//already have it.
-
+#endif
+			// 假设纯位移，点的移动值
 			sumSquaredShiftT += (KuT-x)*(KuT-x) + (KvT-y)*(KvT-y);
 			sumSquaredShiftT += (KuT2-x)*(KuT2-x) + (KvT2-y)*(KvT2-y);
+			// 旋转+位移 点的移动值
 			sumSquaredShiftRT += (Ku-x)*(Ku-x) + (Kv-y)*(Kv-y);
 			sumSquaredShiftRT += (Ku3-x)*(Ku3-x) + (Kv3-y)*(Kv3-y);
 			sumSquaredShiftNum+=2;
 		}
 
-		if(!(Ku > 2 && Kv > 2 && Ku < wl-3 && Kv < hl-3 && new_idepth > 0)) continue;
-
+#ifdef PAL
+		if(!(pal_check_in_range_g(Ku, Kv, 3) && new_idepth > 0)) {
+#else
+		if(!(Ku > 2 && Kv > 2 && Ku < wl-3 && Kv < hl-3 && new_idepth > 0)) {
+#endif
+			continue;
+		}
 
 
 		float refColor = lpc_color[i];
         Vec3f hitColor = getInterpolatedElement33(dINewl, Ku, Kv, wl);
-        if(!std::isfinite((float)hitColor[0])) continue;
+
+        if(!std::isfinite((float)hitColor[0])) 
+			continue;
+
         float residual = hitColor[0] - (float)(affLL[0] * refColor + affLL[1]);
         float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 
-
+		// 误差太大了只累加能量
 		if(fabs(residual) > cutoffTH)
 		{
-			if(debugPlot) resImage->setPixel4(lpc_u[i], lpc_v[i], Vec3b(0,0,255));
+			if(debugPlot) 
+				resImage->setPixel4(lpc_u[i], lpc_v[i], Vec3b(0,0,255));
 			E += maxEnergy;
 			numTermsInE++;
 			numSaturated++;
 		}
+		// 误差还行，进一步保存一些东西
 		else
 		{
-			if(debugPlot) resImage->setPixel4(lpc_u[i], lpc_v[i], Vec3b(residual+128,residual+128,residual+128));
+			if(debugPlot) 
+				resImage->setPixel4(lpc_u[i], lpc_v[i], Vec3b(residual+128,residual+128,residual+128));
 
 			E += hw *residual*residual*(2-hw);
 			numTermsInE++;
@@ -481,6 +563,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 		}
 	}
 
+	// 凑够4的倍数
 	while(numTermsInWarped%4!=0)
 	{
 		buf_warped_idepth[numTermsInWarped] = 0;
@@ -506,16 +589,15 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 	Vec6 rs;
 	rs[0] = E;
 	rs[1] = numTermsInE;
+
 	rs[2] = sumSquaredShiftT/(sumSquaredShiftNum+0.1);
 	rs[3] = 0;
 	rs[4] = sumSquaredShiftRT/(sumSquaredShiftNum+0.1);
+
 	rs[5] = numSaturated / (float)numTermsInE;
 
 	return rs;
 }
-
-
-
 
 
 
@@ -536,24 +618,22 @@ void CoarseTracker::setCoarseTrackingRef(
 	lastRef_aff_g2l = lastRef->aff_g2l();
 
 	firstCoarseRMSE=-1;
-
 }
+
 bool CoarseTracker::trackNewestCoarse(
 		FrameHessian* newFrameHessian,
-		SE3 &lastToNew_out, AffLight &aff_g2l_out,
+		SE3 &lastToNew_out, AffLight &aff_g2l_out, //位姿和光度ab是要输出的
 		int coarsestLvl,
 		Vec5 minResForAbort,
 		IOWrap::Output3DWrapper* wrap)
 {
 	debugPlot = setting_render_displayCoarseTrackingFull;
 	debugPrint = false;
-
 	assert(coarsestLvl < 5 && coarsestLvl < pyrLevelsUsed);
 
+	// 初始化
 	lastResiduals.setConstant(NAN);
 	lastFlowIndicators.setConstant(1000);
-
-
 	newFrame = newFrameHessian;
 	int maxIterations[] = {10,20,50,50,50};
 	float lambdaExtrapolationLimit = 0.001;
@@ -563,12 +643,15 @@ bool CoarseTracker::trackNewestCoarse(
 
 	bool haveRepeated = false;
 
-
+	// 从金字塔最高层向下主层追踪	
 	for(int lvl=coarsestLvl; lvl>=0; lvl--)
 	{
 		Mat88 H; Vec8 b;
 		float levelCutoffRepeat=1;
+		// 计算当前位姿的残差
 		Vec6 resOld = calcRes(lvl, refToNew_current, aff_g2l_current, setting_coarseCutoffTH*levelCutoffRepeat);
+
+		// 如果大残差数目过多，放宽一点残差阈值再算一次（不能超过50）
 		while(resOld[5] > 0.6 && levelCutoffRepeat < 50)
 		{
 			levelCutoffRepeat*=2;
@@ -578,6 +661,8 @@ bool CoarseTracker::trackNewestCoarse(
                 printf("INCREASING cutoff to %f (ratio is %f)!\n", setting_coarseCutoffTH*levelCutoffRepeat, resOld[5]);
 		}
 
+		// SSE 计算H和b
+		// SE3基本没用，亮度有一点点用
 		calcGSSSE(lvl, H, b, refToNew_current, aff_g2l_current);
 
 		float lambda = 0.01;
@@ -598,10 +683,13 @@ bool CoarseTracker::trackNewestCoarse(
 
 		for(int iteration=0; iteration < maxIterations[lvl]; iteration++)
 		{
+			// 求解增量
 			Mat88 Hl = H;
-			for(int i=0;i<8;i++) Hl(i,i) *= (1+lambda);
+			for(int i=0;i<8;i++) 
+				Hl(i,i) *= (1+lambda);
 			Vec8 inc = Hl.ldlt().solve(-b);
 
+			// 根据不同光度模式，单独设置光度增量
 			if(setting_affineOptModeA < 0 && setting_affineOptModeB < 0)	// fix a, b
 			{
 				inc.head<6>() = Hl.topLeftCorner<6,6>().ldlt().solve(-b.head<6>());
@@ -626,28 +714,32 @@ bool CoarseTracker::trackNewestCoarse(
 				inc[7] = incStitch[6];
 			}
 
-
-
-
+			// 如果lambda太小，步长扩大一点
 			float extrapFac = 1;
-			if(lambda < lambdaExtrapolationLimit) extrapFac = sqrt(sqrt(lambdaExtrapolationLimit / lambda));
+			if(lambda < lambdaExtrapolationLimit) 
+				extrapFac = sqrt(sqrt(lambdaExtrapolationLimit / lambda));
 			inc *= extrapFac;
 
+			// 带系数的增量
 			Vec8 incScaled = inc;
 			incScaled.segment<3>(0) *= SCALE_XI_ROT;
 			incScaled.segment<3>(3) *= SCALE_XI_TRANS;
 			incScaled.segment<1>(6) *= SCALE_A;
 			incScaled.segment<1>(7) *= SCALE_B;
 
-            if(!std::isfinite(incScaled.sum())) incScaled.setZero();
+            if(!std::isfinite(incScaled.sum())) 
+				incScaled.setZero();
 
+			//应用增量，新的状态变量存储在xxx_new变量中
 			SE3 refToNew_new = SE3::exp((Vec6)(incScaled.head<6>())) * refToNew_current;
 			AffLight aff_g2l_new = aff_g2l_current;
 			aff_g2l_new.a += incScaled[6];
 			aff_g2l_new.b += incScaled[7];
-
+			
+			// 重新计算res
 			Vec6 resNew = calcRes(lvl, refToNew_new, aff_g2l_new, setting_coarseCutoffTH*levelCutoffRepeat);
 
+			// 误差是否下降
 			bool accept = (resNew[0] / resNew[1]) < (resOld[0] / resOld[1]);
 
 			if(debugPrint)
@@ -663,6 +755,8 @@ bool CoarseTracker::trackNewestCoarse(
 						inc.norm());
 				std::cout << refToNew_new.log().transpose() << " AFF " << aff_g2l_new.vec().transpose() <<" (rel " << relAff.transpose() << ")\n";
 			}
+
+			// 接受增量，重新计算H和b，lambda增加
 			if(accept)
 			{
 				calcGSSSE(lvl, H, b, refToNew_new, aff_g2l_new);
@@ -671,12 +765,15 @@ bool CoarseTracker::trackNewestCoarse(
 				refToNew_current = refToNew_new;
 				lambda *= 0.5;
 			}
+			// 拒绝增量，lambda增加
 			else
 			{
 				lambda *= 4;
-				if(lambda < lambdaExtrapolationLimit) lambda = lambdaExtrapolationLimit;
+				if(lambda < lambdaExtrapolationLimit) 
+					lambda = lambdaExtrapolationLimit;
 			}
 
+			// 增量过小，退出
 			if(!(inc.norm() > 1e-3))
 			{
 				if(debugPrint)
@@ -686,24 +783,28 @@ bool CoarseTracker::trackNewestCoarse(
 		}
 
 		// set last residual for that level, as well as flow indicators.
+		// 保存一下最终的残差
 		lastResiduals[lvl] = sqrtf((float)(resOld[0] / resOld[1]));
-		lastFlowIndicators = resOld.segment<3>(2);
-		if(lastResiduals[lvl] > 1.5*minResForAbort[lvl]) return false;
+		lastFlowIndicators = resOld.segment<3>(2); // resOle[2 3 4] 像素坐标系的位移量
+		//这个变量似乎没用，恒等于NaN
+		if(lastResiduals[lvl] > 1.5*minResForAbort[lvl]) 
+			return false;
 
-
+		// 如果截至阈值大于1,那么就再来重复一遍
 		if(levelCutoffRepeat > 1 && !haveRepeated)
 		{
 			lvl++;
 			haveRepeated=true;
 			printf("REPEAT LEVEL!\n");
 		}
-	}
+	} // 金字塔level
 
 	// set!
+	// 保存更新结果
 	lastToNew_out = refToNew_current;
 	aff_g2l_out = aff_g2l_current;
 
-
+	// 如果光度变化太大，返回false
 	if((setting_affineOptModeA != 0 && (fabsf(aff_g2l_out.a) > 1.2))
 	|| (setting_affineOptModeB != 0 && (fabsf(aff_g2l_out.b) > 200)))
 		return false;
@@ -714,10 +815,10 @@ bool CoarseTracker::trackNewestCoarse(
 	|| (setting_affineOptModeB == 0 && (fabsf((float)relAff[1]) > 200)))
 		return false;
 
-
-
-	if(setting_affineOptModeA < 0) aff_g2l_out.a=0;
-	if(setting_affineOptModeB < 0) aff_g2l_out.b=0;
+	if(setting_affineOptModeA < 0) 
+		aff_g2l_out.a=0;
+	if(setting_affineOptModeB < 0) 
+		aff_g2l_out.b=0;
 
 	return true;
 }

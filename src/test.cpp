@@ -14,28 +14,14 @@ using namespace dso;
 
 int main(void){
 
-    vector<int> pointHessians; 
-    for(int i=1; i<=100; i++){
-        if(i % 10 == 0)
-            pointHessians.push_back(0);
-        else
-            pointHessians.push_back(i);
+    float a = NAN;
+    if(10 < a)
+        cout << "OK" << endl;
+    else
+    {
+        cout <<"not ok" << endl;
     }
-
-    for(unsigned int i=0;i<pointHessians.size();i++){
-        int ph = pointHessians[i];
-
-        if(ph == 0)
-        {
-            pointHessians[i] = pointHessians.back();
-            pointHessians.pop_back();
-            i--;
-        }
-    }
-
-    for(auto i:pointHessians)
-        cout << i << " ";
-
+    
     return 0;
 
     init_pal("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 

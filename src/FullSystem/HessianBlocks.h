@@ -485,14 +485,13 @@ struct PointHessian
 					visInToMarg++;
 		}
 
-		// 这个点的残差数目够多，但是减去mag后的数目不够多 并且 好的残差数目很多（感觉这个不会生效啊！）
+		// 这个点的残差数目够多，但是减去mag后的数目不够多 并且 好的残差数目很多
+		// TODO: 这里再考虑一下
 		if((int)residuals.size() >= setting_minGoodActiveResForMarg &&
 				numGoodResiduals > setting_minGoodResForMarg+10 &&
 				(int)residuals.size()-visInToMarg < setting_minGoodActiveResForMarg)
 		{
-			// hwj认为第二个条件不会成立
-			printf("numGoodResiduals = %d\n", numGoodResiduals);
-			assert(0);
+			// hwj认为第二个条件不会成立 (错了，会成立的，某时刻 numGoodResiduals=20)
 			return true;
 		}
 

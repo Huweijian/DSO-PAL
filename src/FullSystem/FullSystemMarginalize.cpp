@@ -58,7 +58,7 @@ namespace dso
 // 从FH中标记需要边缘化的
 void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 {
-	// TODO: 没看懂 不知道什么时候会发生， 加一个断言把
+	// 默认设置下不会发生，加个断言吧
 	if(setting_minFrameAge > setting_maxFrames)
 	{
 		printf("hwj strange things happens ^_^\n");

@@ -4,7 +4,7 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/src",
+                "${workspaceFolder}/src/",
                 "/opt/ros/kinetic/include/opencv-3.3.1-dev",
                 "/usr/include/eigen3"
             ],

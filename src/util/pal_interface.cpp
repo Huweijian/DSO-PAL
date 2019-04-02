@@ -22,11 +22,11 @@ bool pal_check_in_range_g(float u, float v, float padding, int level){
     return pal_check_in_range_g(u, v, padding, right, bottom, level);
 }
 
-bool pal_check_in_range_g(int idx, int lvl){
-    int cols = pal_mask_g[lvl].cols; 
-    int rows = pal_mask_g[lvl].rows;
-    return pal_check_in_range_g(idx%cols, idx/cols, 0, cols, rows, lvl);
-}
+// bool pal_check_in_range_g(int idx, int lvl){
+//     int cols = pal_mask_g[lvl].cols; 
+//     int rows = pal_mask_g[lvl].rows;
+//     return pal_check_in_range_g(idx%cols, idx/cols, 0, cols, rows, lvl);
+// }
 
 bool init_pal(string calibFile){
     pal_model_g = new pal::PALCamera(calibFile);
