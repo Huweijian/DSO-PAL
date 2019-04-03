@@ -30,19 +30,19 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
-                        "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
-                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
-                        "preset=0", 
-                        "mode=0" 
-                    ],
-
-            // "args": [   "files=/home/hwj23/Dataset/simu/movex_rotatez/color/", 
-            //             "calib=/home/hwj23/Dataset/simu/camera.cfg", 
+            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
+            //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
+            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
             //             "preset=0", 
-            //             "mode=2" 
+            //             "mode=0" 
             //         ],
+
+            "args": [   "files=/home/hwj23/Dataset/simu/movex/color/", 
+                        "calib=/home/hwj23/Dataset/simu/camera.cfg", 
+                        "preset=0", 
+                        "mode=2" 
+                    ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

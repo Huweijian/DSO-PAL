@@ -4,7 +4,7 @@
 #include "pal_model.h"
 #include <string>
 
-#define PAL
+// #define PAL
 const int pal_max_level = 6;
 extern cv::Mat pal_mask_g[pal_max_level];
 extern pal::PALCamera* pal_model_g;

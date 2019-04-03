@@ -87,7 +87,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
     for(IOWrap::Output3DWrapper* ow : wraps)
         ow->pushLiveFrame(newFrameHessian);
 
-	printf("\n - COARSE TRACK Frame %d \n", newFrame->idx);
+	printf("\n - INIT TRACK Frame %d \n", newFrame->shell->incoming_id);
 
 	int maxIterations[] = {5,5,10,30,50};
 
@@ -96,7 +96,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	regWeight = 0.8;//*freeDebugParam4;
 	couplingWeight = 1;//*freeDebugParam5;
 
-	// 如果上一帧没有跟踪成功，重置所有层的所有点的idpeth等于1
+	// 如果有跟踪成功，重置所有层的所有点的idpeth等于1
 	if(!snapped)
 	{
 		thisToNext.translation().setZero();
@@ -123,6 +123,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	// 从高到低枚举金字塔
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
 	{
+		printf("\n - LVL %d start \n", lvl);
+
 		// 上一层的向下传播，初始化本层的
 		if(lvl<pyrLevelsUsed-1)
 			propagateDown(lvl+1);
@@ -133,7 +135,22 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		// 计算初始残差和海森
 		Mat88f H,Hsc; 
 		Vec8f b,bsc;
+
+		// hwjdebug --------------------------
+		// TODO: 测试计算误差功能的正确性
+		Vec6 inc_test;
+		inc_test << -0.001, 0, 0, 0, 0 ,0;
+		for(int i=0; i<50; i++){
+			refToNew_current = SE3::exp(inc_test) * refToNew_current;
+			Vec3f res_test = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
+			float e_total = (res_test[0]+res_test[1]) / res_test[2];
+			printf("res = %.4f ", e_total);
+			std::cout << "current SE3: " << SE3::log(refToNew_current).transpose() << std::endl; 
+		}
+
+		// end ------------------------------------------------------------------------
 		Vec3f resOld = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
+		float eTotalInit = (resOld[0]+resOld[1]) / resOld[2];
 		// 应用计算的结果
 		applyStep(lvl);
 
@@ -194,7 +211,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			// 累计总的能量
 			float eTotalNew = (resNew[0]+resNew[1]+regEnergy[1]);
 			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]);
-
+				
 
 			bool accept = eTotalOld > eTotalNew;
 
@@ -220,7 +237,6 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			{
 
 				if(resNew[1] == alphaK*numPoints[lvl]){
-
 					snapped = true;
 				}
 				H = H_new;
@@ -251,8 +267,10 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 				quitOpt = true;
 			}
 
-			if(quitOpt) 
+			if(quitOpt) {
+				printf(" - LVL %d finished, Err: %.3f -> %.3f\n", lvl, eTotalInit, eTotalNew /  resNew[2]);
 				break;
+			}
 			iteration++;
 		}
 		latestRes = resOld;
@@ -277,11 +295,14 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	if(snapped){
 		printf("!!!!初始化成功(at %d)!!!! now %d\n", snappedAt, frameID);
 	}
+	else{
+		printf("初始化失败(at %d)\n", newFrame->shell->incoming_id);
+	}
 
 	// 输出深度图
 	// HWJDEBUG
-    // debugPlot(0,wraps);
-	// cv::waitKey(1000);
+    debugPlot(0,wraps);
+	cv::waitKey(100);
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;
@@ -604,6 +625,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 	// 如果位移乘以点数足够大，也就是位移足够多(和点数无关)
 	if(alphaEnergy > alphaK*npts)
 	{
+		printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
 		// 那么不进行alpha操作
 		alphaOpt = 0;
 		// alpha能量等于阈值

@@ -14,14 +14,10 @@ using namespace dso;
 
 int main(void){
 
-    float a = NAN;
-    if(10 < a)
-        cout << "OK" << endl;
-    else
-    {
-        cout <<"not ok" << endl;
-    }
-    
+    Eigen::Matrix<double, 6, 1> v;
+    v << 1, 2, 3 ,4 ,5 ,6;
+    cout << v.T;
+
     return 0;
 
     init_pal("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 
