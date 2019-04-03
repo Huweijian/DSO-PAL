@@ -70,7 +70,7 @@
             //             "mode=1" 
             //         ],
 
-            "args": [   "files=/home/hwj23/Dataset/PAL/simu/s1/color/", 
+            "args": [   "files=/home/hwj23/Dataset/PAL/simu/s2/color/", 
                         "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
                         "preset=0", 
                         "mode=2" 

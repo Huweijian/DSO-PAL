@@ -177,12 +177,12 @@ Vector2f PALCamera::world2cam(const Vector3f &xyz_c, int lvl)
     }
     
     float multi = int(1)<<lvl;
-    px = px / multi;
+    px = (px.array() + 0.5f) / multi - 0.5;
 
     return px;
 }
 
-double
+double 
 PALCamera::errorMultiplier2() const
 {
     return 0;

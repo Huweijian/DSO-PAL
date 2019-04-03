@@ -137,18 +137,23 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		Vec8f b,bsc;
 
 		// hwjdebug --------------------------
-		// TODO: 测试计算误差功能的正确性
-		Vec6 inc_test;
-		inc_test << -0.001, 0, 0, 0, 0 ,0;
-		for(int i=0; i<50; i++){
-			refToNew_current = SE3::exp(inc_test) * refToNew_current;
-			Vec3f res_test = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
-			float e_total = (res_test[0]+res_test[1]) / res_test[2];
-			printf("res = %.4f ", e_total);
-			std::cout << "current SE3: " << SE3::log(refToNew_current).transpose() << std::endl; 
-		}
 
-		// end ------------------------------------------------------------------------
+		// Vec6 inc_test_base;
+		// inc_test_base << -0.001, 0, 0, 0, 0 ,0;
+		// for(int i=1; i<60; i++){
+		// 	Vec6 inc_test = inc_test_base;
+		// 	inc_test[0] *= i; 
+		// 	SE3 pose_test = SE3::exp(inc_test) * refToNew_current;
+		// 	Vec3f res_test = calcResAndGS(lvl, H, b, Hsc, bsc, pose_test, refToNew_aff_current, false);
+		// 	float e_total = (res_test[0]+res_test[1]) / res_test[2];
+		// 	printf("res = %.4f ", e_total);
+		// 	std::cout << "current SE3: " << SE3::log(pose_test).transpose() << std::endl; 
+		// 	cv::waitKey();
+		// }
+		// continue;
+
+		// --------------------------------------------------------------------------
+
 		Vec3f resOld = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
 		float eTotalInit = (resOld[0]+resOld[1]) / resOld[2];
 		// 应用计算的结果
@@ -300,9 +305,10 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	}
 
 	// 输出深度图
-	// HWJDEBUG
+	// hwjdebug -------------------- 
     debugPlot(0,wraps);
 	cv::waitKey(100);
+	// -----------------------------
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;
@@ -380,6 +386,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 		const SE3 &refToNew, AffLight refToNew_aff,
 		bool plot)
 {
+	using namespace std;
+	using namespace cv;
+
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f* colorNew = newFrame->dIp[lvl];
@@ -388,6 +397,14 @@ Vec3f CoarseInitializer::calcResAndGS(
 	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
+
+	// hwjdebug -------------------------------------
+	// cout << R << endl; 
+	// cout << RKi << endl;
+	// cout << t.transpose() << endl;
+	cv::Mat resImg = cv::Mat::zeros(hl, wl, CV_8UC1);
+	cv::Mat projImg = cv::Mat::zeros(hl, wl, CV_8UC1);
+	// --------------------------------------------
 
 #ifndef PAL
 	float fxl = fx[lvl];
@@ -482,6 +499,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 			// 亚像素梯度和亮度
 			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);  // 新帧的 [亮度 dx dy]
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl); // 参考帧亮度
+			
+			// hwjdebug==========================
+			if( dx == 0 && dy == 0){
+				projImg.at<uchar>(Kv, Ku) = (uchar)hitColor[0];
+			}
+			// ================================
 
 			// 如果亮度无效，gg
 			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0])){
@@ -563,6 +586,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 			continue;
 		}
 
+		// hwjdebug ----------------------
+		resImg.at<uchar>(point->v, point->u) = energy/10;
+
+		// ------------------------------------
+
 		// 计算完成pattern 8个点的误差，累计能量E，累计8个梯度到acc9中
 		// add into energy.
 		E.updateSingle(energy);
@@ -625,7 +653,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 	// 如果位移乘以点数足够大，也就是位移足够多(和点数无关)
 	if(alphaEnergy > alphaK*npts)
 	{
+		// hwjdebug---------------------------------------
 		printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
+		// --------------------------------------------
+
 		// 那么不进行alpha操作
 		alphaOpt = 0;
 		// alpha能量等于阈值
@@ -684,6 +715,15 @@ Vec3f CoarseInitializer::calcResAndGS(
 	b_out[0] += tlog[0]*alphaOpt*npts;
 	b_out[1] += tlog[1]*alphaOpt*npts;
 	b_out[2] += tlog[2]*alphaOpt*npts;
+
+	// hwjdebug ===================
+	cv::Mat resImg_toshow, projImg_show;
+	cv::resize(resImg, resImg_toshow, cv::Size(w[0], h[0]));
+	cv::resize(projImg, projImg_show, cv::Size(w[0], h[0]));
+	cv::imshow("Res", resImg_toshow);
+	cv::imshow("Proj", projImg_show);
+	cv::waitKey();
+	// -------------------------
 
 	return Vec3f(E.A, alphaEnergy ,E.num);
 }
@@ -1104,10 +1144,19 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 	{
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
+
+#ifdef PAL
+		fx[level] = 1;
+		fy[level] = 1;
+		cx[level] = 0;
+		cy[level] = 0;
+#else
 		fx[level] = fx[level-1] * 0.5;
 		fy[level] = fy[level-1] * 0.5;
 		cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
 		cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
+#endif
+
 	}
 
 	for (int level = 0; level < pyrLevelsUsed; ++ level)

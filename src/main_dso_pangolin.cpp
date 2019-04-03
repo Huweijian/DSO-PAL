@@ -373,8 +373,6 @@ int main( int argc, char** argv )
 	}
 
 
-
-
 	int lstart=start;
 	int lend = end;
 	int linc = 1;
