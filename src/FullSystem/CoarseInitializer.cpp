@@ -87,7 +87,11 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
     for(IOWrap::Output3DWrapper* ow : wraps)
         ow->pushLiveFrame(newFrameHessian);
 
-	printf("\n - INIT TRACK Frame %d \n", newFrame->shell->incoming_id);
+	printf("\n $ INIT-TRACK Frame %d (on %d, %s)\n", 
+		newFrame->shell->incoming_id,
+		firstFrame->shell->incoming_id,
+		snapped? "have snapped" : "NOT  snapped");
+
 
 	int maxIterations[] = {5,5,10,30,50};
 
@@ -112,7 +116,9 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			}
 		}
 	}
-
+	// hwjdebug----------------------
+	std::cout << " $ init Pose: " << SE3::log(thisToNext).transpose() << std::endl;
+	// --------------------
 	// 初始化亮度仿射变换
 	AffLight refToNew_aff_current = thisToNext_aff;
 	if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0)
@@ -717,14 +723,15 @@ Vec3f CoarseInitializer::calcResAndGS(
 	b_out[2] += tlog[2]*alphaOpt*npts;
 
 	// hwjdebug ===================
-	cv::Mat resImg_toshow, projImg_show;
-	cv::resize(resImg, resImg_toshow, cv::Size(w[0], h[0]));
-	cv::resize(projImg, projImg_show, cv::Size(w[0], h[0]));
-	cv::imshow("Res", resImg_toshow);
-	cv::imshow("Proj", projImg_show);
-	cv::waitKey();
+	Mat resImg_toshow, projImg_show;
+	resize(resImg, resImg_toshow, cv::Size(w[0], h[0]));
+	resize(projImg, projImg_show, cv::Size(w[0], h[0]));
+	imshow("Res", resImg_toshow);
+	imshow("Proj", projImg_show);
+	moveWindow("Res", 50, 50);
+	moveWindow("Proj", 50+w[0]+20, 50);
+	waitKey();
 	// -------------------------
-
 	return Vec3f(E.A, alphaEnergy ,E.num);
 }
 
