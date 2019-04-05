@@ -114,17 +114,21 @@ void CoarseTracker::makeK(CalibHessian* HCalib)
 	{
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
-#ifdef PAL
-		fx[level] = 1;
-		fy[level] = 1;
-		cx[level] = 0;
-		cy[level] = 0;
-#else
-		fx[level] = fx[level-1] * 0.5;
-		fy[level] = fy[level-1] * 0.5;
-		cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
-		cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
-#endif
+		if(USE_PAL){
+// #ifdef PAL
+			fx[level] = 1;
+			fy[level] = 1;
+			cx[level] = 0;
+			cy[level] = 0;
+		}
+		else{
+// #else
+			fx[level] = fx[level-1] * 0.5;
+			fy[level] = fy[level-1] * 0.5;
+			cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
+			cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
+		}
+// #endif
 	}
 
 	for (int level = 0; level < pyrLevelsUsed; ++ level)
@@ -330,57 +334,62 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 	assert(n%4==0);
 	for(int i=0;i<n;i+=4)
 	{
-#ifdef PAL
-		float buf_drdSE3[6][4];
-		for(int k=0; k<4; k++){
-			Vec3f pt = pal_model_g->cam2world(buf_warped_u[i+k], buf_warped_v[i+k]) / buf_warped_idepth[i+k];
-			Eigen::Matrix<float, 2, 6> dx2dSE;
-			Eigen::Matrix<float, 2, 3> duv2dxyz;
-			pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
-			Vec6f drdSE3 = Vec2f(buf_warped_dx[i+k], buf_warped_dy[i+k]).transpose() * dx2dSE ;
-			for(int idx=0; idx<6; idx++){
-				buf_drdSE3[idx][k] = drdSE3[idx];	
+// #ifdef PAL
+		if(USE_PAL){
+
+			float buf_drdSE3[6][4];
+			for(int k=0; k<4; k++){
+				Vec3f pt = pal_model_g->cam2world(buf_warped_u[i+k], buf_warped_v[i+k]) / buf_warped_idepth[i+k];
+				Eigen::Matrix<float, 2, 6> dx2dSE;
+				Eigen::Matrix<float, 2, 3> duv2dxyz;
+				pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+				Vec6f drdSE3 = Vec2f(buf_warped_dx[i+k], buf_warped_dy[i+k]).transpose() * dx2dSE ;
+				for(int idx=0; idx<6; idx++){
+					buf_drdSE3[idx][k] = drdSE3[idx];	
+				}
 			}
-		}
 
-		// 对SE的导数就是基本的直接法导数
-		acc.updateSSE_weighted(
-			_mm_load_ps(buf_drdSE3[0]),
-			_mm_load_ps(buf_drdSE3[1]),
-			_mm_load_ps(buf_drdSE3[2]),
-			_mm_load_ps(buf_drdSE3[3]),
-			_mm_load_ps(buf_drdSE3[4]),
-			_mm_load_ps(buf_drdSE3[5]),
-			_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
-			minusOne,																			// 光度b -1 
-			_mm_load_ps(buf_warped_residual+i),													// res
-			_mm_load_ps(buf_warped_weight+i)													// weight
-		);
-
-#else
-		__m128 dx = _mm_mul_ps(_mm_load_ps(buf_warped_dx+i), fxl);
-		__m128 dy = _mm_mul_ps(_mm_load_ps(buf_warped_dy+i), fyl);
-		__m128 u = _mm_load_ps(buf_warped_u+i);
-		__m128 v = _mm_load_ps(buf_warped_v+i);
-		__m128 id = _mm_load_ps(buf_warped_idepth+i);
-
-		// 对SE的导数就是基本的直接法导数
-		acc.updateSSE_weighted(
-				_mm_mul_ps(id,dx),																	// SE0 idep * gx * fx 
-				_mm_mul_ps(id,dy),																	// SE1 idep * gy * fy
-				_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))), 	// SE2 -idepth * (u*gx*fx + v*gy*fy)
-				_mm_sub_ps(zero, _mm_add_ps(														// SE3 -(u*v*gx*fx + gy*fy*(1+v^2))	
-						_mm_mul_ps(_mm_mul_ps(u,v),dx),
-						_mm_mul_ps(dy,_mm_add_ps(one, _mm_mul_ps(v,v))))),
-				_mm_add_ps(																			// SE4 u*v*gy*fy + gx*fx*(1+u^2)
-						_mm_mul_ps(_mm_mul_ps(u,v),dy),
-						_mm_mul_ps(dx,_mm_add_ps(one, _mm_mul_ps(u,u)))),
-				_mm_sub_ps(_mm_mul_ps(u,dy), _mm_mul_ps(v,dx)),										// SE5 u*gy*fy - v*gx*fx
+			// 对SE的导数就是基本的直接法导数
+			acc.updateSSE_weighted(
+				_mm_load_ps(buf_drdSE3[0]),
+				_mm_load_ps(buf_drdSE3[1]),
+				_mm_load_ps(buf_drdSE3[2]),
+				_mm_load_ps(buf_drdSE3[3]),
+				_mm_load_ps(buf_drdSE3[4]),
+				_mm_load_ps(buf_drdSE3[5]),
 				_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
 				minusOne,																			// 光度b -1 
 				_mm_load_ps(buf_warped_residual+i),													// res
-				_mm_load_ps(buf_warped_weight+i));													// weight
-#endif
+				_mm_load_ps(buf_warped_weight+i)													// weight
+			);
+
+		}
+		else{
+// #else
+			__m128 dx = _mm_mul_ps(_mm_load_ps(buf_warped_dx+i), fxl);
+			__m128 dy = _mm_mul_ps(_mm_load_ps(buf_warped_dy+i), fyl);
+			__m128 u = _mm_load_ps(buf_warped_u+i);
+			__m128 v = _mm_load_ps(buf_warped_v+i);
+			__m128 id = _mm_load_ps(buf_warped_idepth+i);
+
+			// 对SE的导数就是基本的直接法导数
+			acc.updateSSE_weighted(
+					_mm_mul_ps(id,dx),																	// SE0 idep * gx * fx 
+					_mm_mul_ps(id,dy),																	// SE1 idep * gy * fy
+					_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))), 	// SE2 -idepth * (u*gx*fx + v*gy*fy)
+					_mm_sub_ps(zero, _mm_add_ps(														// SE3 -(u*v*gx*fx + gy*fy*(1+v^2))	
+							_mm_mul_ps(_mm_mul_ps(u,v),dx),
+							_mm_mul_ps(dy,_mm_add_ps(one, _mm_mul_ps(v,v))))),
+					_mm_add_ps(																			// SE4 u*v*gy*fy + gx*fx*(1+u^2)
+							_mm_mul_ps(_mm_mul_ps(u,v),dy),
+							_mm_mul_ps(dx,_mm_add_ps(one, _mm_mul_ps(u,u)))),
+					_mm_sub_ps(_mm_mul_ps(u,dy), _mm_mul_ps(v,dx)),										// SE5 u*gy*fy - v*gx*fx
+					_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
+					minusOne,																			// 光度b -1 
+					_mm_load_ps(buf_warped_residual+i),													// res
+					_mm_load_ps(buf_warped_weight+i));													// weight
+// #endif
+		}
 	}
 
 	acc.finish();
@@ -454,65 +463,78 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 		float id = lpc_idepth[i];
 		float x = lpc_u[i];
 		float y = lpc_v[i];
-#ifdef PAL
-		Vec3f pt = RKi * pal_model_g->cam2world(x, y) + t*id;
-		float u = pt[0] / pt[2];
-		float v = pt[1] / pt[2];
-		Vec2f Kpt = pal_model_g->world2cam(pt);
-		float Ku = Kpt[0];
-		float Kv = Kpt[1];
-#else
-		Vec3f pt = RKi * Vec3f(x, y, 1) + t*id;
-		float u = pt[0] / pt[2];
-		float v = pt[1] / pt[2];
-		float Ku = fxl * u + cxl;
-		float Kv = fyl * v + cyl;
-#endif
+
+
+		Vec3f pt;
+		float u ;
+		float v ;
+		float Ku;
+		float Kv;
+// #ifdef PAL
+		if(USE_PAL){
+			pt = RKi * pal_model_g->cam2world(x, y) + t*id;
+			u = pt[0] / pt[2];
+			v = pt[1] / pt[2];
+			Vec2f Kpt = pal_model_g->world2cam(pt);
+			Ku = Kpt[0];
+			Kv = Kpt[1];
+		}
+// #else
+		else{
+			pt = RKi * Vec3f(x, y, 1) + t*id;
+			u = pt[0] / pt[2];
+			v = pt[1] / pt[2];
+			Ku = fxl * u + cxl;
+			Kv = fyl * v + cyl;
+		}
+// #endif
 
 		float new_idepth = id/pt[2];
 
 		// 对于第0层
 		if(lvl==0 && i%32==0)
 		{
-#ifdef PAL
-			// translation only (positive)
 			float uT, vT, KuT, KvT; 
-			pal_project(x, y, id, Mat33f::Identity(), t, uT, vT, KuT, KvT);
-
-			// translation only (negative)
 			float uT2, vT2, KuT2, KvT2; 
-			pal_project(x, y, id, Mat33f::Identity(), -t, uT2, vT2, KuT2, KvT2);
-
-			//translation and rotation (negative)
 			float u3, v3, Ku3, Kv3; 
-			pal_project(x, y, id, RKi, -t, u3, v3, Ku3, Kv3);
+// #ifdef PAL
+			if(USE_PAL){
+				// translation only (positive)
+				pal_project(x, y, id, Mat33f::Identity(), t, uT, vT, KuT, KvT);
 
-#else
+				// translation only (negative)
+				pal_project(x, y, id, Mat33f::Identity(), -t, uT2, vT2, KuT2, KvT2);
 
-			// translation only (positive)
-			Vec3f ptT = Ki[lvl] * Vec3f(x, y, 1) + t*id;
-			float uT = ptT[0] / ptT[2];
-			float vT = ptT[1] / ptT[2];
-			float KuT = fxl * uT + cxl;
-			float KvT = fyl * vT + cyl;
+				//translation and rotation (negative)
+				pal_project(x, y, id, RKi, -t, u3, v3, Ku3, Kv3);
+			}
+// #else
+			else{
+				// translation only (positive)
+				Vec3f ptT = Ki[lvl] * Vec3f(x, y, 1) + t*id;
+				uT = ptT[0] / ptT[2];
+				vT = ptT[1] / ptT[2];
+				KuT = fxl * uT + cxl;
+				KvT = fyl * vT + cyl;
 
-			// translation only (negative)
-			Vec3f ptT2 = Ki[lvl] * Vec3f(x, y, 1) - t*id;
-			float uT2 = ptT2[0] / ptT2[2];
-			float vT2 = ptT2[1] / ptT2[2];
-			float KuT2 = fxl * uT2 + cxl;
-			float KvT2 = fyl * vT2 + cyl;
+				// translation only (negative)
+				Vec3f ptT2 = Ki[lvl] * Vec3f(x, y, 1) - t*id;
+				uT2 = ptT2[0] / ptT2[2];
+				vT2 = ptT2[1] / ptT2[2];
+				KuT2 = fxl * uT2 + cxl;
+				KvT2 = fyl * vT2 + cyl;
 
-			//translation and rotation (negative)
-			Vec3f pt3 = RKi * Vec3f(x, y, 1) - t*id;
-			float u3 = pt3[0] / pt3[2];
-			float v3 = pt3[1] / pt3[2];
-			float Ku3 = fxl * u3 + cxl;
-			float Kv3 = fyl * v3 + cyl;
+				//translation and rotation (negative)
+				Vec3f pt3 = RKi * Vec3f(x, y, 1) - t*id;
+				u3 = pt3[0] / pt3[2];
+				v3 = pt3[1] / pt3[2];
+				Ku3 = fxl * u3 + cxl;
+				Kv3 = fyl * v3 + cyl;
+// #endif
+			}
 
 			//translation and rotation (positive)
 			//already have it.
-#endif
 			// 假设纯位移，点的移动值
 			sumSquaredShiftT += (KuT-x)*(KuT-x) + (KvT-y)*(KvT-y);
 			sumSquaredShiftT += (KuT2-x)*(KuT2-x) + (KvT2-y)*(KvT2-y);
@@ -522,12 +544,13 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 			sumSquaredShiftNum+=2;
 		}
 
-#ifdef PAL
-		if(!(pal_check_in_range_g(Ku, Kv, 3) && new_idepth > 0)) {
-#else
-		if(!(Ku > 2 && Kv > 2 && Ku < wl-3 && Kv < hl-3 && new_idepth > 0)) {
-#endif
-			continue;
+		if(USE_PAL){
+			if(!(pal_check_in_range_g(Ku, Kv, 3) && new_idepth > 0))
+				continue;
+		}
+		else{
+			if(!(Ku > 2 && Kv > 2 && Ku < wl-3 && Kv < hl-3 && new_idepth > 0))
+				continue;
 		}
 
 
@@ -1009,20 +1032,26 @@ void CoarseDistanceMap::makeDistanceMap(
 		for(PointHessian* ph : fh->pointHessians)
 		{
 			assert(ph->status == PointHessian::ACTIVE);
-#ifdef PAL
-			Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
-			Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
-			int u = ptp_pal2D[0];
-			int v = ptp_pal2D[1];
-			if(!pal_check_in_range_g(u, v, 0, 1))
-				continue;
-#else
-			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
-			int u = ptp[0] / ptp[2] + 0.5f;
-			int v = ptp[1] / ptp[2] + 0.5f;
-			if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
-				continue;
-#endif
+
+			int u, v;
+// #ifdef PAL
+			if(USE_PAL){
+				Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
+				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
+				u = ptp_pal2D[0];
+				v = ptp_pal2D[1];
+				if(!pal_check_in_range_g(u, v, 0, 1))
+					continue;
+			}
+			else{
+// #else
+				Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
+				u = ptp[0] / ptp[2] + 0.5f;
+				v = ptp[1] / ptp[2] + 0.5f;
+				if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
+					continue;
+			}
+// #endif
 			fwdWarpedIDDistFinal[u+w1*v]=0;
 			bfsList1[numItems] = Eigen::Vector2i(u,v);
 			numItems++;
@@ -1167,17 +1196,21 @@ void CoarseDistanceMap::makeK(CalibHessian* HCalib)
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
 
-#ifdef PAL
-		fx[level] = 1;
-		fy[level] = 1;
-		cx[level] = 0;
-		cy[level] = 0;
-#else
-		fx[level] = fx[level-1] * 0.5;
-		fy[level] = fy[level-1] * 0.5;
-		cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
-		cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
-#endif
+		if(USE_PAL){
+// #ifdef PAL
+			fx[level] = 1;
+			fy[level] = 1;
+			cx[level] = 0;
+			cy[level] = 0;
+		}
+		else{
+// #else
+			fx[level] = fx[level-1] * 0.5;
+			fy[level] = fy[level-1] * 0.5;
+			cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
+			cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
+		}
+// #endif
 
 	}
 

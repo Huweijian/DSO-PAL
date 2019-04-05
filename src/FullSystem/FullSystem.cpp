@@ -367,7 +367,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	// If on a coarse level, tracking is WORSE than achievedRes, we will not continue to save time.
 
 	Vec5 achievedRes = Vec5::Constant(NAN);
-	std::cout << "!!Debug Info : " << achievedRes.transpose() << std::endl;
+
 	bool haveOneGood = false;
 	int tryIterations=0;
 	// 尝试上面的全部位姿
@@ -640,19 +640,35 @@ void FullSystem::activatePointsMT()
 
 			// see if we need to activate point due to distance map.
 			// 未成熟点投影到某一老关键帧上
-#ifdef PAL
-			Vec3f ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
-			Vec2f ptp_pal2D = pal_model_g->world2cam(ptp);
-			int u = ptp_pal2D[0];
-			int v = ptp_pal2D[1];
-			if(pal_check_in_range_g(u, v, 0, 1))
-#else
-			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
-			int u = ptp[0] / ptp[2] + 0.5f;
-			int v = ptp[1] / ptp[2] + 0.5f;
+			Vec3f ptp;
+			int u, v;
+// #ifdef PAL
+			if(USE_PAL){
 
-			if((u > 0 && v > 0 && u < wG[1] && v < hG[1]))
-#endif
+				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
+				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp);
+				u = ptp_pal2D[0];
+				v = ptp_pal2D[1];
+			}
+// #else
+			else{
+
+				ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
+				u = ptp[0] / ptp[2] + 0.5f;
+				v = ptp[1] / ptp[2] + 0.5f;
+			}
+
+			bool inRange = false;
+			if(USE_PAL){
+				if(pal_check_in_range_g(u, v, 0, 1))
+					inRange = true;
+			}
+			else{
+				if((u > 0 && v > 0 && u < wG[1] && v < hG[1]))
+					inRange = true;
+			}
+// #endif
+			if(inRange)
 			{
 
 				// 距离附近成熟点的距离
@@ -1355,11 +1371,13 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 		for(int x=patternPadding+1;x<wG[0]-patternPadding-2;x++)
 		{
 
-#ifdef PAL // 排除外部的点
-			if(!pal_check_in_range_g(x, y, patternPadding+1)){
-				continue;
+// #ifdef PAL // 排除外部的点
+			if(USE_PAL){
+				if(!pal_check_in_range_g(x, y, patternPadding+1)){
+					continue;
+				}
 			}
-#endif
+// #endif
 			int i = x+y*wG[0];
 			if(selectionMap[i]==0) 
 				continue;

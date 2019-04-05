@@ -5,6 +5,7 @@ using namespace std;
 using namespace cv;
 cv::Mat pal_mask_g[pal_max_level];
 PALCamera* pal_model_g = nullptr;
+bool USE_PAL = false;
 
 bool pal_check_in_range_g(float u, float v, float left_top, float right, float bottom, int level){
     if(isnanf(u + v))

@@ -69,21 +69,25 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		// -----------------------------------
 		float &Ku, float &Kv)
 {
-#ifdef PAL
+// #ifdef PAL
+	if(USE_PAL){
 
 	Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
 	Vec2f ptp_2d = pal_model_g->world2cam(ptp);
 	Ku = ptp_2d[0];
 	Kv = ptp_2d[1];
 	return  pal_check_in_range_g(Ku, Kv, 2);
+	}
 
-#else
+// #else
+	else{
 
 	Vec3f ptp = KRKi * Vec3f(u_pt,v_pt, 1) + Kt*idepth;
 	Ku = ptp[0] / ptp[2];
 	Kv = ptp[1] / ptp[2];
 	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
-#endif
+	}
+// #endif
 }
 
 
@@ -97,49 +101,53 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		float &drescale, float &u, float &v, // z变化比例系数；归一化坐标系的值；
 		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)	// 像素坐标系的值；原始归一化坐标系的值；
 {
-#ifdef PAL
-	KliP = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
-	Vec3f P2 = R * KliP + t;
-	new_idepth = 1.0 / P2[2];
-	drescale = new_idepth / idepth;
-	
-	// TODO: uv 可能有问题(PAL的归一化坐标系没意义)
-	u = P2[0] * drescale;
-	v = P2[1] * drescale;
-	Vec2f KP2 = pal_model_g->world2cam(P2);
-	Ku = KP2[0];
-	Kv = KP2[1];
+// #ifdef PAL
+	if(USE_PAL){
 
-	return pal_check_in_range_g(Ku, Kv, 2);
+		KliP = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
+		Vec3f P2 = R * KliP + t;
+		new_idepth = 1.0 / P2[2];
+		drescale = new_idepth / idepth;
+		
+		// TODO: uv 可能有问题(PAL的归一化坐标系没意义)
+		u = P2[0] * drescale;
+		v = P2[1] * drescale;
+		Vec2f KP2 = pal_model_g->world2cam(P2);
+		Ku = KP2[0];
+		Kv = KP2[1];
 
-#else
-	// K*P
-	KliP = Vec3f(
-			(u_pt+dx-HCalib->cxl())*HCalib->fxli(),
-			(v_pt+dy-HCalib->cyl())*HCalib->fyli(),
-			1);
+		return pal_check_in_range_g(Ku, Kv, 2);
+	}
+	else{
+// #else
+		// K*P
+		KliP = Vec3f(
+				(u_pt+dx-HCalib->cxl())*HCalib->fxli(),
+				(v_pt+dy-HCalib->cyl())*HCalib->fyli(),
+				1);
 
-	// RKP + t/d
-	Vec3f ptp = R * KliP + t*idepth;
-	
-	// ptp[2] = d2/d1
-	// drescale = d1/d2 = id2/id1;
-	drescale = 1.0f/ptp[2];
-	new_idepth = idepth*drescale;
+		// RKP + t/d
+		Vec3f ptp = R * KliP + t*idepth;
+		
+		// ptp[2] = d2/d1
+		// drescale = d1/d2 = id2/id1;
+		drescale = 1.0f/ptp[2];
+		new_idepth = idepth*drescale;
 
-	if(!(drescale>0)) 
-		return false;
+		if(!(drescale>0)) 
+			return false;
 
-	// 按照深度缩放后再投影到图像上
-	// u v 是归一化坐标系的坐标
-	u = ptp[0] * drescale;
-	v = ptp[1] * drescale;
-	Ku = u*HCalib->fxl() + HCalib->cxl();
-	Kv = v*HCalib->fyl() + HCalib->cyl();
+		// 按照深度缩放后再投影到图像上
+		// u v 是归一化坐标系的坐标
+		u = ptp[0] * drescale;
+		v = ptp[1] * drescale;
+		Ku = u*HCalib->fxl() + HCalib->cxl();
+		Kv = v*HCalib->fyl() + HCalib->cyl();
 
-	// 返回投影后的点是否在图像内
-	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
-#endif
+		// 返回投影后的点是否在图像内
+		return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+	}
+// #endif
 }
 
 

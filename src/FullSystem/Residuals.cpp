@@ -118,68 +118,71 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 	centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
 
 	// 计算这个残差项对深度，相机参数，位姿的导数
-#ifdef PAL
+// #ifdef PAL
+	if(USE_PAL){
 
-	Eigen::Matrix<float, 2, 6> dx2dSE;
-	Eigen::Matrix<float, 2, 3> duv2dxyz;
-	pal_model_g->jacobian_xyz2uv(Vec3f(u, v, SCALE_IDEPTH*drescale), dx2dSE, duv2dxyz);
+		Eigen::Matrix<float, 2, 6> dx2dSE;
+		Eigen::Matrix<float, 2, 3> duv2dxyz;
+		pal_model_g->jacobian_xyz2uv(Vec3f(u, v, SCALE_IDEPTH*drescale), dx2dSE, duv2dxyz);
 
-	const Vec3f &t = PRE_tTll_0;
-	float dxdd = (t[0]-t[2]*u) ; // \rho_2 / \rho1 * (tx - u'_2 * tz)
-	float dydd = (t[1]-t[2]*v) ; // \rho_2 / \rho1 * (ty - v'_2 * tz)
-	Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
+		const Vec3f &t = PRE_tTll_0;
+		float dxdd = (t[0]-t[2]*u) ; // \rho_2 / \rho1 * (tx - u'_2 * tz)
+		float dydd = (t[1]-t[2]*v) ; // \rho_2 / \rho1 * (ty - v'_2 * tz)
+		Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
 
-	Vec2f dpdd = duv2dxyz * dxyzdd; 
+		Vec2f dpdd = duv2dxyz * dxyzdd; 
 
-	d_d_x = dpdd[0] ;
-	d_d_y = dpdd[1] ;
+		d_d_x = dpdd[0] ;
+		d_d_y = dpdd[1] ;
 
-	// drdSE3
-	d_xi_x = dx2dSE.row(0);
-	d_xi_y = dx2dSE.row(1);
+		// drdSE3
+		d_xi_x = dx2dSE.row(0);
+		d_xi_y = dx2dSE.row(1);
 
-#else
+	}
+	else{
+// #else
+		// diff d_idepth
+		d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
+		d_d_y = drescale * (PRE_tTll_0[1]-PRE_tTll_0[2]*v)*SCALE_IDEPTH*HCalib->fyl();
 
-	// diff d_idepth
-	d_d_x = drescale * (PRE_tTll_0[0]-PRE_tTll_0[2]*u)*SCALE_IDEPTH*HCalib->fxl();
-	d_d_y = drescale * (PRE_tTll_0[1]-PRE_tTll_0[2]*v)*SCALE_IDEPTH*HCalib->fyl();
+		// diff calib
+		d_C_x[2] = drescale*(PRE_RTll_0(2,0)*u-PRE_RTll_0(0,0));
+		d_C_x[3] = HCalib->fxl() * drescale*(PRE_RTll_0(2,1)*u-PRE_RTll_0(0,1)) * HCalib->fyli();
+		d_C_x[0] = KliP[0]*d_C_x[2];
+		d_C_x[1] = KliP[1]*d_C_x[3];
 
-	// diff calib
-	d_C_x[2] = drescale*(PRE_RTll_0(2,0)*u-PRE_RTll_0(0,0));
-	d_C_x[3] = HCalib->fxl() * drescale*(PRE_RTll_0(2,1)*u-PRE_RTll_0(0,1)) * HCalib->fyli();
-	d_C_x[0] = KliP[0]*d_C_x[2];
-	d_C_x[1] = KliP[1]*d_C_x[3];
+		d_C_y[2] = HCalib->fyl() * drescale*(PRE_RTll_0(2,0)*v-PRE_RTll_0(1,0)) * HCalib->fxli();
+		d_C_y[3] = drescale*(PRE_RTll_0(2,1)*v-PRE_RTll_0(1,1));
+		d_C_y[0] = KliP[0]*d_C_y[2];
+		d_C_y[1] = KliP[1]*d_C_y[3];
 
-	d_C_y[2] = HCalib->fyl() * drescale*(PRE_RTll_0(2,0)*v-PRE_RTll_0(1,0)) * HCalib->fxli();
-	d_C_y[3] = drescale*(PRE_RTll_0(2,1)*v-PRE_RTll_0(1,1));
-	d_C_y[0] = KliP[0]*d_C_y[2];
-	d_C_y[1] = KliP[1]*d_C_y[3];
+		d_C_x[0] = (d_C_x[0]+u)*SCALE_F;
+		d_C_x[1] *= SCALE_F;
+		d_C_x[2] = (d_C_x[2]+1)*SCALE_C;
+		d_C_x[3] *= SCALE_C;
 
-	d_C_x[0] = (d_C_x[0]+u)*SCALE_F;
-	d_C_x[1] *= SCALE_F;
-	d_C_x[2] = (d_C_x[2]+1)*SCALE_C;
-	d_C_x[3] *= SCALE_C;
+		d_C_y[0] *= SCALE_F;
+		d_C_y[1] = (d_C_y[1]+v)*SCALE_F;
+		d_C_y[2] *= SCALE_C;
+		d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
 
-	d_C_y[0] *= SCALE_F;
-	d_C_y[1] = (d_C_y[1]+v)*SCALE_F;
-	d_C_y[2] *= SCALE_C;
-	d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
+		// drdSE3
+		d_xi_x[0] = new_idepth*HCalib->fxl();
+		d_xi_x[1] = 0;
+		d_xi_x[2] = -new_idepth*u*HCalib->fxl();
+		d_xi_x[3] = -u*v*HCalib->fxl();
+		d_xi_x[4] = (1+u*u)*HCalib->fxl();
+		d_xi_x[5] = -v*HCalib->fxl();
 
-	// drdSE3
-	d_xi_x[0] = new_idepth*HCalib->fxl();
-	d_xi_x[1] = 0;
-	d_xi_x[2] = -new_idepth*u*HCalib->fxl();
-	d_xi_x[3] = -u*v*HCalib->fxl();
-	d_xi_x[4] = (1+u*u)*HCalib->fxl();
-	d_xi_x[5] = -v*HCalib->fxl();
-
-	d_xi_y[0] = 0;
-	d_xi_y[1] = new_idepth*HCalib->fyl();
-	d_xi_y[2] = -new_idepth*v*HCalib->fyl();
-	d_xi_y[3] = -(1+v*v)*HCalib->fyl();
-	d_xi_y[4] = u*v*HCalib->fyl();
-	d_xi_y[5] = u*HCalib->fyl();
-#endif
+		d_xi_y[0] = 0;
+		d_xi_y[1] = new_idepth*HCalib->fyl();
+		d_xi_y[2] = -new_idepth*v*HCalib->fyl();
+		d_xi_y[3] = -(1+v*v)*HCalib->fyl();
+		d_xi_y[4] = u*v*HCalib->fyl();
+		d_xi_y[5] = u*HCalib->fyl();
+	}
+// #endif
 
 	J->Jpdxi[0] = d_xi_x;
 	J->Jpdxi[1] = d_xi_y;
@@ -228,7 +231,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		hw = hw*w;
 
 		float drdA = (color[idx]-b0);
-#ifdef PAL
+
 		hitColor[1]*=hw;
 		hitColor[2]*=hw;
 
@@ -243,7 +246,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		J->JabF[0][idx] = drdA*hw;
 		J->JabF[1][idx] = hw;
 
-		// 梯度 × 地图
+		// 梯度 × 梯度
 		JIdxJIdx_00+=hitColor[1]*hitColor[1];
 		JIdxJIdx_11+=hitColor[2]*hitColor[2];
 		JIdxJIdx_10+=hitColor[1]*hitColor[2];
@@ -266,43 +269,6 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 			J->JabF[0][idx]=0;
 		if(setting_affineOptModeB < 0) 
 			J->JabF[1][idx]=0;	
-
-#else
-		hitColor[1]*=hw;
-		hitColor[2]*=hw;
-
-		// 残差
-		J->resF[idx] = residual*hw;
-
-		// 梯度
-		J->JIdx[0][idx] = hitColor[1];
-		J->JIdx[1][idx] = hitColor[2];
-
-		// dr / d[a b]
-		J->JabF[0][idx] = drdA*hw;
-		J->JabF[1][idx] = hw;
-
-		// 
-		JIdxJIdx_00+=hitColor[1]*hitColor[1];
-		JIdxJIdx_11+=hitColor[2]*hitColor[2];
-		JIdxJIdx_10+=hitColor[1]*hitColor[2];
-
-		JabJIdx_00+= drdA*hw * hitColor[1];
-		JabJIdx_01+= drdA*hw * hitColor[2];
-		JabJIdx_10+= hw * hitColor[1];
-		JabJIdx_11+= hw * hitColor[2];
-
-		JabJab_00+= drdA*drdA*hw*hw;
-		JabJab_01+= drdA*hw*hw;
-		JabJab_11+= hw*hw;
-
-		wJI2_sum += hw*hw*(hitColor[1]*hitColor[1]+hitColor[2]*hitColor[2]);
-
-		if(setting_affineOptModeA < 0) 
-			J->JabF[0][idx]=0;
-		if(setting_affineOptModeB < 0) 
-			J->JabF[1][idx]=0;
-#endif
 
 	}
 
