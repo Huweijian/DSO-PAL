@@ -320,10 +320,10 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 {
 	acc.initialize();
 	// SSE准备
-#ifndef PAL
+// #ifndef PAL
 	__m128 fxl = _mm_set1_ps(fx[lvl]);
 	__m128 fyl = _mm_set1_ps(fy[lvl]);
-#endif
+// #endif
 	__m128 b0 = _mm_set1_ps(lastRef_aff_g2l.b);
 	__m128 a = _mm_set1_ps((float)(AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l)[0]));
 	__m128 one = _mm_set1_ps(1);
@@ -424,12 +424,12 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 	int hl = h[lvl];
 	Eigen::Vector3f* dINewl = newFrame->dIp[lvl];
 	
-#ifndef PAL
+// #ifndef PAL
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
-#endif
+// #endif
 
 	// 准备变量
 	Mat33f RKi = (refToNew.rotationMatrix().cast<float>() * Ki[lvl]);

@@ -485,12 +485,14 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 	int trace_total=0, trace_good=0, trace_oob=0, trace_out=0, trace_skip=0, trace_badcondition=0, trace_uninitialized=0;
 
 	Mat33f K = Mat33f::Identity();
-#ifndef PAL
-	K(0,0) = Hcalib.fxl();
-	K(1,1) = Hcalib.fyl();
-	K(0,2) = Hcalib.cxl();
-	K(1,2) = Hcalib.cyl();
-#endif
+// #ifndef PAL
+	if(!USE_PAL){
+		K(0,0) = Hcalib.fxl();
+		K(1,1) = Hcalib.fyl();
+		K(0,2) = Hcalib.cxl();
+		K(1,2) = Hcalib.cyl();
+	}
+// #endif
 
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{

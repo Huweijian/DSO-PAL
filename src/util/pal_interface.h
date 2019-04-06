@@ -4,7 +4,7 @@
 #include "pal_model.h"
 #include <string>
 
-// #define PAL
+// #define PAL // 不再使用，改用USE_PAL 变量以减少编译次数
 extern bool USE_PAL;
 const int pal_max_level = 6;
 extern cv::Mat pal_mask_g[pal_max_level];

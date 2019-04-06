@@ -412,12 +412,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 	cv::Mat projImg = cv::Mat::zeros(hl, wl, CV_8UC1);
 	// --------------------------------------------
 
-#ifndef PAL
+// #ifndef PAL
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
-#endif
+// #endif
 
 	Accumulator11 E;
 	acc9.initialize();

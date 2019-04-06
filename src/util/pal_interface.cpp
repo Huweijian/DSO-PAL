@@ -41,7 +41,7 @@ bool init_pal(string calibFile){
 	}
     // imshow("mask0", pal_mask_g[0]);
     // waitKey();
-
+    USE_PAL = true;
     if(pal_model_g->mask_radius[0] < pal_model_g->mask_radius[1])
         return true;
     else
