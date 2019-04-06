@@ -83,7 +83,9 @@ void PangolinDSOViewer::run()
 {
 	printf("START PANGOLIN!\n");
 
-	pangolin::CreateWindowAndBind("Main",2*w,2*h);
+	int hwjHeight = 1.5*480;
+	int hwjWidth = 1.5*640;
+	pangolin::CreateWindowAndBind("Main",hwjWidth, hwjHeight);	// dso原本设置为2.0*w 2.0*h
 	const int UI_WIDTH = 180;
 
 	glEnable(GL_DEPTH_TEST);

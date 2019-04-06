@@ -1012,6 +1012,7 @@ public:
 		for(int c=r;c<9;c++)
 		{
 			float d = SSEData1m[idx+0] + SSEData1m[idx+1] + SSEData1m[idx+2] + SSEData1m[idx+3];
+			// printf("%.2f %.2f %.2f %.2f\n", SSEData1m[idx], SSEData1m[idx+1], SSEData1m[idx+2], SSEData1m[idx+3]);
 			H(r,c) = H(c,r) = d;
 			idx+=4;
 		}
@@ -1089,7 +1090,6 @@ public:
 
 
 
-
   inline void updateSSE_weighted(
 		  const __m128 J0,const __m128 J1,
 		  const __m128 J2,const __m128 J3,
@@ -1098,17 +1098,17 @@ public:
 		  const __m128 J8, const __m128 w)
   {
 	  float* pt=SSEData;
-
+		// printf("now = %f\n", SSEData[3]);
 	  __m128 J0w = _mm_mul_ps(J0,w);
-	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J0))); pt+=4;
-	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J1))); pt+=4;
+	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J0))); pt+=4;	// pt[0] = pt[0] + J0w*J0
+	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J1))); pt+=4;	// pt[1] = p1[1] + J0w*J1
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J2))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J3))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J4))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J5))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J6))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J7))); pt+=4;
-	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J8))); pt+=4;
+	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J8))); pt+=4;	// pt[8] = pt[8] + J0w*J8
 
 	  __m128 J1w = _mm_mul_ps(J1,w);
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J1w,J1))); pt+=4;
@@ -1323,13 +1323,13 @@ private:
   EIGEN_ALIGN16 float SSEData1m[4*45];
   float numIn1, numIn1k, numIn1m;
 
-
+// 防止累加过多，造成精度丢失
   void shiftUp(bool force)
   {
 	  if(numIn1 > 1000 || force)
 	  {
 		  for(int i=0;i<45;i++)
-			  _mm_store_ps(SSEData1k+4*i, _mm_add_ps(_mm_load_ps(SSEData+4*i),_mm_load_ps(SSEData1k+4*i)));
+			  _mm_store_ps(SSEData1k+4*i, _mm_add_ps(_mm_load_ps(SSEData+4*i),_mm_load_ps(SSEData1k+4*i)));	// Data1K[i] = Data1K[i] + Data[i]; 
 		  numIn1k+=numIn1;
 		  numIn1=0;
 		  memset(SSEData,0, sizeof(float)*4*45);

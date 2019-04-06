@@ -117,7 +117,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		uMin = ptpMin2D[0];
 		vMin = ptpMin2D[1];
 
-		if(!(pal_check_in_range_g(uMin, vMin, 5))){
+		if(!(pal_check_in_range_g(uMin, vMin, 5, 0))){
 			if(debugPrint) 
 				printf("OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
 					u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
@@ -159,7 +159,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			uMax = ptpMax2D[0];
 			vMax = ptpMax2D[1];
 
-			if(!(pal_check_in_range_g(uMax, vMax, 5)))
+			if(!(pal_check_in_range_g(uMax, vMax, 5, 0)))
 			{
 				if(debugPrint) 
 					printf("OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
@@ -224,7 +224,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 				dist_pal = sqrt(dx*dx+dy*dy);	
 			}while(dist_pal > dist);
 
-			if(!(pal_check_in_range_g(uMax, vMax, 5)))
+			if(!(pal_check_in_range_g(uMax, vMax, 5, 0)))
 			{
 				if(debugPrint) 
 					printf("OOB uMax-coarse %f %f %f!\n", uMax, vMax,  ptpMax[2]);

@@ -459,7 +459,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 
     if(!setting_debugout_runquiet)
         printf("Coarse Tracker tracked ab = %f %f (exp %f). Res %f!\n", aff_g2l.a, aff_g2l.b, fh->ab_exposure, achievedRes[0]);
-
+	
 	if(setting_logStuff)
 	{
 		(*coarseTrackingLog) << std::setprecision(16)
@@ -472,6 +472,18 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 						<< achievedRes[0] << " "
 						<< tryIterations << "\n";
 	}
+
+	// hwjdebug ----------------
+	std::cout << std::setprecision(4)	//之前是16
+					<< " $ "
+					<< fh->shell->id << " "
+					<< fh->shell->timestamp << " "
+					<< fh->ab_exposure << "  pose: "
+					<< fh->shell->camToWorld.log().transpose() << " aff: "
+					<< aff_g2l.a << " "
+					<< aff_g2l.b << " res:"
+					<< achievedRes[0] << " it:"
+					<< tryIterations << "\n";
 
 	// 返回误差和光流
 	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
@@ -647,7 +659,7 @@ void FullSystem::activatePointsMT()
 // #ifdef PAL
 			if(USE_PAL){
 
-				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
+				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
 				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp);
 				u = ptp_pal2D[0];
 				v = ptp_pal2D[1];
@@ -958,12 +970,22 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 			// BRIGHTNESS CHECK
 			// 如果位姿或者光度变化足够大 || 当前误差大于第一次误差的2倍 就创建新的关键帧
-			needToMakeKF = allFrameHistory.size()== 1 ||
-					setting_kfGlobalWeight*setting_maxShiftWeightT *  sqrtf((double)tres[1]) / (wG[0]+hG[0]) +
+			if(allFrameHistory.size()== 1){
+				needToMakeKF = true;
+				printf("\n $ 创建新关键帧(allFrameHistory = 1)\n");
+			}
+			else if(setting_kfGlobalWeight*setting_maxShiftWeightT *  sqrtf((double)tres[1]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightR *  sqrtf((double)tres[2]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightRT * sqrtf((double)tres[3]) / (wG[0]+hG[0]) +
-					setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) > 1 ||
-					2*coarseTracker->firstCoarseRMSE < tres[0];
+					setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) > 1 ){
+				needToMakeKF = true;
+				printf("\n $ 创建新关键帧(位姿或光度变化过大)\n");
+			}
+			else if(2*coarseTracker->firstCoarseRMSE < tres[0]){
+				needToMakeKF = true;
+				printf("\n $ 创建新关键帧(当前误差 > 第一次跟踪误差的2倍)\n");
+			}
+
 		}
 
         for(IOWrap::Output3DWrapper* ow : outputWrapper)
@@ -979,6 +1001,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 {
+
 	if(linearizeOperation)
 	{
 		// 判断要不要单步运行

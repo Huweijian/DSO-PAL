@@ -76,7 +76,7 @@ EIGEN_STRONG_INLINE bool projectPoint(
 	Vec2f ptp_2d = pal_model_g->world2cam(ptp);
 	Ku = ptp_2d[0];
 	Kv = ptp_2d[1];
-	return  pal_check_in_range_g(Ku, Kv, 2);
+	return  pal_check_in_range_g(Ku, Kv, 2, 0);
 	}
 
 // #else
@@ -116,7 +116,7 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		Ku = KP2[0];
 		Kv = KP2[1];
 
-		return pal_check_in_range_g(Ku, Kv, 2);
+		return pal_check_in_range_g(Ku, Kv, 2, 0);
 	}
 	else{
 // #else

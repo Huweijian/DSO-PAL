@@ -406,11 +406,8 @@ int main( int argc, char** argv )
     }
 
 
-
     if(useSampleOutput)
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
-
-
 
 
     // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
@@ -559,7 +556,6 @@ int main( int argc, char** argv )
         }
 
     });
-
 
     if(viewer != 0)
         viewer->run();

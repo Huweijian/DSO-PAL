@@ -61,7 +61,7 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 
 	frameID=-1;
 	fixAffine=true;
-	printDebug=true;
+	printDebug=false;
 
 	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
 	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
@@ -129,7 +129,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	// 从高到低枚举金字塔
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
 	{
-		printf("\n - LVL %d start \n", lvl);
+		if(printDebug) printf("\n - LVL %d start \n", lvl);
 
 		// 上一层的向下传播，初始化本层的
 		if(lvl<pyrLevelsUsed-1)
@@ -279,7 +279,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			}
 
 			if(quitOpt) {
-				printf(" - LVL %d finished, Err: %.3f -> %.3f\n", lvl, eTotalInit, eTotalNew /  resNew[2]);
+				if(printDebug) printf(" - LVL %d finished, Err: %.3f -> %.3f\n", lvl, eTotalInit, eTotalNew /  resNew[2]);
 				break;
 			}
 			iteration++;
@@ -320,8 +320,9 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	return snapped && frameID > snappedAt+5;
 }
 
-void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps, bool onlyCVImg)
+void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps, bool playCVImg)
 {
+	bool onlyCVImg = false;
 	// 在不传入wraps的情况下强制输出到OpenCV Mat
 	if(wraps.size() != 0){
 		bool needCall = false;
@@ -331,6 +332,7 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	}
 	else{
 		onlyCVImg = true;
+		playCVImg = true;
 	}
 
 
@@ -374,7 +376,8 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 		}
 	}
 
-	IOWrap::displayImage("idepth-R", &iRImg, true);
+	if(playCVImg)
+		IOWrap::displayImage("idepth-R", &iRImg, true);
 
 	if(onlyCVImg)
 		return ;	
@@ -678,7 +681,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 	if(alphaEnergy > alphaK*npts)
 	{
 		// hwjdebug---------------------------------------
-		printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
+		if(printDebug) 
+			printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, 
+				refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
 		// --------------------------------------------
 
 		// 那么不进行alpha操作
