@@ -65,8 +65,12 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 				if(r->isNew)
 				{
 					PointHessian* p = r->point;
+					// RP + t*0(无穷远的深度)
 					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
+					// RP + t*idepth
 					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll*p->idepth_scaled;	// projected point with real depth.
+					// relBS = 0.01 * ([u v]_Inf - [u v]_real).norm() 
+					// 无穷远点和估计点 在 归一化坐标系上的误差(粗略来看是基线)
 					float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 

@@ -79,6 +79,8 @@ ImmaturePoint::~ImmaturePoint()
  */
 ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f& hostToFrame_affine, CalibHessian* HCalib, bool debugPrint)
 {
+	using namespace cv;
+
 	if(lastTraceStatus == ImmaturePointStatus::IPS_OOB) 
 		return lastTraceStatus;
 
@@ -105,14 +107,10 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	Vec3f ptpMin;
 	float uMin;
 	float vMin;
-
-
-// #ifdef PAL 	// PAL 极线搜索Min点确定
-
+	// PAL 极线搜索Min点确定
+	pr = hostToFrame_KRKi * Vec3f(u, v, 1);
+	ptpMin = pr + hostToFrame_Kt*idepth_min;
 	if(USE_PAL){
-
-		pr = hostToFrame_KRKi * pal_model_g->cam2world(u, v);
-		ptpMin = pr + hostToFrame_Kt*idepth_min;
 		Vec2f ptpMin2D = pal_model_g->world2cam(ptpMin);
 		uMin = ptpMin2D[0];
 		vMin = ptpMin2D[1];
@@ -125,12 +123,8 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
-
 	}
-// #else
 	else{
-		pr = hostToFrame_KRKi * Vec3f(u,v, 1);
-		ptpMin = pr + hostToFrame_Kt*idepth_min;
 		uMin = ptpMin[0] / ptpMin[2];
 		vMin = ptpMin[1] / ptpMin[2];
 
@@ -142,7 +136,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
-// #endif
 	}
 
 	float dist;
@@ -153,7 +146,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	{
 		ptpMax = pr + hostToFrame_Kt*idepth_max;
 
-// #ifdef PAL // PAL极线搜索max点确定
+		// PAL极线搜索max点确定
 		if(USE_PAL){
 			Vec2f ptpMax2D = pal_model_g->world2cam(ptpMax);
 			uMax = ptpMax2D[0];
@@ -170,7 +163,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			}
 		}
 		else{
-// #else
 			uMax = ptpMax[0] / ptpMax[2];
 			vMax = ptpMax[1] / ptpMax[2];
 
@@ -182,7 +174,19 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 				return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 			}
 		}
-// #endif
+
+		// hwjdebug ---------------
+			Mat img_now = IOWrap::getOCVImg(frame->dI,wG[0], hG[0]);	
+			drawMarker(img_now, Point(uMax, vMax), 255);
+			drawMarker(img_now, Point(uMin, vMin), 255);
+			line(img_now, Point(uMax, vMax), Point(uMin, vMin), 255);
+			imshow("img_now", img_now);
+
+			Mat img_ref = IOWrap::getOCVImg(host->dI, wG[0], hG[0]);	
+			drawMarker(img_ref, Point(u, v), 255);
+			imshow("img_ref", img_ref);
+			waitKey();
+		// -------------------
 
 		// ============== check their distance. everything below 2px is OK (-> skip). ===================
 
@@ -208,7 +212,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		dist = maxPixSearch;
 
 		// project to arbitrary depth to get direction.
-// #ifdef PAL // 在idepthmax为 无穷的情况下确定PAL极线搜索范围
+		// 在idepthmax为 无穷的情况下确定PAL极线搜索范围
 		if(USE_PAL){
 
 			float dist_pal = 0;
@@ -235,7 +239,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 
 		}
 		else{
-// #else
 
 			ptpMax = pr + hostToFrame_Kt*0.01;
 			uMax = ptpMax[0] / ptpMax[2];
@@ -261,7 +264,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			assert(dist>0);
 
 		}
-// #endif
 	} // if(std::isfinite(idepth_max))
 	
 

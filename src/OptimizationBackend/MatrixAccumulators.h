@@ -1098,7 +1098,6 @@ public:
 		  const __m128 J8, const __m128 w)
   {
 	  float* pt=SSEData;
-		// printf("now = %f\n", SSEData[3]);
 	  __m128 J0w = _mm_mul_ps(J0,w);
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J0))); pt+=4;	// pt[0] = pt[0] + J0w*J0
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0w,J1))); pt+=4;	// pt[1] = p1[1] + J0w*J1

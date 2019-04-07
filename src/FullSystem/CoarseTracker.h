@@ -110,9 +110,9 @@ private:
 
 	// warped buffers
 	float* buf_warped_idepth;
-	float* buf_warped_u;
-	float* buf_warped_v;
-	float* buf_warped_dx;
+	float* buf_warped_u;	// 归一化坐标！！
+	float* buf_warped_v;	// 归一化坐标！！
+	float* buf_warped_dx;	
 	float* buf_warped_dy;
 	float* buf_warped_residual;
 	float* buf_warped_weight;

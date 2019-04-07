@@ -36,6 +36,7 @@
 #include "FullSystem/ImmaturePoint.h"
 #include "util/FrameShell.h"
 
+#include "util/pal_interface.h"
 
 
 namespace dso
@@ -68,10 +69,18 @@ KeyFrameDisplay::KeyFrameDisplay()
 void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 {
 	id = frame->id;
-	fx = HCalib->fxl();
-	fy = HCalib->fyl();
-	cx = HCalib->cxl();
-	cy = HCalib->cyl();
+	if(USE_PAL){	//PAL fake camera parameter for visualization
+		fx = 480;
+		fy = 480; 
+		cx = pal_model_g->width_/2;
+		cy = pal_model_g->height_/2;
+	}
+	else{
+		fx = HCalib->fxl();
+		fy = HCalib->fyl();
+		cx = HCalib->cxl();
+		cy = HCalib->cyl();
+	}
 	width = wG[0];
 	height = hG[0];
 	fxi = 1/fx;
@@ -115,6 +124,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 		pc[numSparsePoints].status = 0;
 		numSparsePoints++;
 	}
+		// printf("imPoint.num=%d ", numSparsePoints);
 
 	for(PointHessian* p : fh->pointHessians)
 	{
@@ -130,6 +140,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 
 		numSparsePoints++;
 	}
+		// printf("ph.num=%d ", numSparsePoints);
 
 	for(PointHessian* p : fh->pointHessiansMarginalized)
 	{
@@ -144,6 +155,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 		pc[numSparsePoints].status=2;
 		numSparsePoints++;
 	}
+		// printf("ph_mar.num=%d ", numSparsePoints);
 
 	for(PointHessian* p : fh->pointHessiansOut)
 	{
@@ -158,6 +170,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 		pc[numSparsePoints].status=3;
 		numSparsePoints++;
 	}
+		// printf("ph_out.num=%d\n", numSparsePoints);
 	assert(numSparsePoints <= npoints);
 
 	camToWorld = fh->PRE_camToWorld;
@@ -228,7 +241,14 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 		if(var > my_absTH)
 			continue;
 
-		if(originalInputSparse[i].relObsBaseline < my_minRelBS)
+		float my_minRelBS_pal = my_minRelBS;
+		
+		if(USE_PAL){
+			my_minRelBS_pal = 0;
+			// my_minRelBS_pal = my_minRelBS / 100; 	// 这里可以选择合适的点筛选条件
+		}
+
+		if(originalInputSparse[i].relObsBaseline < my_minRelBS_pal)
 			continue;
 
 
@@ -239,9 +259,20 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 			int dx = patternP[pnt][0];
 			int dy = patternP[pnt][1];
 
-			tmpVertexBuffer[vertexBufferNumPoints][0] = ((originalInputSparse[i].u+dx)*fxi + cxi) * depth;
-			tmpVertexBuffer[vertexBufferNumPoints][1] = ((originalInputSparse[i].v+dy)*fyi + cyi) * depth;
-			tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
+			if(USE_PAL){
+				Vec3f pt_pal = pal_model_g->cam2world((originalInputSparse[i].u+dx), originalInputSparse[i].v+dy) * depth;
+				tmpVertexBuffer[vertexBufferNumPoints][0] = pt_pal[0];
+				tmpVertexBuffer[vertexBufferNumPoints][1] = pt_pal[1];
+				tmpVertexBuffer[vertexBufferNumPoints][2] = depth;
+				// printf("p = %.2f, %.2f %.2f -> %.2f %.2f %.2f\n", originalInputSparse[i].u+dx, originalInputSparse[i].v+dy, depth, pt_pal[0], pt_pal[1], pt_pal[2]);
+				
+			}
+			else{
+				tmpVertexBuffer[vertexBufferNumPoints][0] = ((originalInputSparse[i].u+dx)*fxi + cxi) * depth;
+				tmpVertexBuffer[vertexBufferNumPoints][1] = ((originalInputSparse[i].v+dy)*fyi + cyi) * depth;
+				tmpVertexBuffer[vertexBufferNumPoints][2] = depth*(1 + 2*fxi * (rand()/(float)RAND_MAX-0.5f));
+
+			}
 
 
 

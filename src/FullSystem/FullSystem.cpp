@@ -457,8 +457,8 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	if(coarseTracker->firstCoarseRMSE < 0)
 		coarseTracker->firstCoarseRMSE = achievedRes[0];
 
-    if(!setting_debugout_runquiet)
-        printf("Coarse Tracker tracked ab = %f %f (exp %f). Res %f!\n", aff_g2l.a, aff_g2l.b, fh->ab_exposure, achievedRes[0]);
+    // if(!setting_debugout_runquiet)
+    //     printf("Coarse Tracker tracked ab = %f %f (exp %f). Res %f!\n", aff_g2l.a, aff_g2l.b, fh->ab_exposure, achievedRes[0]);
 	
 	if(setting_logStuff)
 	{
@@ -474,16 +474,19 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	}
 
 	// hwjdebug ----------------
-	std::cout << std::setprecision(4)	//之前是16
-					<< " $ "
-					<< fh->shell->id << " "
-					<< fh->shell->timestamp << " "
-					<< fh->ab_exposure << "  pose: "
-					<< fh->shell->camToWorld.log().transpose() << " aff: "
-					<< aff_g2l.a << " "
-					<< aff_g2l.b << " res:"
-					<< achievedRes[0] << " it:"
-					<< tryIterations << "\n";
+    if(!setting_debugout_runquiet)
+		std::cout << std::setprecision(4)	//之前是16
+						<< "Coarse Tracker: "
+						<< fh->shell->id << " "
+						<< fh->shell->timestamp << " "
+						<< fh->ab_exposure << "  pose: "
+						<< fh->shell->camToWorld.log().transpose() << " "
+						// << "aff: " 
+						// << aff_g2l.a << " "
+						// << aff_g2l.b << " "
+						<< "res:"
+						<< achievedRes[0] << " it:"
+						<< tryIterations << "\n";
 
 	// 返回误差和光流
 	return Vec4(achievedRes[0], flowVecs[0], flowVecs[1], flowVecs[2]);
@@ -529,14 +532,17 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 			trace_total++;
 		}
 	}
-//	printf("ADD: TRACE: %'d points. %'d (%.0f%%) good. %'d (%.0f%%) skip. %'d (%.0f%%) badcond. %'d (%.0f%%) oob. %'d (%.0f%%) out. %'d (%.0f%%) uninit.\n",
-//			trace_total,
-//			trace_good, 100*trace_good/(float)trace_total,
-//			trace_skip, 100*trace_skip/(float)trace_total,
-//			trace_badcondition, 100*trace_badcondition/(float)trace_total,
-//			trace_oob, 100*trace_oob/(float)trace_total,
-//			trace_out, 100*trace_out/(float)trace_total,
-//			trace_uninitialized, 100*trace_uninitialized/(float)trace_total);
+
+	printf(" & TRACE: %'d points. %'d (%.0f%%) good. %'d (%.0f%%) skip. %'d (%.0f%%) badcond. %'d (%.0f%%) oob. %'d (%.0f%%) out. %'d (%.0f%%) uninit.\n",
+			trace_total,
+			trace_good, 100*trace_good/(float)trace_total,
+			trace_skip, 100*trace_skip/(float)trace_total,
+			trace_badcondition, 100*trace_badcondition/(float)trace_total,
+			trace_oob, 100*trace_oob/(float)trace_total,
+			trace_out, 100*trace_out/(float)trace_total,
+			trace_uninitialized, 100*trace_uninitialized/(float)trace_total);
+
+	return ;
 }
 
 

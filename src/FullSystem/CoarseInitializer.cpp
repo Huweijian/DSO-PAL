@@ -996,7 +996,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		if(USE_PAL){
 			int r0 = pal_model_g->mask_radius[0];
 			int r1 = pal_model_g->mask_radius[1];
-			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / w[0]*h[0];
+			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / (w[0]*h[0]);
 		}
 // #endif
 		sel.currentPotential = 3;

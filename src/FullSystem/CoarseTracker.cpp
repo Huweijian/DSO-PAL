@@ -320,11 +320,8 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 {
 	using namespace std;
 	acc.initialize();
-	// SSE准备
-// #ifndef PAL
 	__m128 fxl = _mm_set1_ps(fx[lvl]);
 	__m128 fyl = _mm_set1_ps(fy[lvl]);
-// #endif
 	__m128 b0 = _mm_set1_ps(lastRef_aff_g2l.b);
 	__m128 a = _mm_set1_ps((float)(AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l)[0]));
 	__m128 one = _mm_set1_ps(1);
@@ -338,36 +335,37 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 // #ifdef PAL
 		if(USE_PAL){
 
-			float buf_drdSE3[6][4];
-			float buf_weight_pal[4];
+			float buf_drdSE3[6][4] = {0};
 			for(int k=0; k<4; k++){
-				Vec3f pt = pal_model_g->cam2world(buf_warped_u[i+k], buf_warped_v[i+k], lvl) / buf_warped_idepth[i+k];
-				Eigen::Matrix<float, 2, 6> dx2dSE;
-				Eigen::Matrix<float, 2, 3> duv2dxyz;
-				pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
-				Vec2f drdx2 = Vec2f(buf_warped_dx[i+k], buf_warped_dy[i+k]);
-				Vec6f drdSE3 = drdx2.transpose() * dx2dSE;
+				if(buf_warped_idepth[i+k] != 0){	// 反深度为0会导致pt为nan
 
-				// hwjdebug -------------
-				if(k == 0){
-					cout << drdx2.transpose() << std::endl;
-					cout << dx2dSE << endl;
-					cout << drdSE3.transpose() << endl; 
-				}
-				// -------------------
+					Vec3f pt = Vec3f(buf_warped_u[i+k], buf_warped_v[i+k], 1) / buf_warped_idepth[i+k];
+					Eigen::Matrix<float, 2, 6> dx2dSE;
+					Eigen::Matrix<float, 2, 3> duv2dxyz;
+					pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+					Vec2f drdx2 = Vec2f(buf_warped_dx[i+k], buf_warped_dy[i+k]);
+					Vec6f drdSE3 = drdx2.transpose() * dx2dSE;
 
-				for(int idx=0; idx<6; idx++){
-					buf_drdSE3[idx][k] = drdSE3[idx];	
+					// hwjdebug -------------
+
+					// if(i+k % 100 == 0){
+					// 	printf("(i=%d lvl=%d) p = %.2f %.2f %.2f\n", i+k, lvl, buf_warped_u[i+k], buf_warped_v[i+k], buf_warped_idepth[i+k]);
+					// 	cout << "pt = " << pt.transpose() << endl;
+					// 	cout << "drdx2 = " << drdx2.transpose() << std::endl;
+					// 	cout << dx2dSE << endl;
+					// 	cout << "drdSE3 = " <<drdSE3.transpose() << endl; 
+					// 	cout << "-----------" << endl;
+					// }
+
+					// -------------------
+
+					for(int idx=0; idx<6; idx++){
+						buf_drdSE3[idx][k] = drdSE3[idx];	
+					}
 				}
-				buf_weight_pal[k] = buf_warped_weight[k]/10000.0;
-				
 			}
 
-				cout << a[0] * (b0[0] - buf_warped_refColor[i]) << " " << -1 << " " << buf_warped_residual[i] << " " << buf_weight_pal[0] << endl; 
-				cout << "-----------" << endl;
-
 			// 对SE的导数就是基本的直接法导数
-			// TODO: 这里JTJ的乘法会导致数据爆炸， 变为NAN, 需要查看内部变量累加情况
 			acc.updateSSE_weighted(
 				_mm_load_ps(buf_drdSE3[0]),
 				_mm_load_ps(buf_drdSE3[1]),
@@ -378,9 +376,9 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 				_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),					// 光度a a * (b - color)[TODO: 这两个光度的残差没有想明白]
 				minusOne,																			// 光度b -1 
 				_mm_load_ps(buf_warped_residual+i),													// res
-				_mm_load_ps(buf_weight_pal)															// weight
+				_mm_load_ps(buf_warped_weight+i)													// weight
 			);
-
+			// printf("i = %d, H(0,0) = [%.2f %.2f %.2f %.2f]\n", i, acc.SSEData[0], acc.SSEData[1], acc.SSEData[2], acc.SSEData[3]);
 		}
 		else{
 // #else
@@ -409,9 +407,12 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 // #endif
 		}
 	}
-
-	// TODO: 这里的acc.H的前8个维度已经炸了，需要debug[数据太大造成的]
 	acc.finish();
+	// hwjdebug ----------------
+	// printf(" ! AFTER  finish H(0 0) = %.2f(%.2f + %.2f + %.2f + %.2f)\n", acc.H(0, 0), 
+	//	acc.SSEData1m[0], acc.SSEData1m[1], acc.SSEData1m[2], acc.SSEData1m[3]);
+	// cout << "H = \n" << acc.H << endl;
+	// --------------------------
 	H_out = acc.H.topLeftCorner<8,8>().cast<double>() * (1.0f/n);
 	b_out = acc.H.topRightCorner<8,1>().cast<double>() * (1.0f/n);
 
@@ -645,21 +646,23 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 		IOWrap::waitKey(0);
 		delete resImage;
 	}
+
 	// hwjdebug----------------------------
-		Mat ref_depth_show, fra_depth_show;
-		resize(ref_depth, ref_depth_show, Size(w[0], h[0]));
-		resize(fra_depth, fra_depth_show, Size(w[0], h[0]));
-		imshow("frameDepth", fra_depth_show);
-		imshow("refDepth", ref_depth_show);
-		moveWindow("refDepth", 50, 50);
-		moveWindow("frameDepth", 50+w[0]+50, 50);
-		waitKey();
+
+		// Mat ref_depth_show, fra_depth_show;
+		// resize(ref_depth, ref_depth_show, Size(w[0], h[0]));
+		// resize(fra_depth, fra_depth_show, Size(w[0], h[0]));
+		// imshow("frameDepth", fra_depth_show);
+		// imshow("refDepth", ref_depth_show);
+		// moveWindow("refDepth", 50, 50);
+		// moveWindow("frameDepth", 50+w[0]+50, 50);
+		// waitKey();
+
 	// -----------------------
 
 	Vec6 rs;
 	rs[0] = E;
 	rs[1] = numTermsInE;
-	printf("E = %.2f, num = %.2f\n", rs[0], rs[1]);
 
 	rs[2] = sumSquaredShiftT/(sumSquaredShiftNum+0.1);
 	rs[3] = 0;
@@ -698,13 +701,16 @@ bool CoarseTracker::trackNewestCoarse(
 		Vec5 minResForAbort,
 		IOWrap::Output3DWrapper* wrap)
 {
+
 	debugPlot = setting_render_displayCoarseTrackingFull;
 	debugPrint = false;
+
 	// hwjdebug--------------
 	using namespace std;
 	// debugPlot = true;
-	debugPrint = true;
+	// debugPrint = true;
 	// --------------------
+
 	assert(coarsestLvl < 5 && coarsestLvl < pyrLevelsUsed);
 
 	// 初始化
@@ -726,6 +732,24 @@ bool CoarseTracker::trackNewestCoarse(
 		float levelCutoffRepeat=1;
 		// 计算当前位姿的残差
 		Vec6 resOld = calcRes(lvl, refToNew_current, aff_g2l_current, setting_coarseCutoffTH*levelCutoffRepeat);
+
+		// hwjdebug--------------------------
+
+		// printf("\n - LVL %d start \n", lvl);
+		// SE3 pose_test = SE3::exp(Vec6::Zero());
+		// for(int i=0; i<100; i++){
+		// 	resOld = calcRes(lvl, pose_test, aff_g2l_current, setting_coarseCutoffTH*levelCutoffRepeat);
+		// 	Vec2f relAff = AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l_current).cast<float>();
+		// 	printf(" res = %.3f \t ",
+		// 			resOld[0] / resOld[1]);
+		// 	std::cout << pose_test.log().transpose() << endl;
+		// 	Vec6 inc_se3_test;
+		// 	inc_se3_test << -0.001, 0, 0, 0, 0, 0;
+		// 	pose_test = SE3::exp(inc_se3_test) * pose_test;
+		// }
+		// continue;
+
+		// -----------------------------------
 
 		// 如果大残差数目过多，放宽一点残差阈值再算一次（不能超过50）
 		while(resOld[5] > 0.6 && levelCutoffRepeat < 50)
@@ -750,7 +774,7 @@ bool CoarseTracker::trackNewestCoarse(
 			printf("lvl %d, it %d (l=%.4f / %.4f) %s: [%.3f->%.3f] (%d -> %d) (|inc| = %f)! \n\t",
 					lvl, -1, lambda, 1.0f,
 					"INITIA",
-					0.0f,
+					resOld[0] / resOld[1],
 					resOld[0] / resOld[1],
 					 0,(int)resOld[1],
 					0.0f);
@@ -822,7 +846,7 @@ bool CoarseTracker::trackNewestCoarse(
 			if(debugPrint)
 			{
 				Vec2f relAff = AffLight::fromToVecExposure(lastRef->ab_exposure, newFrame->ab_exposure, lastRef_aff_g2l, aff_g2l_new).cast<float>();
-				printf("lvl %d, it %d (l=%.4f / %.4f) %s: [%.3f->%.3f] (%d -> %d) (|inc| = %f)! \n\t",
+				printf("lvl %d, it %d (l=%.4f / %.4f) %s: [%.3f->%.3f] (%d -> %d) (|inc| = %f)! \n",
 						lvl, iteration, lambda,
 						extrapFac,
 						(accept ? "ACCEPT" : "REJECT"),
@@ -830,7 +854,8 @@ bool CoarseTracker::trackNewestCoarse(
 						resNew[0] / resNew[1],
 						(int)resOld[1], (int)resNew[1],
 						inc.norm());
-				std::cout << refToNew_new.log().transpose() << " AFF " << aff_g2l_new.vec().transpose() <<" (rel " << relAff.transpose() << ")\n";
+				cout << "\tinc = " << incScaled.head<6>().transpose() << endl;
+				std::cout << "\t" <<refToNew_new.log().transpose() << " AFF " << aff_g2l_new.vec().transpose() <<" (rel " << relAff.transpose() << ")\n";
 			}
 
 			// 接受增量，重新计算H和b，lambda增加
@@ -851,10 +876,10 @@ bool CoarseTracker::trackNewestCoarse(
 			}
 
 			// 增量过小，退出
-			if(!(inc.norm() > 1e-3))
+			if(!(inc.norm() > 1e-3)) 
 			{
 				if(debugPrint)
-					printf("inc too small, break!\n");
+					printf("inc(%f) too small, break!\n", inc.norm());
 				break;
 			}
 		}
