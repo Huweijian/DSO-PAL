@@ -64,7 +64,7 @@ public:
 
 
 
-	Mat22f gradH;
+	Mat22f gradH; // 梯度.T * 梯度
 	Vec2f gradH_ev;
 	Mat22f gradH_eig;
 	float energyTH;
@@ -85,7 +85,7 @@ public:
 
 	ImmaturePointStatus lastTraceStatus;
 	Vec2f lastTraceUV;
-	float lastTracePixelInterval;
+	float lastTracePixelInterval; // 上次跟踪的误差
 
 	float idepth_GT;
 

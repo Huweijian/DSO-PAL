@@ -992,13 +992,13 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	float densities[] = {0.03,0.05,0.15,0.5,1};
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
-// #ifdef PAL //修改点的密度
+		// 修改点的密度
+		// 因为mask以为的点不需要搜索
 		if(USE_PAL){
-			int r0 = pal_model_g->mask_radius[0];
-			int r1 = pal_model_g->mask_radius[1];
+			int r0 = pal_model_g->sensing_radius[0];
+			int r1 = pal_model_g->sensing_radius[1];
 			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / (w[0]*h[0]);
 		}
-// #endif
 		sel.currentPotential = 3;
 		int npts;
 		if(lvl == 0)

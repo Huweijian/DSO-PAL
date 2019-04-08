@@ -67,7 +67,8 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	}
 	assert(nres == ((int)frameHessians.size())-1);
 
-	bool print = false;//rand()%50==0;
+	// bool print = false;//rand()%50==0;
+	bool print = true;
 
 	float lastEnergy = 0;
 	float lastHdd=0;
@@ -87,17 +88,18 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	if(!std::isfinite(lastEnergy) || lastHdd < setting_minIdepthH_act)
 	{
 		if(print)
-			printf("OptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
+			printf("\tOptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
 				nres, lastHdd, lastEnergy);
 		return 0;
 	}
 
-	// 你成熟了！
+	// 批准继续成熟
 	if(print) 
-		printf("Activate point. %d residuals. H=%f. Initial Energy: %f. Initial Id=%f\n" ,
-			nres, lastHdd,lastEnergy,currentIdepth);
+		printf("\tPoint. %d residuals. Hdd=%.2f. Initial Energy: %.2f. Initial Id=%.2f\n" ,
+			nres, lastHdd, lastEnergy, currentIdepth);
 
 	// 优化深度
+	// TODO: 这里优化有问题,误差下降不明显(需要进一步可视化+debug)
 	float lambda = 0.1;
 	for(int iteration=0;iteration<setting_GNItsOnPointActivation;iteration++)
 	{
@@ -114,17 +116,17 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 		if(!std::isfinite(lastEnergy) || newHdd < setting_minIdepthH_act)
 		{
-			if(print) printf("OptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
+			if(print) printf("\tOptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
 					nres,
 					newHdd,
 					lastEnergy);
 			return 0;
 		}
 
-		if(print) printf("%s %d (L %.2f) %s: %f -> %f (idepth %f)!\n",
+		if(print) printf("\t - %s %d (L %.2f) %s: %.4f -> %.4f (idepth %.4f)!\n",
 				(true || newEnergy < lastEnergy) ? "ACCEPT" : "REJECT",
 				iteration,
-				log10(lambda),
+				(lambda),
 				"",
 				lastEnergy, newEnergy, newIdepth);
 
@@ -169,11 +171,11 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	if(numGoodRes < minObs)
 	{
 		if(print) 
-			printf("OptPoint: OUTLIER!\n"); 
+			printf("\tOptPoint: OUTLIER!\n"); 
 		return (PointHessian*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
-	// 你已经几乎是一个成熟的点了	
+	// 你已经几乎是一个成熟的点了,可惜energyTH大了点,gg
 	PointHessian* p = new PointHessian(point, &Hcalib);
 	if(!std::isfinite(p->energyTH)){
 		delete p; 
@@ -212,9 +214,9 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			}
 		}
 
-	// 成熟宣言
+	// 成熟了蛤
 	if(print) 
-		printf("point activated!\n");
+		printf("\tpoint activated!\n");
 
 	statistics_numActivatedPoints++;
 	return p;

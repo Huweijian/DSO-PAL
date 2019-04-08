@@ -65,7 +65,7 @@ PALCamera::PALCamera(std::string filename)
     // mask size
     fgets(buf, CMV_MAX_BUF,f);
     fscanf(f,"\n");
-    fscanf(f,"%d %d\n", &(this->mask_radius[1]),  &(this->mask_radius[0]));
+    fscanf(f,"%d %d %d %d\n", &(this->mask_radius[1]),  &(this->mask_radius[0]), &(this->sensing_radius[1]),  &(this->sensing_radius[0]));
 
     fclose(f);
 

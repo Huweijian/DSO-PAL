@@ -31,7 +31,8 @@ public:
   double c_;                      // affine parameter
   double d_;                      // affine parameter
   double e_;                      // affine parameter
-  int mask_radius[2] = {0, 0};
+  int mask_radius[2] = {0, 0};    // mask的内径和外经
+  int sensing_radius[2] = {0, 0}; // 传感的内径和外经
 
 public:
   PALCamera(std::string filename);

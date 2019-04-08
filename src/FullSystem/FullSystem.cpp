@@ -476,8 +476,8 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	// hwjdebug ----------------
     if(!setting_debugout_runquiet)
 		std::cout << std::setprecision(4)	//之前是16
-						<< "Coarse Tracker: "
-						<< fh->shell->id << " "
+						// << "Coarse Tracker: "
+						<< "跟踪帧 " << fh->shell->id << " "
 						<< fh->shell->timestamp << " "
 						<< fh->ab_exposure << "  pose: "
 						<< fh->shell->camToWorld.log().transpose() << " "
@@ -500,14 +500,13 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 	int trace_total=0, trace_good=0, trace_oob=0, trace_out=0, trace_skip=0, trace_badcondition=0, trace_uninitialized=0;
 
 	Mat33f K = Mat33f::Identity();
-// #ifndef PAL
+	
 	if(!USE_PAL){
 		K(0,0) = Hcalib.fxl();
 		K(1,1) = Hcalib.fyl();
 		K(0,2) = Hcalib.cxl();
 		K(1,2) = Hcalib.cyl();
 	}
-// #endif
 
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
@@ -593,7 +592,7 @@ void FullSystem::activatePointsMT()
 	if(currentMinActDist > 4) currentMinActDist = 4;
 
     if(!setting_debugout_runquiet)
-        printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
+        printf(" - SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
                 currentMinActDist, (int)(setting_desiredPointDensity), ef->nPoints);
 
 
@@ -608,14 +607,19 @@ void FullSystem::activatePointsMT()
 	std::vector<ImmaturePoint*> toOptimize; 
 	toOptimize.reserve(20000);
 
-	//枚举老帧上的未熟点， 如果这些未熟点还行，并且投影到老帧上距离其他成熟点较远，那么加入toOptimize队列，准备优化
+	// hwjdebug ------------------
+	int immature_deleted = 0, immature_notReady = 0, immature_needMarg = 0, immature_want = 0, immature_out = 0;
+
+	// ------------------
+
+	//枚举老帧上的未熟点， 如果这些未熟点还行(条件见下面 canActivate )，并且投影到老帧上距离其他成熟点较远，那么加入toOptimize队列，准备优化
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
 		if(host == newestHs) 
 			continue;
 
 		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
-		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
+		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]); // DSO可太坏了,K和Ki分贝是不同lvl的
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
 		for(unsigned int i=0;i<host->immaturePoints.size();i+=1)
@@ -627,6 +631,7 @@ void FullSystem::activatePointsMT()
 			if(!std::isfinite(ph->idepth_max) || ph->lastTraceStatus == IPS_OUTLIER)
 			{
 				// remove point.
+				immature_deleted ++ ;
 				delete ph;
 				host->immaturePoints[i]=0;
 				continue;
@@ -649,11 +654,17 @@ void FullSystem::activatePointsMT()
 				// if point will be out afterwards, delete it instead.
 				if(ph->host->flaggedForMarginalization || ph->lastTraceStatus == IPS_OOB)
 				{
-//					immature_notReady_deleted++;
+					immature_needMarg ++ ;
 					delete ph;
 					host->immaturePoints[i]=0;
+					continue ;
 				}
-//				immature_notReady_skipped++;
+
+				immature_notReady ++ ;
+				// hwjdebug ----------------------
+					// printf("\t IMP NRDY (%d): status(%d), lastTraceErr(%.2f), quanlity(%.2f), minid(%.2f)\n", 
+					// 	i, ph->lastTraceStatus, ph->lastTracePixelInterval, ph->quality, 0.5*(ph->idepth_max+ph->idepth_min));
+				// -------------
 				continue;
 			}
 
@@ -662,15 +673,14 @@ void FullSystem::activatePointsMT()
 			// 未成熟点投影到某一老关键帧上
 			Vec3f ptp;
 			int u, v;
-// #ifdef PAL
+			
 			if(USE_PAL){
-
-				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
-				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp);
+				
+				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v, 0) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
+				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp, 1);
 				u = ptp_pal2D[0];
 				v = ptp_pal2D[1];
 			}
-// #else
 			else{
 
 				ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
@@ -687,7 +697,7 @@ void FullSystem::activatePointsMT()
 				if((u > 0 && v > 0 && u < wG[1] && v < hG[1]))
 					inRange = true;
 			}
-// #endif
+
 			if(inRange)
 			{
 
@@ -703,22 +713,38 @@ void FullSystem::activatePointsMT()
 					coarseDistanceMap->addIntoDistFinal(u,v);
 					toOptimize.push_back(ph);
 				}
+				
+				// hwjdebug ----------------------
+					// printf("\t IMP IN (%d): [lvl 1] (%.2f, %.2f) -[%.2f %.2f %.2f]> (%d, %d)\n", i, ph->u, ph->v, ptp[0], ptp[1], ptp[2], u, v);
+				// -------------
 			}
 			else
 			{
+				// hwjdebug ----------------------
+					// printf("\t IMP OUT (%d): [lvl 1] (%.2f, %.2f) -> (%d, %d)\n", i, ph->u, ph->v, u, v);
+				// -------------
+				immature_out ++ ;
 				delete ph;
 				host->immaturePoints[i]=0;
 			}
 		}
 	}
 
-
-//	printf("ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, marg-skip %d)\n",
-//			(int)toOptimize.size(), immature_deleted, immature_notReady, immature_needMarg, immature_want, immature_margskip);
+	// hwjdebug -------------
+    if(!setting_debugout_runquiet)
+		printf(" - ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, out %d)\n",
+				(int)toOptimize.size(), immature_deleted, immature_notReady, immature_needMarg, immature_want, immature_out);
+	// -------------------
 
 	// 开始多线程激活未熟点
 	std::vector<PointHessian*> optimized; 
 	optimized.resize(toOptimize.size());
+
+
+	// hwjdebug-------
+	multiThreading = false;
+	int optiFail = 0, optiBadPoint = 0, optiGood = 0;
+	// --------
 
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&FullSystem::activatePointsMT_Reductor, this, &optimized, &toOptimize, _1, _2, _3, _4), 0, toOptimize.size(), 50);
@@ -744,17 +770,25 @@ void FullSystem::activatePointsMT()
 			assert(newpoint->efPoint != 0);
 			// 彻底摆脱不熟的自己
 			delete ph;
+			optiGood ++;
 		}
 		else if(newpoint == (PointHessian*)((long)(-1)) || ph->lastTraceStatus==IPS_OOB)
 		{
 			delete ph;
 			ph->host->immaturePoints[ph->idxInImmaturePoints]=0;
+			optiFail ++;
 		}
 		else
 		{
 			assert(newpoint == 0 || newpoint == (PointHessian*)((long)(-1)));
+			optiBadPoint ++;
 		}
 	}
+
+	// hwjdebug -------------
+    if(!setting_debugout_runquiet)
+		printf("- - ACTIVE RESULT: good(%d), fail(%d), bad(%d)\n", optiGood, optiFail, optiBadPoint);
+	// ---------------
 
 
 	// 排除帧中的所有处理过的未熟点
@@ -978,18 +1012,18 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 			// 如果位姿或者光度变化足够大 || 当前误差大于第一次误差的2倍 就创建新的关键帧
 			if(allFrameHistory.size()== 1){
 				needToMakeKF = true;
-				printf("\n $ 创建新关键帧(allFrameHistory = 1)\n");
+				printf("\n创建新关键帧(allFrameHistory = 1)\n");
 			}
 			else if(setting_kfGlobalWeight*setting_maxShiftWeightT *  sqrtf((double)tres[1]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightR *  sqrtf((double)tres[2]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightRT * sqrtf((double)tres[3]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) > 1 ){
 				needToMakeKF = true;
-				printf("\n $ 创建新关键帧(位姿或光度变化过大)\n");
+				printf("\n创建新关键帧(位姿或光度变化过大)\n");
 			}
 			else if(2*coarseTracker->firstCoarseRMSE < tres[0]){
 				needToMakeKF = true;
-				printf("\n $ 创建新关键帧(当前误差 > 第一次跟踪误差的2倍)\n");
+				printf("\n创建新关键帧(当前误差 > 第一次跟踪误差的2倍)\n");
 			}
 
 		}
@@ -1140,6 +1174,30 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 	}
 
 	traceNewCoarse(fh);
+	
+	// hwjdebug --------------
+
+	// using namespace cv;
+	// FrameHessian* key_fh = frameHessians.front();
+	// Mat color = IOWrap::getOCVImg(key_fh->dI, wG[0], hG[0]);
+	// Mat imp_img = Mat::zeros(hG[0], wG[0], CV_8UC1); 
+	// for(auto &imp : key_fh->immaturePoints){
+	// 	imp_img.at<uchar>(imp->v, imp->u) = (imp->idepth_max + imp->idepth_min) / 2 * 100;
+	// }
+	// imshow("imp_img", imp_img);
+	// moveWindow("imp_img", 50, 50);
+
+	// Mat ph_img = Mat::zeros(hG[0], wG[0], CV_8UC1);
+	// for(auto &ph : key_fh->pointHessians){
+	// 	ph_img.at<uchar>(ph->v, ph->u) = ph->idepth * 100;
+	// }
+	// imshow("ph_img", ph_img);
+	// moveWindow("ph_img", 50 + wG[0] + 50, 50);
+	// printf(" $ %ul im points, %ul ph points\n", key_fh->immaturePoints.size(), key_fh->pointHessians.size());
+
+	// waitKey();
+
+	// -----------
 	delete fh;
 }
 
