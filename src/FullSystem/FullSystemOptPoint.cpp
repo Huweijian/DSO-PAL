@@ -67,13 +67,18 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 	}
 	assert(nres == ((int)frameHessians.size())-1);
 
-	// bool print = false;//rand()%50==0;
-	bool print = true;
+	bool print = false;//rand()%50==0;
+	// bool print = true;
 
 	float lastEnergy = 0;
 	float lastHdd=0;
 	float lastbd=0;
 	float currentIdepth = (point->idepth_max+point->idepth_min)*0.5f;
+
+
+	if(print){
+		printf("\tOptPoint: %d residuals\n", nres);
+	}
 
 	// 计算点投影到每一帧之后的误差和雅克比，并累计总能量
 	for(int i=0;i<nres;i++)
@@ -84,25 +89,48 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 		residuals[i].state_energy = residuals[i].state_NewEnergy;
 	}
 
+
+
 	// 如果总能量炸了，或者Hdd不足(??? Hdd什么意思)，成熟失败 gg
 	if(!std::isfinite(lastEnergy) || lastHdd < setting_minIdepthH_act)
 	{
 		if(print)
-			printf("\tOptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
-				nres, lastHdd, lastEnergy);
+			printf("\t - Not well-constrained. Initial H=%.1f. E=%.2f. SKIP!\n",
+				lastHdd, lastEnergy);
 		return 0;
 	}
+	else{
+	// 批准继续优化成熟
+		if(print) 
+			printf("\t - Initial Hdd=%.2f. Energy: %.2f. Id=%.2f\n" ,
+				lastHdd, lastEnergy, currentIdepth);
+	}
 
-	// 批准继续成熟
-	if(print) 
-		printf("\tPoint. %d residuals. Hdd=%.2f. Initial Energy: %.2f. Initial Id=%.2f\n" ,
-			nres, lastHdd, lastEnergy, currentIdepth);
+
+	// hwjdbeug ----------------------
+	// 测试不同深度的残差计算是否正确
+
+	// float maxid = point->idepth_max;
+	// float newIdepth = point->idepth_min;
+
+	// float maxid = 1.1;
+	// float newIdepth = 0.9;
+
+	// float dif = (maxid-newIdepth)/20;
+
+	// while(newIdepth < maxid){
+	// 	float newHdd=0; float newbd=0; float newEnergy=0;
+	// 	for(int i=0;i<nres;i++)
+	// 		newEnergy += point->linearizeResidual(&Hcalib, 1, residuals+i,newHdd, newbd, newIdepth);	
+	// 	printf("\t\t(test) id = %.2f, E = %.2f\n", newIdepth, newEnergy);
+	// 	newIdepth += dif;
+	// }
+
+	// --------------------
 
 	// 优化深度
-	// TODO: 这里优化有问题,误差下降不明显(需要进一步可视化+debug)
 	float lambda = 0.1;
-	for(int iteration=0;iteration<setting_GNItsOnPointActivation;iteration++)
-	{
+	for(int iteration=0;iteration<setting_GNItsOnPointActivation;iteration++){
 		float H = lastHdd;
 		H *= 1+lambda;
 		// idepth前进步长
@@ -116,7 +144,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 		if(!std::isfinite(lastEnergy) || newHdd < setting_minIdepthH_act)
 		{
-			if(print) printf("\tOptPoint: Not well-constrained (%d res, H=%.1f). E=%f. SKIP!\n",
+			if(print) printf("\t - OptPoint: Not well-constrained (%d res, Hdd=%.1f). E=%f. SKIP!\n",
 					nres,
 					newHdd,
 					lastEnergy);
@@ -124,14 +152,14 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 		}
 
 		if(print) printf("\t - %s %d (L %.2f) %s: %.4f -> %.4f (idepth %.4f)!\n",
-				(true || newEnergy < lastEnergy) ? "ACCEPT" : "REJECT",
+				( newEnergy < lastEnergy) ? "ACCEPT" : "REJECT",
 				iteration,
 				(lambda),
 				"",
 				lastEnergy, newEnergy, newIdepth);
 
 		// 前进成功
-		if(newEnergy < lastEnergy)
+		if(newEnergy < lastEnergy)  
 		{
 			currentIdepth = newIdepth;
 			lastHdd = newHdd;
@@ -152,7 +180,10 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 		if(fabsf(step) < 0.0001*currentIdepth)
 			break;
+
+
 	}
+
 
 	// 重大bug反馈
 	if(!std::isfinite(currentIdepth))
@@ -174,6 +205,12 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 			printf("\tOptPoint: OUTLIER!\n"); 
 		return (PointHessian*)((long)(-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
+
+	// hwjdebug --------------------
+		// cv::imshow("sleep", cv::Mat::zeros(300, 300, CV_8UC1));
+		// cv::moveWindow("sleep",1920+50, 50);
+		// cv::waitKey();
+	// -------------
 
 	// 你已经几乎是一个成熟的点了,可惜energyTH大了点,gg
 	PointHessian* p = new PointHessian(point, &Hcalib);
@@ -216,7 +253,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(
 
 	// 成熟了蛤
 	if(print) 
-		printf("\tpoint activated!\n");
+		printf("\t $ Point have activated!\n");
 
 	statistics_numActivatedPoints++;
 	return p;

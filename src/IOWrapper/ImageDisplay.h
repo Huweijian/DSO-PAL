@@ -42,18 +42,15 @@ void displayImage(const char* windowName, const MinimalImageB16* img, bool autoS
 cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h);
 
 template<typename T>
-cv::Mat getOCVImg(T* data, int w, int h){
-	cv::Mat img(h, w, CV_32FC1, data);
-	cv::Mat imgtoshow(h, w, CV_8UC1);
+cv::Mat getOCVImg_tem(T* data, int w, int h){
+	cv::Mat img(h, w, CV_8UC1);
 
 	for(int i=0; i<w; i++){
 		for(int j=0; j<h; j++){
-			imgtoshow.at<uchar>(j, i) = data[j*w+i];
+			img.at<uchar>(j, i) = data[j*w+i];
 		}
 	}
 
-	cv::imshow("hihi", imgtoshow);
-	cv::waitKey(0);
 	return img;
 }
 

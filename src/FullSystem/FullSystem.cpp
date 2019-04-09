@@ -742,7 +742,7 @@ void FullSystem::activatePointsMT()
 
 
 	// hwjdebug-------
-	multiThreading = false;
+	// multiThreading = false;
 	int optiFail = 0, optiBadPoint = 0, optiGood = 0;
 	// --------
 

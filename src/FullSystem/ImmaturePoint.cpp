@@ -693,6 +693,8 @@ double ImmaturePoint::linearizeResidual(
 	if(tmpRes->state_state == ResState::OOB)
 	{ 
 		tmpRes->state_NewState = ResState::OOB; 
+		// hwjdebugsb
+		// printf("\t\t FAIL(OOB)\n");
 		return tmpRes->state_energy; 
 	}
 
@@ -702,12 +704,25 @@ double ImmaturePoint::linearizeResidual(
 	// check OOB due to scale angle change.
 
 	float energyLeft=0;
-	const Eigen::Vector3f* dIl = tmpRes->target->dI; // 目标帧的图像
+	Eigen::Vector3f* dIl = tmpRes->target->dI; // 目标帧的图像
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 	//const float * const Il = tmpRes->target->I;
 
 	Vec2f affLL = precalc->PRE_aff_mode;
+
+	// hwjdebug -----------------
+	// Mat fra = IOWrap::getOCVImg(dIl, wG[0], hG[0]);
+	// circle(fra, Point(Ku, Kv), 3, 255);
+	// imshow("ref", ref);
+	// imshow("frame", fra);
+	// moveWindow("ref", 50, 50);
+	// moveWindow("frame", 50+wG[0]+50, 50);
+	// waitKey(0);
+	// printf("\t\t");
+	// --------------------
+
+
 
 	// 对于每个pattern点，投影到关键帧，计算亮度误差
 	for(int idx=0;idx<patternNum;idx++)
@@ -723,8 +738,11 @@ double ImmaturePoint::linearizeResidual(
 			drescale, u, v, Ku, Kv, KliP, new_idepth))	// 输出
 			{
 			tmpRes->state_NewState = ResState::OOB; 
+			// hwjdebugsb
+			// printf("\t\tFAIL(Project OUT)\n");
 			return tmpRes->state_energy;
 		}
+
 
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
@@ -732,6 +750,8 @@ double ImmaturePoint::linearizeResidual(
 		if(!std::isfinite((float)hitColor[0])) 
 		{
 			tmpRes->state_NewState = ResState::OOB;
+			// hwjdebugsb
+			// printf("\t\tFAIL(INF COLOR)\n");
 			return tmpRes->state_energy;
 		}
 
@@ -742,38 +762,48 @@ double ImmaturePoint::linearizeResidual(
 
 		// depth derivatives.
 		// 对点的深度求导
-// #ifdef PAL
 		float d_idepth;
 		if(USE_PAL){
 
 			float gx = hitColor[1];
 			float gy = hitColor[2];
 			d_idepth = derive_idepth_pal(PRE_tTll, u, v, idepth, gx, gy, drescale);
+			// printf("\t\t - p = (%.2f, %.2f, %.2f), dd = %.2f  ", u, v, idepth, d_idepth);
 		}
-// #else
 		else{
 			float dxInterp = hitColor[1]*HCalib->fxl();
 			float dyInterp = hitColor[2]*HCalib->fyl();
 			d_idepth = derive_idepth(PRE_tTll, u, v, dx, dy, dxInterp, dyInterp, drescale);
 		}
-// #endif
 
 		hw *= weights[idx]*weights[idx];
 
 		Hdd += (hw*d_idepth)*d_idepth;
 		bd += (hw*residual)*d_idepth;
+		// printf("hw(%.2f) dd(%.2f) H(%.2f) b(%.2f)\n",hw, d_idepth, (hw*d_idepth)*d_idepth, (hw*residual)*d_idepth);
 	}
+
 
 	// 误差还行，记为内点，否则记为外点
 	if(energyLeft > energyTH*outlierTHSlack)
 	{
 		energyLeft = energyTH*outlierTHSlack;
 		tmpRes->state_NewState = ResState::OUTLIER;
+		// hwjdebugsb
+		// printf("\t\t FAIL(BAD RES) E = %.2f, Eth = %.2f\n", energyLeft, energyTH*outlierTHSlack);
 	}
 	else
 	{
 		tmpRes->state_NewState = ResState::IN;
+		// hwjdebugsb
+		// printf("\t\t GOOD!\n");
 	}
+
+	// hwjdebug-----------------
+	// using namespace cv;
+	// Mat ref = IOWrap::getOCVImg(host->dI, wG[0], hG[0]);
+	// circle(ref, Point(this->u, this->v), 3, 255);
+	// -------------------------
 
 	tmpRes->state_NewEnergy = energyLeft;
 	return energyLeft;

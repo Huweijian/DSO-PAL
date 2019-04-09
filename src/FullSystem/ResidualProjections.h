@@ -33,7 +33,7 @@
 namespace dso
 {
 
-
+// 输入的uv是相机坐标系!!!!
 EIGEN_STRONG_INLINE float derive_idepth(
 		const Vec3f &t, const float &u, const float &v,
 		const int &dx, const int &dy, const float &dxInterp,
@@ -43,20 +43,28 @@ EIGEN_STRONG_INLINE float derive_idepth(
 			+ dyInterp*drescale * (t[1]-t[2]*v))*SCALE_IDEPTH;
 }
 
+// 输入的uv是相机坐标系!!!!
 EIGEN_STRONG_INLINE float derive_idepth_pal(
 		const Vec3f &t, 
-		const float &u, const float &v, const float idepth,
-		const float &gx,const float &gy, 
-		const float &drescale)
+		float u, float v, float idepth,
+		float gx,float gy, 
+		float drescale)
 {
-	Vec3f pt = pal_model_g->cam2world(u, v)/idepth;
+	Vec3f pt = Vec3f(u, v, 1)/idepth;
 	Eigen::Matrix<float, 2, 3> duvdxyz;
 	Eigen::Matrix<float, 2, 6> duvdSE;
 	pal_model_g->jacobian_xyz2uv(pt, duvdSE, duvdxyz);
 
+	// printf("(%.2f, %.2f, %.2f) -> (%.2f, %.2f, %.2f) dres = %.2f", u, v, idepth, pt[0], pt[1], pt[2], drescale);
+	
 	Vec3f dxyzdd = Vec3f((t[0]-t[2]*u), (t[1]-t[2]*v), 0);
+	Eigen::Matrix<float, 1, 1> dd_scalar= Vec2f(gx, gy).transpose() * duvdxyz * dxyzdd; 	
 
-	auto dd_scalar= Vec2f(gx, gy).transpose() * duvdxyz * dxyzdd; 	
+	// using namespace std;
+	// cout << endl;
+	// cout << "d1 = " << Vec2f(gx, gy).transpose() << endl;
+	// cout << "d2 = " << duvdxyz << endl;
+	// cout << "d3 = " << dxyzdd.transpose() << endl;
 
 	return dd_scalar[0] * drescale;
 }
@@ -101,7 +109,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		float &drescale, float &u, float &v, // z变化比例系数；归一化坐标系的值；
 		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)	// 像素坐标系的值；原始归一化坐标系的值；
 {
-// #ifdef PAL
 	if(USE_PAL){
 
 		KliP = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
@@ -119,7 +126,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		return pal_check_in_range_g(Ku, Kv, 2, 0);
 	}
 	else{
-// #else
 		// K*P
 		KliP = Vec3f(
 				(u_pt+dx-HCalib->cxl())*HCalib->fxli(),
@@ -147,7 +153,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		// 返回投影后的点是否在图像内
 		return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
 	}
-// #endif
 }
 
 
