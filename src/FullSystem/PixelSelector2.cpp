@@ -33,6 +33,7 @@
 #include "util/globalCalib.h"
 #include "FullSystem/HessianBlocks.h"
 #include "util/globalFuncs.h"
+#include "util/pal_interface.h"
 
 namespace dso
 {
@@ -94,16 +95,26 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 			int* hist0 = gradHist;// + 50*(x+y*w32);
 			memset(hist0,0,sizeof(int)*50);
 
-			for(int j=0;j<32;j++) for(int i=0;i<32;i++)
-			{
-				int it = i+32*x;
-				int jt = j+32*y;
-				if(it>w-2 || jt>h-2 || it<1 || jt<1) continue;
-				int g = sqrtf(map0[i+j*w]);
-				if(g>48) g=48;
-				hist0[g+1]++;
-				hist0[0]++;
-			}
+			for(int j=0;j<32;j++) 
+				for(int i=0;i<32;i++)
+				{
+					int it = i+32*x;
+					int jt = j+32*y;
+
+					// 位于图像边缘的点不加入梯度直方图
+					if(USE_PAL){
+						if(!pal_check_in_range_g(it, jt, 1, 0))
+							continue;	
+					}
+					else{
+						if(it>w-2 || jt>h-2 || it<1 || jt<1) 
+							continue;
+					}
+					int g = sqrtf(map0[i+j*w]);
+					if(g>48) g=48;
+					hist0[g+1]++;
+					hist0[0]++;
+				}
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 		}
@@ -152,7 +163,7 @@ int PixelSelector::makeMaps(
 		// K / (pot+1)^2, where K is a scene-dependent constant.
 		// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
 
-		// 利用梯度直方图计算梯度阈值
+		// 分成32*32个小块，利用梯度直方图计算每个小块的梯度阈值
 		if(fh != gradHistFrame) 
 			makeHists(fh);
 

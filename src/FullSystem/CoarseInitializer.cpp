@@ -993,7 +993,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
 	{
 		// 修改点的密度
-		// 因为mask以为的点不需要搜索
+		// 因为mask以外的点不需要搜索
 		if(USE_PAL){
 			int r0 = pal_model_g->sensing_radius[0];
 			int r1 = pal_model_g->sensing_radius[1];
@@ -1021,13 +1021,13 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 				// 如果这个点被选中了
 				if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 				{
+					// 排除外部的点
 					if(USE_PAL){
-// #ifdef PAL // 排除外部的点
 						if(!pal_check_in_range_g(x, y, patternPadding+1, lvl)){
 							continue;
 						}
 					}
-// #endif
+
 					// 初始化这个点的信息
 					pl[nl].u = x+0.1;
 					pl[nl].v = y+0.1;

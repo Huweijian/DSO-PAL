@@ -13,7 +13,7 @@ using namespace Eigen;
 using namespace dso;
 
 int main(void){
-    init_pal("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 
+    pal_init("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 
 
 	Eigen::Matrix<float, 2, 6> dx2dSE;
 	Eigen::Matrix<float, 2, 3> duv2dxyz;

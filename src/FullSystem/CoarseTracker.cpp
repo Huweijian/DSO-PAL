@@ -1106,24 +1106,21 @@ void CoarseDistanceMap::makeDistanceMap(
 			assert(ph->status == PointHessian::ACTIVE);
 
 			int u, v;
-// #ifdef PAL
 			if(USE_PAL){
 				Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
 				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
 				u = ptp_pal2D[0];
 				v = ptp_pal2D[1];
-				if(!pal_check_in_range_g(u, v, 0, 1))
+				if(!pal_check_in_range_g(u, v, 1, 1))
 					continue;
 			}
 			else{
-// #else
 				Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
 				u = ptp[0] / ptp[2] + 0.5f;
 				v = ptp[1] / ptp[2] + 0.5f;
 				if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
 					continue;
 			}
-// #endif
 			fwdWarpedIDDistFinal[u+w1*v]=0;
 			bfsList1[numItems] = Eigen::Vector2i(u,v);
 			numItems++;

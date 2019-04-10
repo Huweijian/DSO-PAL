@@ -24,13 +24,11 @@ extern pal::PALCamera* pal_model_g;
 //     return Eigen::Vector2f(pCam[0], pCam[1]);
 // };
 
-bool pal_check_in_range_g(float u, float v, float left_top, float right, float bottom, int level = 0);
-
 bool pal_check_in_range_g(float u, float v, float padding, int level = 0);
 
-bool pal_check_in_range_g(int idx, int lvl = 0);
+bool pal_check_valid_sensing(float u, float v);
 
-bool init_pal(std::string calibFile);
+bool pal_init(std::string calibFile);
 
 inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Matrix3f &R, const Eigen::Vector3f t, 
     float &u, float &v, float &Ku, float &Kv)

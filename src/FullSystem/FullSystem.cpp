@@ -690,7 +690,7 @@ void FullSystem::activatePointsMT()
 
 			bool inRange = false;
 			if(USE_PAL){
-				if(pal_check_in_range_g(u, v, 0, 1))
+				if(pal_check_in_range_g(u, v, 1, 1))
 					inRange = true;
 			}
 			else{
@@ -1443,7 +1443,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
 }
 
-// 选择未熟点，添加到队列
+// 给最新关键帧初始化一些未熟点
 void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 {
 	pixelSelector->allowFast = true;
@@ -1460,13 +1460,13 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 		for(int x=patternPadding+1;x<wG[0]-patternPadding-2;x++)
 		{
 
-// #ifdef PAL // 排除外部的点
+			// 排除外部的点
 			if(USE_PAL){
 				if(!pal_check_in_range_g(x, y, patternPadding+1)){
 					continue;
 				}
 			}
-// #endif
+
 			int i = x+y*wG[0];
 			if(selectionMap[i]==0) 
 				continue;

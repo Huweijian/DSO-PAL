@@ -361,7 +361,7 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
     }
 
 
-    else if(init_pal(configFilename)){
+    else if(pal_init(configFilename)){
 		u = new UndistortPAL();
 	}
 
@@ -384,6 +384,7 @@ void Undistort::loadPhotometricCalibration(std::string file, std::string noiseIm
 }
 
 // 矫正畸变
+
 template<typename T>
 ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float exposure, double timestamp, float factor) const
 {
@@ -395,10 +396,12 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 
 	// 矫正光度误差(渐晕和CMOS响应)
 	photometricUndist->processFrame<T>(image_raw->data, exposure, factor);
-	// 复制一份
-	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
-	photometricUndist->output->copyMetaTo(*result);
 
+	// 准备好输出变量
+	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
+	photometricUndist->output->copyMetaTo(*result); // 这个操作有点多余吧，感觉可以删除
+
+	// not passthrough
 	if (!passthrough)
 	{
 		float* out_data = result->image;
@@ -406,6 +409,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 
 		float* noiseMapX=0;
 		float* noiseMapY=0;
+		// 默认varNoise = 0 不执行
 		if(benchmark_varNoise>0)
 		{
 			int numnoise=(benchmark_noiseGridsize+8)*(benchmark_noiseGridsize+8);
@@ -475,6 +479,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 		}
 
 	}
+	// passthrough
 	else
 	{
 		memcpy(result->image, photometricUndist->output->image, sizeof(float)*w*h);
@@ -1243,15 +1248,22 @@ UndistortPAL::UndistortPAL()
 	w = wOrg = pal_model_g->width_;
 	h = hOrg = pal_model_g->height_;
 	K = dso::Mat33::Identity();	
-	passthrough = true;
 }
 
 void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
 {
 	for(int i=0;i<n;i++)
 	{
-		out_x[i] = in_x[i];
-		out_y[i] = in_y[i];
+		float xi = in_x[i];
+		float yi = in_y[i];
+		if(pal_check_valid_sensing(xi, yi)){
+			out_x[i] = xi;
+			out_y[i] = yi;
+		}
+		else{
+			out_x[i] = -1;
+			out_y[i] = -1;
+		}
 	}
 }
 

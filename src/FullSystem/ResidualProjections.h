@@ -77,7 +77,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		// -----------------------------------
 		float &Ku, float &Kv)
 {
-// #ifdef PAL
 	if(USE_PAL){
 
 	Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
@@ -87,7 +86,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 	return  pal_check_in_range_g(Ku, Kv, 2, 0);
 	}
 
-// #else
 	else{
 
 	Vec3f ptp = KRKi * Vec3f(u_pt,v_pt, 1) + Kt*idepth;
@@ -95,7 +93,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 	Kv = ptp[1] / ptp[2];
 	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
 	}
-// #endif
 }
 
 

@@ -242,7 +242,7 @@ public:
 	Undistort* undistort;
 private:
 
-
+	// 读取图像的入口
 	MinimalImageB* getImageRaw_internal(int id, int unused)
 	{
 		if(!isZipped)
@@ -253,7 +253,8 @@ private:
 		else
 		{
 #if HAS_ZIPLIB
-			if(databuffer==0) databuffer = new char[widthOrg*heightOrg*6+10000];
+			if(databuffer==0) 
+				databuffer = new char[widthOrg*heightOrg*6+10000];
 			zip_file_t* fle = zip_fopen(ziparchive, files[id].c_str(), 0);
 			long readbytes = zip_fread(fle, databuffer, (long)widthOrg*heightOrg*6+10000);
 
@@ -283,7 +284,9 @@ private:
 
 	ImageAndExposure* getImage_internal(int id, int unused)
 	{
+		// 读取图像
 		MinimalImageB* minimg = getImageRaw_internal(id, 0);
+		// 校正畸变
 		ImageAndExposure* ret2 = undistort->undistort<unsigned char>(
 				minimg,
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
