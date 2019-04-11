@@ -86,8 +86,17 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
     for(IOWrap::Output3DWrapper* ow : wraps)
         ow->pushLiveFrame(newFrameHessian);
+	// ------------
+	{
+		// using namespace cv;
+		// Mat img = IOWrap::getOCVImg(newFrameHessian->dI, wG[0], hG[0]);
+		// imshow("img", img);
+		// waitKey();
+	}
 
-	printf("\n $ INIT-TRACK Frame %d (on %d, %s)\n", 
+	//0-----------
+
+	printf("\n初始化帧 %d (on %d, %s)\n", 
 		newFrame->shell->incoming_id,
 		firstFrame->shell->incoming_id,
 		snapped? "have snapped" : "NOT  snapped");
@@ -117,7 +126,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		}
 	}
 	// hwjdebug----------------------
-	std::cout << " $ init Pose: " << SE3::log(thisToNext).transpose() << std::endl;
+	std::cout << " - init Pose: " << SE3::log(thisToNext).transpose() << std::endl;
 	// --------------------
 	// 初始化亮度仿射变换
 	AffLight refToNew_aff_current = thisToNext_aff;
@@ -304,10 +313,10 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		snappedAt = frameID;
 	}
 	if(snapped){
-		printf("!!!!初始化成功(at %d)!!!! now %d\n", snappedAt, frameID);
+		printf(" $ 初始化*成功*(first at %d) now %d\n", snappedAt, frameID);
 	}
 	else{
-		printf("初始化失败(at %d)\n", newFrame->shell->incoming_id);
+		printf(" $ 初始化失败(at %d)\n", newFrame->shell->incoming_id);
 	}
 
 	// 输出深度图
@@ -1008,6 +1017,13 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 			// 对于其他金字塔图像
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
 
+		// hwjdebugsb============
+		// printf("lvl %d: get %d points\n", lvl, npts);
+		// cv::Mat img, img2;
+		// img = IOWrap::getOCVImg(firstFrame->dIp[lvl], w[lvl], h[lvl]);
+		// img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], w[lvl], h[lvl]);
+		// ----------------------
+
 		if(points[lvl] != 0) delete[] points[lvl];
 		points[lvl] = new Pnt[npts];
 
@@ -1021,12 +1037,15 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 				// 如果这个点被选中了
 				if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 				{
+					// img.at<uchar>(y, x) = 255;
+
 					// 排除外部的点
 					if(USE_PAL){
 						if(!pal_check_in_range_g(x, y, patternPadding+1, lvl)){
 							continue;
 						}
 					}
+					// img2.at<uchar>(y, x) = 255;
 
 					// 初始化这个点的信息
 					pl[nl].u = x+0.1;
@@ -1057,6 +1076,19 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		}
 
 		numPoints[lvl]=nl;
+
+		// // hwjdebug-----------------
+		// printf(" - after remove, %d points left\n", numPoints[lvl]);
+		// {
+		// 	using namespace cv;
+		// 	imshow("img", img);
+		// 	imshow("img2", img2);
+		// 	moveWindow("img", 50, 50);
+		// 	moveWindow("im2", 50 + wl + 50, 50);
+		// 	waitKey();
+		// }
+		// // ----------------------
+
 	}
 
 	delete[] statusMap;
@@ -1224,6 +1256,7 @@ void CoarseInitializer::makeNN()
 	FLANNPointcloud pcs[PYR_LEVELS];
 	for(int i=0;i<pyrLevelsUsed;i++)
 	{
+		// printf(" - make FLANN PC && KD Tree in lvl %d, %d points\n", i, numPoints[i]);
 		// 每一层创建一个FLANN点云和KD树
 		pcs[i] = FLANNPointcloud(numPoints[i], points[i]);
 		indexes[i] = new KDTree(2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams(5) );
@@ -1235,6 +1268,7 @@ void CoarseInitializer::makeNN()
 	// find NN & parents
 	for(int lvl=0;lvl<pyrLevelsUsed;lvl++)
 	{
+
 		Pnt* pts = points[lvl];
 		int npts = numPoints[lvl];
 
@@ -1269,14 +1303,27 @@ void CoarseInitializer::makeNN()
 			if(lvl < pyrLevelsUsed-1 )
 			{
 				resultSet1.init(ret_index, ret_dist);
+				auto pt_old = pt;
 				pt = pt*0.5f-Vec2f(0.25f,0.25f);// 点在上层金字塔的位置
 				//查找点在上层金字塔中最接近的点
 				indexes[lvl+1]->findNeighbors(resultSet1, (float*)&pt, nanoflann::SearchParams());
 				// 保存为这个点的爸爸和爸爸距离
 				pts[i].parent = ret_index[0];
 				pts[i].parentDist = expf(-ret_dist[0]*NNDistFactor);
-
+			
 				assert(ret_index[0]>=0 && ret_index[0] < numPoints[lvl+1]);
+
+				// // hwjdebug-------------------
+				// assert(ret_index[0]>=0);
+				// if(ret_index[0] >= numPoints[lvl+1]){
+				// 	using namespace std;
+				// 	printf("BBBBBug I ret = %.d  all = %d\n", ret_index[0], numPoints[lvl+1]);
+				// 	cout <<"lvl:" << lvl+1 <<  "  " << pt.transpose() << endl;;
+				// 	cout << "lvl:" << lvl << "   " <<pt_old.transpose() << endl;
+				// 	assert(0);
+				// }
+				// // -------------
+
 			}
 			else
 			{

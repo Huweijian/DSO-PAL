@@ -429,7 +429,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		}
 
 		// 如果比上次的好，就可以退出了，不用继续尝试了
-        if(haveOneGood &&  achievedRes[0] < lastCoarseRMSE[0]*setting_reTrackThreshold)
+        if(haveOneGood && achievedRes[0] < lastCoarseRMSE[0]*setting_reTrackThreshold)
             break;
 
 	} // 尝试各种可能位姿
@@ -532,7 +532,7 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 		}
 	}
 
-	printf(" & TRACE: %'d points. %'d (%.0f%%) good. %'d (%.0f%%) skip. %'d (%.0f%%) badcond. %'d (%.0f%%) oob. %'d (%.0f%%) out. %'d (%.0f%%) uninit.\n",
+	printf(" $ TRACE: %'d points. %'d (%.0f%%) good. %'d (%.0f%%) skip. %'d (%.0f%%) badcond. %'d (%.0f%%) oob. %'d (%.0f%%) out. %'d (%.0f%%) uninit.\n",
 			trace_total,
 			trace_good, 100*trace_good/(float)trace_total,
 			trace_skip, 100*trace_skip/(float)trace_total,
@@ -787,7 +787,7 @@ void FullSystem::activatePointsMT()
 
 	// hwjdebug -------------
     if(!setting_debugout_runquiet)
-		printf("- - ACTIVE RESULT: good(%d), fail(%d), bad(%d)\n", optiGood, optiFail, optiBadPoint);
+		printf(" - ACTIVE RESULT: good(%d), fail(%d), bad(%d)\n", optiGood, optiFail, optiBadPoint);
 	// ---------------
 
 
@@ -926,6 +926,12 @@ void FullSystem::flagPointsForRemoval()
 // slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
+	// hwjdebug ----------- 显示畸变矫正后的图像
+	// cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
+	// cv::imshow("undistImg", rawimg);
+	// cv::waitKey();
+	// return ;
+
     if(isLost) 
 		return;
 
@@ -1204,6 +1210,7 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 // fh 当前帧
 void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
+
 	// needs to be set by mapping thread
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
@@ -1508,7 +1515,7 @@ void FullSystem::printLogLine()
 	if(frameHessians.size()==0) return;
 
     if(!setting_debugout_runquiet)
-        printf("LOG %d: %.3f fine. Res: %d A, %d L, %d M; (%'d / %'d) forceDrop. a=%f, b=%f. Window %d (%d)\n",
+        printf("LOG %d: %.3f fine. Res: %d A, %d L, %d M; (%'d / %'d) forceDrop. a=%f, b=%f. Window %d (%d)\n\n",
                 allKeyFramesHistory.back()->id,
                 statistics_lastFineTrackRMSE,
                 ef->resInA,
@@ -1545,7 +1552,6 @@ void FullSystem::printLogLine()
 				(int)frameHessians.size() << " "  << "\n";
 		numsLog->flush();
 	}
-
 
 }
 

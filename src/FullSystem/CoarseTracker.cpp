@@ -474,8 +474,8 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 		resImage->setConst(Vec3b(255,255,255));
 	}
 	// hwjdebug----------------------
-		Mat ref_depth = Mat::zeros(hl, wl, CV_8UC1);
-		Mat fra_depth = Mat::zeros(hl, wl, CV_8UC1);
+		// Mat ref_depth = Mat::zeros(hl, wl, CV_8UC1);
+		// Mat fra_depth = Mat::zeros(hl, wl, CV_8UC1);
 	// ---------------------------
 
 	int nl = pc_n[lvl];
@@ -519,8 +519,8 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 
 		// hwjdebug ---------------
 		// printf("ref [%.2f %.2f %.2f] -> new [%.2f %.2f %.2f]\n", x, y, 1.0/id, Ku, Kv, 1.0/new_idepth);
-		ref_depth.at<uchar>(y, x) = abs(1.0/id*100 - 100) ;
-		fra_depth.at<uchar>(Kv, Ku) = (1.0/new_idepth * 100); 
+		// ref_depth.at<uchar>(y, x) = abs(1.0/id*100 - 100) ;
+		// fra_depth.at<uchar>(Kv, Ku) = (1.0/new_idepth * 100); 
 		// ---------------------
 
 		// 对于第0层计算光流

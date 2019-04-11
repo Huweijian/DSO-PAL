@@ -30,19 +30,19 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
-            //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
-            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
-            //             "preset=0", 
-            //             "mode=0" 
-            //         ],
-
-            "args": [   "files=/home/hwj23/Dataset/simu/movex/color/", 
-                        "calib=/home/hwj23/Dataset/simu/camera.cfg", 
+            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
+                        "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
+                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
                         "preset=0", 
-                        "mode=2" 
+                        "mode=0" 
                     ],
+
+            // "args": [   "files=/home/hwj23/Dataset/simu/movex/color/", 
+            //             "calib=/home/hwj23/Dataset/simu/camera.cfg", 
+            //             "preset=0", 
+            //             "mode=2" 
+            //         ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
@@ -63,18 +63,18 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            // "args": [   "files=/home/hwj23/Dataset/PAL/real/s1/images/", 
-            //             "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
-            //             "gamma=/home/hwj23/Dataset/PAL/pcalib.txt", 
-            //             "preset=0", 
-            //             "mode=1" 
-            //         ],
-
-            "args": [   "files=/home/hwj23/Dataset/PAL/simu/s2/color/", 
-                        "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
+            "args": [   "files=/home/hwj23/Dataset/PAL/real/s1/images", 
+                        "calib=/home/hwj23/Dataset/PAL/calib_results_special_for_s1.txt", 
+                        "gamma=/home/hwj23/Dataset/PAL/pcalib.txt", 
                         "preset=0", 
-                        "mode=2" 
+                        "mode=1" 
                     ],
+
+            // "args": [   "files=/home/hwj23/Dataset/PAL/simu/s2/color/", 
+            //             "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
+            //             "preset=0", 
+            //             "mode=2" 
+            //         ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

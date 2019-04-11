@@ -360,7 +360,6 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
         if(!u->isValid()) {delete u; return 0; }
     }
 
-
     else if(pal_init(configFilename)){
 		u = new UndistortPAL();
 	}
@@ -384,7 +383,6 @@ void Undistort::loadPhotometricCalibration(std::string file, std::string noiseIm
 }
 
 // 矫正畸变
-
 template<typename T>
 ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float exposure, double timestamp, float factor) const
 {
@@ -1243,11 +1241,22 @@ void UndistortPinhole::distortCoordinates(float* in_x, float* in_y, float* out_x
 
 UndistortPAL::UndistortPAL()
 {
-	printf("Creating PAL undistorter\n");
-	valid = true;
 	w = wOrg = pal_model_g->width_;
 	h = hOrg = pal_model_g->height_;
 	K = dso::Mat33::Identity();	
+   	remapX = new float[w*h];
+    remapY = new float[w*h];
+
+	for(int y=0;y<h;y++)
+		for(int x=0;x<w;x++)
+		{
+			remapX[x+y*w] = x;
+			remapY[x+y*w] = y;
+		}
+
+	distortCoordinates(remapX, remapY, remapX, remapY, h*w);
+	valid = true;
+	printf("Creating PAL undistorter\n");
 }
 
 void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const

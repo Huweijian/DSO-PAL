@@ -188,11 +188,12 @@ int PixelSelector::makeMaps(
 			if(idealPotential>=currentPotential)
 				idealPotential = currentPotential-1;
 
-	//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
-	//				100*numHave/(float)(wG[0]*hG[0]),
-	//				100*numWant/(float)(wG[0]*hG[0]),
-	//				currentPotential,
-	//				idealPotential);
+			// printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
+			// 		100*numHave/(float)(wG[0]*hG[0]),
+			// 		100*numWant/(float)(wG[0]*hG[0]),
+			// 		currentPotential,
+			// 		idealPotential);
+
 			currentPotential = idealPotential;
 			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
 		}
@@ -203,11 +204,12 @@ int PixelSelector::makeMaps(
 			if(idealPotential<=currentPotential)
 				idealPotential = currentPotential+1;
 
-	//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
-	//				100*numHave/(float)(wG[0]*hG[0]),
-	//				100*numWant/(float)(wG[0]*hG[0]),
-	//				currentPotential,
-	//				idealPotential);
+			// printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
+			// 		100*numHave/(float)(wG[0]*hG[0]),
+			// 		100*numWant/(float)(wG[0]*hG[0]),
+			// 		currentPotential,
+			// 		idealPotential);
+
 			currentPotential = idealPotential;
 			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
 

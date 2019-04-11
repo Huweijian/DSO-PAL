@@ -48,18 +48,18 @@ bool pal_init(string calibFile){
 	pal_mask_g[0] = cv::Mat::zeros(pal_model_g->height_, pal_model_g->width_, CV_8UC1);
 	cv::circle(pal_mask_g[0], cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->mask_radius[1], 255, -1);
 	cv::circle(pal_mask_g[0], cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->mask_radius[0], 0, -1);
-    pal_addMaskbuffer(pal_mask_g[0], 5);
 
-	pal_valid_sensing_mask_g[0] = cv::Mat::zeros(pal_model_g->height_, pal_model_g->width_, CV_8UC1);
-	cv::circle(pal_valid_sensing_mask_g[0], cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->sensing_radius[1], 255, -1);
-	cv::circle(pal_valid_sensing_mask_g[0], cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->sensing_radius[0], 0, -1);
+	pal_valid_sensing_mask_g = cv::Mat::zeros(pal_model_g->height_, pal_model_g->width_, CV_8UC1);
+	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->sensing_radius[1], 255, -1);
+	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal_model_g->xc_, pal_model_g->yc_), pal_model_g->sensing_radius[0], 0, -1);
 
 	for(int i=1; i<pal_max_level; i++){
 		cv::resize(pal_mask_g[i-1], pal_mask_g[i], cv::Size(), 0.5, 0.5, cv::INTER_NEAREST);
-        pal_addMaskbuffer(pal_mask_g[i], 5);
-        // imshow("mask" + to_string(i), pal_mask_g[i]);
 	}
-    // imshow("mask0", pal_mask_g[0]);
+    for(int i=0; i<pal_max_level; i++){
+        pal_addMaskbuffer(pal_mask_g[i], (5-i));
+        // imshow("mask" + to_string(i), pal_mask_g[i]);
+    }
     // waitKey();
 
     USE_PAL = true;
@@ -67,4 +67,4 @@ bool pal_init(string calibFile){
         return true;
     else
         return false;
-}    
+}     
