@@ -926,11 +926,11 @@ void FullSystem::flagPointsForRemoval()
 // slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
+
 	// hwjdebug ----------- 显示畸变矫正后的图像
-	// cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
-	// cv::imshow("undistImg", rawimg);
-	// cv::waitKey();
-	// return ;
+	cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
+	cv::imshow("undistImg", rawimg);
+	cv::waitKey(1);
 
     if(isLost) 
 		return;

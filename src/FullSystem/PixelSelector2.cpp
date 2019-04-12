@@ -84,6 +84,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 	int w = wG[0];
 	int h = hG[0];
 
+
+
 	int w32 = w/32;
 	int h32 = h/32;
 	thsStep = w32;
@@ -102,11 +104,12 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 					int jt = j+32*y;
 
 					// 位于图像边缘的点不加入梯度直方图
-					if(USE_PAL){
-						if(!pal_check_in_range_g(it, jt, 1, 0))
-							continue;	
-					}
-					else{
+					// if(USE_PAL){
+					// 	if(!pal_check_in_range_g(it, jt, 1, 0))
+					// 		continue;	
+					// }
+					// else
+					{
 						if(it>w-2 || jt>h-2 || it<1 || jt<1) 
 							continue;
 					}
@@ -117,33 +120,84 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 				}
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
+
+			if(USE_PAL){
+				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
+					ths[x+y*w32] = 255;
+				else
+					thsSmoothed[x+y*w32] = ths[x+y*w32] * 3;
+			}			
 		}
-	// 均值平滑一下
+
+	// 3*3滑动窗口平滑一下,再平方
 	for(int y=0;y<h32;y++)
-		for(int x=0;x<w32;x++)
+	for(int x=0;x<w32;x++)
+	{
+		float sum=0,num=0;
+		if(x>0)
 		{
-			float sum=0,num=0;
-			if(x>0)
-			{
-				if(y>0) 	{num++; 	sum+=ths[x-1+(y-1)*w32];}
-				if(y<h32-1) {num++; 	sum+=ths[x-1+(y+1)*w32];}
-				num++; sum+=ths[x-1+(y)*w32];
-			}
-
-			if(x<w32-1)
-			{
-				if(y>0) 	{num++; 	sum+=ths[x+1+(y-1)*w32];}
-				if(y<h32-1) {num++; 	sum+=ths[x+1+(y+1)*w32];}
-				num++; sum+=ths[x+1+(y)*w32];
-			}
-
-			if(y>0) 	{num++; 	sum+=ths[x+(y-1)*w32];}
-			if(y<h32-1) {num++; 	sum+=ths[x+(y+1)*w32];}
-			num++; sum+=ths[x+y*w32];
-
-			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
-
+			if(y>0) 	{num++; 	sum+=ths[x-1+(y-1)*w32];}
+			if(y<h32-1) {num++; 	sum+=ths[x-1+(y+1)*w32];}
+			num++; sum+=ths[x-1+(y)*w32];
 		}
+
+		if(x<w32-1)
+		{
+			if(y>0) 	{num++; 	sum+=ths[x+1+(y-1)*w32];}
+			if(y<h32-1) {num++; 	sum+=ths[x+1+(y+1)*w32];}
+			num++; sum+=ths[x+1+(y)*w32];
+		}
+
+		if(y>0) 	{num++; 	sum+=ths[x+(y-1)*w32];}
+		if(y<h32-1) {num++; 	sum+=ths[x+(y+1)*w32];}
+		num++; sum+=ths[x+y*w32];
+
+		// PAL降低梯度阈值
+		if(USE_PAL){
+			thsSmoothed[x+y*w32] = (sum/num)*3;
+		}
+		else{
+			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
+		}
+
+	}
+
+	// hwjdebug
+	{
+		using namespace cv;
+
+		Mat thsMat = Mat(h32, w32, CV_8UC1);
+		Mat thsSmoMat = Mat(h32, w32, CV_8UC1);
+		auto grad = IOWrap::getOCVImg_tem(mapmax0, w, h);
+
+		for(int y=0;y<h32;y++){
+
+			for(int x=0;x<w32;x++){
+				circle(grad, Point(y*32, x*32), 3, 255);
+				grad.at<uchar>(y*32, x*32) = (uchar)ths[y*w32+x];
+
+				thsMat.at<uchar>(y, x) = ths[y*w32+x];
+				printf("%.1f ", ths[y*w32+x]);
+				thsSmoMat.at<uchar>(y, x) = thsSmoothed[y*w32+x];
+
+				// grad.at<uchar>(y*32, x*32) = thsSmoothed[y*w32+x];
+				// grad.at<uchar>(y*32, x*32+1) = ths[y*w32+x];
+			}
+			printf("\n");
+		}
+
+
+		resize(thsMat, thsMat, Size(), 32, 32, INTER_NEAREST);
+		resize(thsSmoMat, thsSmoMat, Size(), 32, 32, INTER_NEAREST);
+
+		imshow("ths", thsMat);
+		imshow("thsSmo", thsSmoMat);
+
+		imshow("grad", grad);
+		moveWindow("grad", 50+w+50, 50);
+		waitKey();
+	}
+
 
 }
 
@@ -260,6 +314,9 @@ int PixelSelector::makeMaps(
 			if(c>255) c=255;
 			img.at(i) = Vec3b(c,c,c);
 		}
+
+
+
 		IOWrap::displayImage("Selector Image", &img);
 
 		for(int y=0; y<h;y++)
@@ -325,12 +382,15 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 
 
 	int n3=0, n2=0, n4=0;
+	// 4倍pot枚举枚举网格
 	for(int y4=0;y4<h;y4+=(4*pot)) for(int x4=0;x4<w;x4+=(4*pot))
 	{
 		int my3 = std::min((4*pot), h-y4);
 		int mx3 = std::min((4*pot), w-x4);
 		int bestIdx4=-1; float bestVal4=0;
 		Vec2f dir4 = directions[randomPattern[n2] & 0xF];
+
+		// 枚举每个4倍网格中的2倍网格
 		for(int y3=0;y3<my3;y3+=(2*pot)) for(int x3=0;x3<mx3;x3+=(2*pot))
 		{
 			int x34 = x3+x4;
@@ -339,6 +399,8 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 			int mx2 = std::min((2*pot), w-x34);
 			int bestIdx3=-1; float bestVal3=0;
 			Vec2f dir3 = directions[randomPattern[n2] & 0xF];
+
+			// 枚举每个2倍网格中的1倍网格
 			for(int y2=0;y2<my2;y2+=pot) for(int x2=0;x2<mx2;x2+=pot)
 			{
 				int x234 = x2+x34;
@@ -347,6 +409,8 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 				int mx1 = std::min(pot, w-x234);
 				int bestIdx2=-1; float bestVal2=0;
 				Vec2f dir2 = directions[randomPattern[n2] & 0xF];
+
+				// 枚举每个网格中的每个像素
 				for(int y1=0;y1<my1;y1+=1) for(int x1=0;x1<mx1;x1+=1)
 				{
 					assert(x1+x234 < w);
@@ -355,7 +419,12 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 					int xf = x1+x234;
 					int yf = y1+y234;
 
-					if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
+					if(USE_PAL){
+						if(!pal_check_in_range_g(xf, yf, 4)) continue;
+					}
+					else{
+						if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
+					}
 
 					// 三个梯度阈值
 					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];

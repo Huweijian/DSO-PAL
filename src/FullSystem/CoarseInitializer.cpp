@@ -1012,17 +1012,30 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		int npts;
 		if(lvl == 0)
 			// 对于原始图像，选择一些梯度较大的点
-			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0],1,false,2);
+			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0], 1, false, 2);
 		else
 			// 对于其他金字塔图像
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
+			
+		// hwjdebug----------------
+		// if(lvl == 0){
+		// 	using namespace cv;
+		// 	int w = wG[0];
+		// 	int h = hG[0];
+		// 	Mat img = IOWrap::getOCVImg(firstFrame->dIp[lvl], w, h);
 
-		// hwjdebugsb============
-		// printf("lvl %d: get %d points\n", lvl, npts);
-		// cv::Mat img, img2;
-		// img = IOWrap::getOCVImg(firstFrame->dIp[lvl], w[lvl], h[lvl]);
-		// img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], w[lvl], h[lvl]);
+		// 	int w32 = w/32;
+		// 	int h32 = h/32;
+		// 	for(int xx=0; xx<w32; xx++){
+		// 		for(int yy=0; yy<h32; yy++){
+		// 			circle(img, Point(32*yy,32*xx), 4, sel.ths[xx + yy*32]);
+		// 		}
+		// 	}
+		// 	imshow("img", img);
+		// 	waitKey();
+		// }
 		// ----------------------
+
 
 		if(points[lvl] != 0) delete[] points[lvl];
 		points[lvl] = new Pnt[npts];

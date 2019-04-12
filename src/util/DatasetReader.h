@@ -291,6 +291,14 @@ private:
 				minimg,
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
 				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
+
+		// {
+		// 	using namespace cv;
+		// 	auto img = IOWrap::getOCVImg_tem(ret2->image, ret2->w, ret2->h);
+		// 	imshow("img", img);
+		// 	waitKey();
+		// }
+
 		delete minimg;
 		return ret2;
 	}

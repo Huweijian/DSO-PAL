@@ -59,6 +59,8 @@ private:
 
 
 	int* gradHist;
+// hwjdebug
+public:
 	float* ths; // 梯度阈值
 	float* thsSmoothed;//平滑后的梯度阈值
 	int thsStep;

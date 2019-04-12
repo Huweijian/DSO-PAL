@@ -28,6 +28,7 @@
 #include "FullSystem/ImmaturePoint.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 
+#include "util/pal_interface.h"
 namespace dso
 {
 
@@ -168,6 +169,7 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 
 		for(int idx=wl;idx < wl*(hl-1);idx++)
 		{
+
 			float dx = 0.5f*(dI_l[idx+1][0] - dI_l[idx-1][0]);
 			float dy = 0.5f*(dI_l[idx+wl][0] - dI_l[idx-wl][0]);
 
@@ -178,8 +180,14 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 			dI_l[idx][1] = dx;
 			dI_l[idx][2] = dy;
 
-
 			dabs_l[idx] = dx*dx+dy*dy;
+
+			if(USE_PAL){
+				int x = idx % wl;
+				int y = idx / wl;
+				if(!pal_check_in_range_g(x, y, 2, lvl))
+					dabs_l[idx] = 0;
+			}
 
 			if(setting_gammaWeightsPixelSelect==1 && HCalib!=0)
 			{
