@@ -173,17 +173,17 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		for(int y=0;y<h32;y++){
 
 			for(int x=0;x<w32;x++){
-				circle(grad, Point(y*32, x*32), 3, 255);
+				circle(grad, Point(x*32, y*32), 3, 255);
 				grad.at<uchar>(y*32, x*32) = (uchar)ths[y*w32+x];
 
 				thsMat.at<uchar>(y, x) = ths[y*w32+x];
-				printf("%.1f ", ths[y*w32+x]);
+				// printf("%.1f ", ths[y*w32+x]);
 				thsSmoMat.at<uchar>(y, x) = thsSmoothed[y*w32+x];
 
 				// grad.at<uchar>(y*32, x*32) = thsSmoothed[y*w32+x];
 				// grad.at<uchar>(y*32, x*32+1) = ths[y*w32+x];
 			}
-			printf("\n");
+			// printf("\n");
 		}
 
 
