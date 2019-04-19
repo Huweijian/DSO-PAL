@@ -46,7 +46,7 @@ struct InputPointSparse
 {
 	float u;
 	float v;
-	float idpeth;
+	float idepth;
 	float idepth_hessian;
 	float relObsBaseline;
 	int numGoodRes;
@@ -106,16 +106,19 @@ private:
 	bool needRefresh;
 
 
-	int numSparsePoints;
 	int numSparseBufferSize;
-    InputPointSparse<MAX_RES_PER_POINT>* originalInputSparse;
 
 
 	bool bufferValid;
 	int numGLBufferPoints;
-	int numGLBufferGoodPoints;
 	pangolin::GlBuffer vertexBuffer;
 	pangolin::GlBuffer colorBuffer;
+	
+	// hwj 改成了public
+public:
+    InputPointSparse<MAX_RES_PER_POINT>* originalInputSparse;
+	int numSparsePoints;
+	int numGLBufferGoodPoints;
 };
 
 }

@@ -6,8 +6,8 @@
 
 // #define PAL // 不再使用，改用USE_PAL 变量以减少编译次数
 extern bool USE_PAL;
+extern bool ENH_PAL;
 const int pal_max_level = 6;
-extern cv::Mat pal_mask_g[pal_max_level];
 extern pal::PALCamera* pal_model_g;
 
 // inline Eigen::Vector3f cam2world(float x, float y, ocam_model& myocam_model){
@@ -23,6 +23,8 @@ extern pal::PALCamera* pal_model_g;
 //     world2cam(pCam, pWorld, &my_model);
 //     return Eigen::Vector2f(pCam[0], pCam[1]);
 // };
+
+float pal_get_weight(Eigen::Vector2f pt, int lvl = 0);
 
 bool pal_check_in_range_g(float u, float v, float padding, int level = 0);
 

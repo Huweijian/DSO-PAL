@@ -929,8 +929,9 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 	// hwjdebug ----------- 显示畸变矫正后的图像
 	cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
-	cv::imshow("undistImg", rawimg);
-	cv::waitKey(1);
+	cv::imshow("undisImg", rawimg);
+	cv::moveWindow("undisImg", 0+100, 50);
+	cv::waitKey();
 
     if(isLost) 
 		return;
@@ -953,6 +954,45 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
+
+	// hwjtest 测试直接显示pal点云
+	// {
+
+	// 	// printf("%lu %lu %lu %lu\n", fh->pointHessians.size(), fh->immaturePoints.size(), fh->pointHessiansMarginalized.size(), fh->pointHessiansOut.size());
+	// 	if(id > 5)
+	// 		return;
+
+	// 	for(int u=0; u<wG[0]; u+=10){
+	// 		for(int v=0; v<hG[0]; v+=10){
+	// 			if(!pal_check_in_range_g(u, v, 3))
+	// 				continue;
+
+	// 			int val = fh->dI[v*wG[0]+u][0];
+	// 			auto pt = pal_model_g->cam2world(u, v);
+	// 			ImmaturePoint *ip = new ImmaturePoint(u, v, fh, 1, &Hcalib);
+	// 			ip->idepth_max = ip->idepth_min = 1.0;
+	// 			PointHessian *p = new PointHessian(ip, &Hcalib);
+	// 			p->idepth_scaled = pt[2];
+	// 			p->maxRelBaseline = 10.0;
+	// 			p->idepth_hessian = 1000.0;
+	// 			fh->pointHessians.push_back(p);
+	// 		}
+	// 	}
+
+	// 	Vec6 pose;
+	// 	pose << id*10, 0, 0, 0, 0, 0;
+	// 	fh->PRE_camToWorld = SE3::exp(pose);
+	// 	fh->PRE_worldToCam = fh->PRE_camToWorld.inverse();
+	// 	fh->frameID = id;
+
+	// 	frameHessians.push_back(fh);
+	// 	for(IOWrap::Output3DWrapper* ow : outputWrapper)
+	// 	{
+	// 		ow->publishKeyframes(frameHessians, false, &Hcalib);
+	// 	}
+	// 	frameHessians.clear();
+	// 	return ;
+	// }
 
 	// 初始化
 	if(!initialized)

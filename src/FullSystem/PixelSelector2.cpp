@@ -84,8 +84,6 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 	int w = wG[0];
 	int h = hG[0];
 
-
-
 	int w32 = w/32;
 	int h32 = h/32;
 	thsStep = w32;
@@ -104,11 +102,11 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 					int jt = j+32*y;
 
 					// 位于图像边缘的点不加入梯度直方图
-					// if(USE_PAL){
-					// 	if(!pal_check_in_range_g(it, jt, 1, 0))
-					// 		continue;	
-					// }
-					// else
+					if(USE_PAL){
+						if(!pal_check_in_range_g(it, jt, 1, 0))
+							continue;	
+					}
+					else
 					{
 						if(it>w-2 || jt>h-2 || it<1 || jt<1) 
 							continue;
@@ -121,12 +119,10 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 
-			if(USE_PAL){
-				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
-					ths[x+y*w32] = 255;
-				else
-					thsSmoothed[x+y*w32] = ths[x+y*w32] * 3;
-			}			
+			// if(USE_PAL){
+			// 	if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
+			// 		ths[x+y*w32] = 255;
+			// }			
 		}
 
 	// 3*3滑动窗口平滑一下,再平方
@@ -152,9 +148,12 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		if(y<h32-1) {num++; 	sum+=ths[x+(y+1)*w32];}
 		num++; sum+=ths[x+y*w32];
 
-		// PAL降低梯度阈值
-		if(USE_PAL){
-			thsSmoothed[x+y*w32] = (sum/num)*3;
+		// PAL按照视场范围修改阈值,并且不使用滑动窗口
+		// PAL阈值
+		if(ENH_PAL){
+			float w = pal_get_weight(Vec2f(x*32, y*32));
+			w = 1.5 + 20*((1-w));
+			thsSmoothed[x+y*w32] = ths[x+y*w32]*w;
 		}
 		else{
 			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
@@ -174,11 +173,11 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			for(int x=0;x<w32;x++){
 				circle(grad, Point(x*32, y*32), 3, 255);
-				grad.at<uchar>(y*32, x*32) = (uchar)ths[y*w32+x];
 
-				thsMat.at<uchar>(y, x) = ths[y*w32+x];
+				thsMat.at<uchar>(y, x) = ths[y*w32+x]>255? 255: ths[y*w32+x];
 				// printf("%.1f ", ths[y*w32+x]);
-				thsSmoMat.at<uchar>(y, x) = thsSmoothed[y*w32+x];
+				thsSmoMat.at<uchar>(y, x) = thsSmoothed[y*w32+x]>255? 255:thsSmoothed[y*w32+x];
+				grad.at<uchar>(y*32, x*32) = thsSmoMat.at<uchar>(y, x);
 
 				// grad.at<uchar>(y*32, x*32) = thsSmoothed[y*w32+x];
 				// grad.at<uchar>(y*32, x*32+1) = ths[y*w32+x];
@@ -201,7 +200,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 }
 
-// density: 希望采集xx个点  recursionLeft：递归采集剩余次数（=1表示允许递归采集1次） thFactor:thresholdFactor 梯度阈值因子
+// density: 希望采集xx个点  recursionLeft：递归采集剩余次数（=1表示允许递归采集1次） thFactor:thresholdFactor 梯度阈值因子(默认=1)
 // 返回成功采集的点
 int PixelSelector::makeMaps(
 		const FrameHessian* const fh,
@@ -218,12 +217,15 @@ int PixelSelector::makeMaps(
 		// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
 
 		// 分成32*32个小块，利用梯度直方图计算每个小块的梯度阈值
-		if(fh != gradHistFrame) 
+		if(fh != gradHistFrame) {
+			printf("\t Point selection, want=%.1f\n", density);
 			makeHists(fh);
+		}
 
 		// select!
 		// 根据阈值选择点
 		Eigen::Vector3i n = this->select(fh, map_out,currentPotential, thFactor);
+		printf("\t - it %d, get %d points, pot=%d\n", 1-recursionsLeft, n[0] + n[1] + n[2], currentPotential);
 		
 		// sub-select!
 		// 根据本次采集的点数重新估计网格大小(Potential 可以理解为采点的网格大小)
@@ -337,7 +339,8 @@ int PixelSelector::makeMaps(
 }
 
 
-// 选中的点,map_out = 1.0 没选中的点，map_out = 0.0
+// 选中的点,map_out > 0 (值代表在x层网格中被选中) 没选中的点，map_out = 0.0
+// pot,每个pot*pot的像素块中只会选一个点
 Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 		float* map_out, int pot, float thFactor)
 {
@@ -426,7 +429,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 						if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
 					}
 
-					// 三个梯度阈值
+					// 三个梯度阈值(一个比一个低0.75)
 					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];
 					float pixelTH1 = pixelTH0*dw1;
 					float pixelTH2 = pixelTH1*dw2;
@@ -439,11 +442,13 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 						float dirNorm = fabsf((float)(ag0d.dot(dir2))); // 梯度在某个随机方向上的投影
 						if(!setting_selectDirectionDistribution) dirNorm = ag0;
 
+						// 保存梯度最大的点,之后就不用在高层金字塔上选点了
 						if(dirNorm > bestVal2)
 						{ bestVal2 = dirNorm; bestIdx2 = idx; bestIdx3 = -2; bestIdx4 = -2;}
 					}
 					if(bestIdx3==-2) continue;
 
+					// 如果这一点对应第1层金字塔梯度超过阈值,那么就选当前点
 					float ag1 = mapmax1[(int)(xf*0.5f+0.25f) + (int)(yf*0.5f+0.25f)*w1];
 					if(ag1 > pixelTH1*thFactor)
 					{

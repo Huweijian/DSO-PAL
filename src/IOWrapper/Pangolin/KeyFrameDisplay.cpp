@@ -91,6 +91,7 @@ void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 	needRefresh=true;
 }
 
+// 从FH类型中读取点的信息
 void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 {
 	setFromF(fh->shell, HCalib);
@@ -101,6 +102,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 					fh->pointHessiansMarginalized.size() +
 					fh->pointHessiansOut.size();
 
+	// 空间不足就重新多开一点
 	if(numSparseBufferSize < npoints)
 	{
 		if(originalInputSparse != 0) delete originalInputSparse;
@@ -108,8 +110,10 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
         originalInputSparse = new InputPointSparse<MAX_RES_PER_POINT>[numSparseBufferSize];
 	}
 
+	// 用于显示的点云数据存储空间
     InputPointSparse<MAX_RES_PER_POINT>* pc = originalInputSparse;
 	numSparsePoints=0;
+	// 把这一帧的所有点都拷贝进来,位姿也拷贝进来
 	for(ImmaturePoint* p : fh->immaturePoints)
 	{
 		for(int i=0;i<patternNum;i++)
@@ -117,7 +121,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 
 		pc[numSparsePoints].u = p->u;
 		pc[numSparsePoints].v = p->v;
-		pc[numSparsePoints].idpeth = (p->idepth_max+p->idepth_min)*0.5f;
+		pc[numSparsePoints].idepth = (p->idepth_max+p->idepth_min)*0.5f;
 		pc[numSparsePoints].idepth_hessian = 1000;
 		pc[numSparsePoints].relObsBaseline = 0;
 		pc[numSparsePoints].numGoodRes = 1;
@@ -132,7 +136,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 			pc[numSparsePoints].color[i] = p->color[i];
 		pc[numSparsePoints].u = p->u;
 		pc[numSparsePoints].v = p->v;
-		pc[numSparsePoints].idpeth = p->idepth_scaled;
+		pc[numSparsePoints].idepth = p->idepth_scaled;
 		pc[numSparsePoints].relObsBaseline = p->maxRelBaseline;
 		pc[numSparsePoints].idepth_hessian = p->idepth_hessian;
 		pc[numSparsePoints].numGoodRes =  0;
@@ -148,7 +152,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 			pc[numSparsePoints].color[i] = p->color[i];
 		pc[numSparsePoints].u = p->u;
 		pc[numSparsePoints].v = p->v;
-		pc[numSparsePoints].idpeth = p->idepth_scaled;
+		pc[numSparsePoints].idepth = p->idepth_scaled;
 		pc[numSparsePoints].relObsBaseline = p->maxRelBaseline;
 		pc[numSparsePoints].idepth_hessian = p->idepth_hessian;
 		pc[numSparsePoints].numGoodRes =  0;
@@ -163,7 +167,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian* fh, CalibHessian* HCalib)
 			pc[numSparsePoints].color[i] = p->color[i];
 		pc[numSparsePoints].u = p->u;
 		pc[numSparsePoints].v = p->v;
-		pc[numSparsePoints].idpeth = p->idepth_scaled;
+		pc[numSparsePoints].idepth = p->idepth_scaled;
 		pc[numSparsePoints].relObsBaseline = p->maxRelBaseline;
 		pc[numSparsePoints].idepth_hessian = p->idepth_hessian;
 		pc[numSparsePoints].numGoodRes =  0;
@@ -184,6 +188,7 @@ KeyFrameDisplay::~KeyFrameDisplay()
 		delete[] originalInputSparse;
 }
 
+// 在关键帧的所有点中,根据阈值选择一些点,存入vertexBuffer
 bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, int mode, float minBS, int sparsity)
 {
 	if(canRefresh)
@@ -215,6 +220,9 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 	Vec3b* tmpColorBuffer = new Vec3b[numSparsePoints*patternNum];
 	int vertexBufferNumPoints=0;
 
+	// 枚举所有点云(未熟,成熟,mag,out), 如果满足条件,则显示出来
+	// 条件包括:方差小于阈值,深度误差小于阈值,基线长度大于阈值
+
 	for(int i=0;i<numSparsePoints;i++)
 	{
 		/* display modes:
@@ -228,10 +236,10 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 		if(my_displayMode==2 && originalInputSparse[i].status != 1) continue;
 		if(my_displayMode>2) continue;
 
-		if(originalInputSparse[i].idpeth < 0) continue;
+		if(originalInputSparse[i].idepth < 0) continue;
 
 
-		float depth = 1.0f / originalInputSparse[i].idpeth;
+		float depth = 1.0f / originalInputSparse[i].idepth;
 		float depth4 = depth*depth; depth4*= depth4;
 		float var = (1.0f / (originalInputSparse[i].idepth_hessian+0.01));
 

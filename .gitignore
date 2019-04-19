@@ -8,5 +8,6 @@ build-*
 *.a
 *.so.*
 thirdparty/libzip-1.1.1*
-result.txt
+result.txt增加
 .vscode/ipch/*
+*.pcd

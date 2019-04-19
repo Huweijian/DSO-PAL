@@ -32,6 +32,8 @@
 #include "FullSystem/FullSystem.h"
 #include "FullSystem/ImmaturePoint.h"
 
+#include "util/pal_interface.h"
+
 namespace dso
 {
 namespace IOWrap
@@ -179,6 +181,7 @@ void PangolinDSOViewer::run()
 			//pangolin::glDrawColouredCube();
 			int refreshed=0;
 			
+			// 显示每一个关键帧
 			for(KeyFrameDisplay* fh : keyframes)
 			{
 				float blue[3] = {0,0,1};
@@ -283,6 +286,9 @@ void PangolinDSOViewer::run()
 	    	printf("RESET!\n");
 	    	settings_resetButton.Reset();
 	    	setting_fullResetRequested = true;
+			
+			// hwjfunction
+			export_pcd(this->settings_scaledVarTH, this->settings_absVarTH, this->settings_minRelBS);
 	    }
 
 		// Swap frames and Process Events
@@ -299,6 +305,79 @@ void PangolinDSOViewer::run()
 	exit(1);
 }
 
+void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
+
+	// TDDO: 输出点云,定性判断修改前后的结果
+	printf(" ! Output Points cloud ... ");
+	// header 
+	std::time_t t = std::time(nullptr);
+	char filename[20];
+	sprintf(filename, "%lu", t); 
+	std::ofstream of(filename + std::string(".pcd"));
+	of << "# .PCD v.7 - Point Cloud Data file format\nVERSION .7\n";
+	of << "FIELDS x y z rgb\n";
+	of << "SIZE 4 4 4 4\n";
+	of << "TYPE F F F F\n";
+	of << "COUNT 1 1 1 1\n";
+	int numPoints = 0;
+	for(int i=0; i<keyframes.size(); i++){
+		//printf(" %d ", keyframes[i]->numGLBufferGoodPoints);
+		numPoints += keyframes[i]->numSparsePoints;
+	}
+	of << "WIDTH " << numPoints << "\n";
+	of << "HEIGHT 1\n";
+	of << "VIEWPOINT 0 0 0 1 0 0 0\n";
+	of << "POINTS " << numPoints << "\n";
+	of << "DATA ascii\n";
+
+	// points
+	int numValidPC = 0;
+	for(int ik=0; ik<keyframes.size(); ik++){
+		KeyFrameDisplay* kfd = keyframes[ik];
+		for(int ip=0; ip<kfd->numSparsePoints; ip++){
+			InputPointSparse<MAX_RES_PER_POINT> &p = kfd->originalInputSparse[ip];
+
+			// check pc valid 
+			if(p.idepth< 0)
+				continue;
+
+			float depth = 1.0f / p.idepth;
+			float depth4 = depth*depth; depth4*= depth4;
+
+			float var = (1.0f / (p.idepth_hessian+0.01));
+
+			if(var * depth4 > scaledTH)
+				continue;
+
+			if(var > absTH)
+				continue;
+
+			float my_minRelBS_pal = minBS;
+			
+			if(USE_PAL){
+				my_minRelBS_pal = 0;
+				// my_minRelBS_pal = my_minRelBS / 100; 	// 这里可以选择合适的点筛选条件
+			}
+
+			if(p.relObsBaseline < my_minRelBS_pal)
+				continue;
+
+			Vec3f ptf = pal_model_g->cam2world(p.u, p.v) / p.idepth;
+			Vec3 pt = kfd->camToWorld.rotationMatrix() * ptf.cast<double>() + kfd->camToWorld.translation();
+			uint32_t color_pcl_32 = 0;
+			uint8_t r, g, b;
+			r = g = b = p.color[4];
+			color_pcl_32 = (74 << 24) | (r << 16) | (g << 8) | b; 
+			float color_pcl = *(float*)(&color_pcl_32);
+			of << pt[0] << " " << pt[1] << " " << pt[2] << " " << color_pcl <<"\n";
+			numValidPC ++;																																	
+			// printf("%f %f %f %f\n", pt[0], pt[1], pt[2], color_pcl); 
+		}
+	}
+	printf(" - MSG:i get %d points, Pangolin get %d points\n", numValidPC, numPoints);
+
+	printf("finisned! \n");
+}
 
 void PangolinDSOViewer::close()
 {
@@ -476,6 +555,8 @@ void PangolinDSOViewer::publishKeyframes(
     if(disableAllDisplay) return;
 
 	boost::unique_lock<boost::mutex> lk(model3DMutex);
+	// 枚举所有kf,如果这个kf没有加入过,那么就在KeyFramesByID表中增加这一项.并且把这一帧的点云,位姿更新一下
+	// 如果这个kf之前publish过,那么就更新这一帧的信息(点云..)
 	for(FrameHessian* fh : frames)
 	{
 		if(keyframesByKFID.find(fh->frameID) == keyframesByKFID.end())
@@ -484,6 +565,7 @@ void PangolinDSOViewer::publishKeyframes(
 			keyframesByKFID[fh->frameID] = kfd;
 			keyframes.push_back(kfd);
 		}
+		// 拷贝某关键帧的全部点云信息和位姿
 		keyframesByKFID[fh->frameID]->setFromKF(fh, HCalib);
 	}
 }

@@ -28,44 +28,46 @@ PALCamera::PALCamera(std::string filename)
     }
 
     //Read polynomial coefficients
-    fgets(buf, CMV_MAX_BUF, f);
-    fscanf(f, "\n");
-    fscanf(f, "%d", &length_pol);
+    int wr = 0; // wanring remover
+    char *wrc = nullptr;
+    wrc= fgets(buf, CMV_MAX_BUF, f);
+    wr = fscanf(f, "\n");
+    wr = fscanf(f, "%d", &length_pol);
     for (i = 0; i < length_pol; i++)
     {
-        fscanf(f, " %lf", &pol[i]);
+        wr = fscanf(f, " %lf", &pol[i]);
     }
 
     //Read inverse polynomial coefficients
-    fscanf(f, "\n");
-    fgets(buf, CMV_MAX_BUF, f);
-    fscanf(f, "\n");
-    fscanf(f, "%d", &length_invpol);
+    wr = fscanf(f, "\n");
+    wrc= fgets(buf, CMV_MAX_BUF, f);
+    wr = fscanf(f, "\n");
+    wr = fscanf(f, "%d", &length_invpol);
     for (i = 0; i < length_invpol; i++)
     {
-        fscanf(f, " %lf", &invpol[i]);
+        wr = fscanf(f, " %lf", &invpol[i]);
     }
 
     //Read center coordinates
-    fscanf(f, "\n");
-    fgets(buf, CMV_MAX_BUF, f);
-    fscanf(f, "\n");
-    fscanf(f, "%lf %lf\n", &xc, &yc);
+    wr = fscanf(f, "\n");
+    wrc= fgets(buf, CMV_MAX_BUF, f);
+    wr = fscanf(f, "\n");
+    wr = fscanf(f, "%lf %lf\n", &xc, &yc);
 
     //Read affine coefficients
-    fgets(buf, CMV_MAX_BUF, f);
-    fscanf(f, "\n");
-    fscanf(f, "%lf %lf %lf\n", &c, &d, &e);
+    wrc= fgets(buf, CMV_MAX_BUF, f);
+    wr = fscanf(f, "\n");
+    wr = fscanf(f, "%lf %lf %lf\n", &c, &d, &e);
 
     //Read image size
-    fgets(buf, CMV_MAX_BUF, f);
-    fscanf(f, "\n");
-    fscanf(f, "%d %d\n", &height, &width);
+    wrc= fgets(buf, CMV_MAX_BUF, f);
+    wr = fscanf(f, "\n");
+    wr = fscanf(f, "%d %d\n", &height, &width);
 
     // mask size
-    fgets(buf, CMV_MAX_BUF,f);
-    fscanf(f,"\n");
-    fscanf(f,"%d %d %d %d\n", &(this->mask_radius[1]),  &(this->mask_radius[0]), &(this->sensing_radius[1]),  &(this->sensing_radius[0]));
+    wrc= fgets(buf, CMV_MAX_BUF,f);
+    wr = fscanf(f,"\n");
+    wr = fscanf(f,"%d %d %d %d\n", &(this->mask_radius[1]),  &(this->mask_radius[0]), &(this->sensing_radius[1]),  &(this->sensing_radius[0]));
 
     fclose(f);
 

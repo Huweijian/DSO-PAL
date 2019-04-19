@@ -76,9 +76,13 @@ public:
     virtual void pushDepthImage(MinimalImageB3* image) override;
     virtual bool needPushDepthImage() override;
 
+
     virtual void join() override;
 
     virtual void reset() override;
+
+	// hwjfunction 保存点云,pcd格式
+	void export_pcd(float scaledTH, float absTH, float minBS);
 private:
 
 	bool needReset;
@@ -103,7 +107,7 @@ private:
 	// 3D model rendering
 	boost::mutex model3DMutex;
 	KeyFrameDisplay* currentCam;
-	std::vector<KeyFrameDisplay*> keyframes;
+	std::vector<KeyFrameDisplay*> keyframes; //存储着全部点云,只出不进
 	std::vector<Vec3f,Eigen::aligned_allocator<Vec3f>> allFramePoses;
 	std::map<int, KeyFrameDisplay*> keyframesByKFID;
 	std::vector<GraphConnection,Eigen::aligned_allocator<GraphConnection>> connections;

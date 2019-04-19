@@ -430,8 +430,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 			float xx = remapX[idx];
 			float yy = remapY[idx];
 
-
-
+			// 默认varNoise = 0 不执行
 			if(benchmark_varNoise>0)
 			{
 				float deltax = getInterpolatedElement11BiCub(noiseMapX, 4+(xx/(float)wOrg)*benchmark_noiseGridsize, 4+(yy/(float)hOrg)*benchmark_noiseGridsize, benchmark_noiseGridsize+8 );
@@ -447,7 +446,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 				yy = getInterpolatedElement(remapY, x, y, w);
 			}
 
-
+			// TODO:如果undistort不执行,那么就看看这部分.
 			if(xx<0)
 				out_data[idx] = 0;
 			else

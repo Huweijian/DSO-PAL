@@ -10,10 +10,12 @@ set(BUILD_TYPE Release)
 
 if(${BUILD_TYPE} MATCHES "Debug")
 	message("!!!Debug mode!!!")
+	set(CMAKE_BUILD_TYPE "Debug")
 	set(CMAKE_CXX_FLAGS "${SSE_FLAGS} -O0 -g -std=c++0x -march=native" )
 	
 else()
 	message("!!!Release mode!!!")
+	set(CMAKE_BUILD_TYPE "Release")
 	add_definitions("-DENABLE_SSE")
 	set(CMAKE_CXX_FLAGS	"${SSE_FLAGS} -O3 -g -std=c++0x -march=native")
 

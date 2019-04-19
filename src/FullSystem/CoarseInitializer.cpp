@@ -424,12 +424,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 	cv::Mat projImg = cv::Mat::zeros(hl, wl, CV_8UC1);
 	// --------------------------------------------
 
-// #ifndef PAL
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
-// #endif
 
 	Accumulator11 E;
 	acc9.initialize();
@@ -482,7 +480,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float Ku; 
 			float Kv; 
 			float new_idepth;
-// #ifdef PAL
 
 			if(USE_PAL){
 				pt = R * pal_model_g->cam2world(point->u+dx, point->v+dy, lvl) + t*point->idepth_new;
@@ -509,7 +506,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 				// printf("  success\n");
 			}
-// #else
 			else{
 				pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 				u = pt[0] / pt[2];
@@ -523,7 +519,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 					break;
 				}
 			}
-// #endif
 
 			// 亚像素梯度和亮度
 			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);  // 新帧的 [亮度 dx dy]
@@ -554,6 +549,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float maxstep ;
 // #ifdef PAL
 			if(USE_PAL){
+				if(ENH_PAL){
+					hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
+				}
+
 				dxdd = (t[0]-t[2]*u); // \rho_2 / \rho1 * (tx - u'_2 * tz)
 				dydd = (t[1]-t[2]*v); // \rho_2 / \rho1 * (ty - v'_2 * tz)
 				Vec2f dr2duv2(hitColor[1]*hw, hitColor[2]*hw);
@@ -1018,14 +1017,12 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
 			
 		// hwjdebug----------------
-		// if(lvl == 0){
-		// 	using namespace cv;
-		// 	int w = wG[0];
-		// 	int h = hG[0];
-		// 	Mat img = IOWrap::getOCVImg(firstFrame->dIp[lvl], w, h);
+		cv::Mat img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], wG[lvl], hG[lvl]);
 
+		// if(lvl == 0){
 		// 	int w32 = w/32;
 		// 	int h32 = h/32;
+		// 	cv::Mat img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], wG[lvl], hG[lvl]);
 		// 	for(int xx=0; xx<w32; xx++){
 		// 		for(int yy=0; yy<h32; yy++){
 		// 			circle(img, Point(32*yy,32*xx), 4, sel.ths[xx + yy*32]);
@@ -1033,6 +1030,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		// 	}
 		// 	imshow("img", img);
 		// 	waitKey();
+
 		// }
 		// ----------------------
 
@@ -1050,7 +1048,6 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 				// 如果这个点被选中了
 				if((lvl!=0 && statusMapB[x+y*wl]) || (lvl==0 && statusMap[x+y*wl] != 0))
 				{
-					// img.at<uchar>(y, x) = 255;
 
 					// 排除外部的点
 					if(USE_PAL){
@@ -1058,7 +1055,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 							continue;
 						}
 					}
-					// img2.at<uchar>(y, x) = 255;
+					img2.at<uchar>(y, x) = 255 - (statusMap[x+y*wl]-1)*20;
 
 					// 初始化这个点的信息
 					pl[nl].u = x+0.1;
@@ -1091,15 +1088,13 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		numPoints[lvl]=nl;
 
 		// // hwjdebug-----------------
-		// printf(" - after remove, %d points left\n", numPoints[lvl]);
-		// {
-		// 	using namespace cv;
-		// 	imshow("img", img);
-		// 	imshow("img2", img2);
-		// 	moveWindow("img", 50, 50);
-		// 	moveWindow("im2", 50 + wl + 50, 50);
-		// 	waitKey();
-		// }
+		printf(" - (lvl%d) after remove, %d points left\n",lvl, numPoints[lvl]);
+		if(lvl == 0){
+			using namespace cv;
+			imshow("initPoints", img2);
+			moveWindow("initPoints", 50 + 1920 + 100, 50);
+			waitKey();
+		}
 		// // ----------------------
 
 	}
@@ -1120,9 +1115,6 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		dGrads[i].setZero();
 
 	// 可视化 pal 点选择结果 
-	// std::vector<IOWrap::Output3DWrapper*> place_holder;
-	// debugPlot(0, place_holder, true);
-	// cv::waitKey();
 }
 
 // 重置某层点的误差 and idepth_new，
