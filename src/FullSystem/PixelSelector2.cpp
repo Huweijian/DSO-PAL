@@ -189,12 +189,12 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		resize(thsMat, thsMat, Size(), 32, 32, INTER_NEAREST);
 		resize(thsSmoMat, thsSmoMat, Size(), 32, 32, INTER_NEAREST);
 
-		imshow("ths", thsMat);
-		imshow("thsSmo", thsSmoMat);
+		// imshow("ths", thsMat);
+		// imshow("thsSmo", thsSmoMat);
 
 		imshow("grad", grad);
 		moveWindow("grad", 50+w+50, 50);
-		waitKey();
+		waitKey(1);
 	}
 
 

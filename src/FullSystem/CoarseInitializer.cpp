@@ -1093,7 +1093,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 			using namespace cv;
 			imshow("initPoints", img2);
 			moveWindow("initPoints", 50 + 1920 + 100, 50);
-			waitKey();
+			waitKey(1);
 		}
 		// // ----------------------
 
