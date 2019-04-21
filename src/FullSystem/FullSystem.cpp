@@ -928,10 +928,10 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
 
 	// hwjdebug ----------- 显示畸变矫正后的图像
-	cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
-	cv::imshow("undisImg", rawimg);
-	cv::moveWindow("undisImg", 0+100, 50);
-	cv::waitKey();
+	// cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
+	// cv::imshow("undisImg", rawimg);
+	// cv::moveWindow("undisImg", 0+100, 50);
+	// cv::waitKey();
 
     if(isLost) 
 		return;

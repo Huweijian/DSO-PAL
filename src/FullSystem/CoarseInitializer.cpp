@@ -1003,21 +1003,21 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		// 修改点的密度
 		// 因为mask以外的点不需要搜索
 		if(USE_PAL){
-			int r0 = pal_model_g->sensing_radius[0];
-			int r1 = pal_model_g->sensing_radius[1];
+			int r0 = pal_model_g->mask_radius[0];
+			int r1 = pal_model_g->mask_radius[1];
 			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / (w[0]*h[0]);
 		}
 		sel.currentPotential = 3;
 		int npts;
 		if(lvl == 0)
 			// 对于原始图像，选择一些梯度较大的点
-			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0], 1, false, 2);
+			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0], 1, true, 2);
 		else
 			// 对于其他金字塔图像
 			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl]*w[0]*h[0]);
 			
 		// hwjdebug----------------
-		cv::Mat img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], wG[lvl], hG[lvl]);
+		// cv::Mat img2 = IOWrap::getOCVImg(firstFrame->dIp[lvl], wG[lvl], hG[lvl]);
 
 		// if(lvl == 0){
 		// 	int w32 = w/32;
@@ -1055,7 +1055,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 							continue;
 						}
 					}
-					img2.at<uchar>(y, x) = 255 - (statusMap[x+y*wl]-1)*20;
+					// img2.at<uchar>(y, x) = 255 - (statusMap[x+y*wl]-1)*20;
 
 					// 初始化这个点的信息
 					pl[nl].u = x+0.1;
@@ -1087,15 +1087,15 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 
 		numPoints[lvl]=nl;
 
-		// // hwjdebug-----------------
-		printf(" - (lvl%d) after remove, %d points left\n",lvl, numPoints[lvl]);
-		if(lvl == 0){
-			using namespace cv;
-			imshow("initPoints", img2);
-			moveWindow("initPoints", 50 + 1920 + 100, 50);
-			waitKey(1);
-		}
-		// // ----------------------
+		// // // hwjdebug-----------------
+		// printf(" - (lvl%d) after remove, %d points left\n",lvl, numPoints[lvl]);
+		// if(lvl == 0){
+		// 	using namespace cv;
+		// 	imshow("initPoints", img2);
+		// 	moveWindow("initPoints", 50 + 1920 + 100 + wG[0], 50);
+		// 	waitKey(1);
+		// }
+		// // // ----------------------
 
 	}
 

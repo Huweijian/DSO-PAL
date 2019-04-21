@@ -399,6 +399,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
 	photometricUndist->output->copyMetaTo(*result); // 这个操作有点多余吧，感觉可以删除
 
+	printf("\t - [undistort] passthrough = %s\n", passthrough?"true":"false");
 	// not passthrough
 	if (!passthrough)
 	{
@@ -423,7 +424,8 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 			}
 		}
 
-
+		int goodPixel = 0, badPixel = 0;
+		
 		for(int idx = w*h-1;idx>=0;idx--)
 		{
 			// get interp. values
@@ -447,10 +449,13 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 			}
 
 			// TODO:如果undistort不执行,那么就看看这部分.
-			if(xx<0)
+			if(xx<0){
+				badPixel ++;
 				out_data[idx] = 0;
+			}
 			else
 			{
+				goodPixel ++;
 				// get integer and rational parts
 				int xxi = xx;
 				int yyi = yy;
@@ -468,6 +473,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 									+ (1-xx-yy+xxyy) * src[0];
 			}
 		}
+		// printf("[Undistort DBG] %d good, %d bad\n", goodPixel, badPixel);
 
 		if(benchmark_varNoise>0)
 		{
@@ -887,6 +893,8 @@ void Undistort::readFromFile(const char* configFileName, int nPars, std::string 
         K(0,2) = parsOrg[2];
         K(1,2) = parsOrg[3];
 		passthrough = true;
+
+		printf("\t [undistort] passthrough is assigned to true!!!\n");
 	}
 	else
 	{

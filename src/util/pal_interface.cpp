@@ -57,14 +57,14 @@ bool pal_init(string calibFile){
     auto &pal = pal_model_g;
 
     USE_PAL = true;
-    ENH_PAL = false;
+    // ENH_PAL = true;
     // max radius check
     if(pal->mask_radius[0] > pal->mask_radius[1] || pal->sensing_radius[0] > pal->sensing_radius[1]){
         return false;
     }
     auto pt_z0 = pal->world2cam(Vector3f(100, 0, 0));
     float maxR_z0 = (pt_z0-Vector2f(pal->xc_, pal->yc_)).norm(); 
-    if(maxR_z0 > pal->mask_radius[1]){
+    if(maxR_z0 < pal->mask_radius[1]){
         printf(" ! [WARNING] pal mask outer radius is %.2d larger than maximum(%.2f)! force set to maximum\n", pal->mask_radius[1], maxR_z0);
         pal->mask_radius[1] = maxR_z0;
     }

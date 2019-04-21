@@ -93,7 +93,7 @@ protected:
 	Mat33 K;
 	VecX parsOrg;
 	bool valid;
-	bool passthrough;
+	bool passthrough = false;
 
 	float* remapX;
 	float* remapY;

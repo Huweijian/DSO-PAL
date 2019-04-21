@@ -113,7 +113,6 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		new_idepth = 1.0 / P2[2];
 		drescale = new_idepth / idepth;
 		
-		// TODO: uv 可能有问题(PAL的归一化坐标系没意义)
 		u = P2[0] * drescale;
 		v = P2[1] * drescale;
 		Vec2f KP2 = pal_model_g->world2cam(P2);

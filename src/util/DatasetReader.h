@@ -292,12 +292,13 @@ private:
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
 				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
 
-		// {
-		// 	using namespace cv;
-		// 	auto img = IOWrap::getOCVImg_tem(ret2->image, ret2->w, ret2->h);
-		// 	imshow("img", img);
-		// 	waitKey();
-		// }
+		{
+			using namespace cv;
+			auto img = IOWrap::getOCVImg_tem(ret2->image, ret2->w, ret2->h);
+			imshow("after undistort immediately", img);
+			cv::moveWindow("after undistort immediately", 0+100, 50);
+			waitKey();
+		}
 
 		delete minimg;
 		return ret2;

@@ -119,10 +119,11 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 
-			// if(USE_PAL){
-			// 	if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
-			// 		ths[x+y*w32] = 255;
-			// }			
+			// mask以外的区域设置为超大阈值
+			if(ENH_PAL){
+				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
+					ths[x+y*w32] = 10000;
+			}			
 		}
 
 	// 3*3滑动窗口平滑一下,再平方
@@ -152,8 +153,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		// PAL阈值
 		if(ENH_PAL){
 			float w = pal_get_weight(Vec2f(x*32, y*32));
-			w = 1.5 + 20*((1-w));
-			thsSmoothed[x+y*w32] = ths[x+y*w32]*w;
+			w = 0.8 + 1*((1-w));
+			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32];
 		}
 		else{
 			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
@@ -190,7 +191,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		resize(thsSmoMat, thsSmoMat, Size(), 32, 32, INTER_NEAREST);
 
 		// imshow("ths", thsMat);
-		// imshow("thsSmo", thsSmoMat);
+		imshow("thsSmo", thsSmoMat);
 
 		imshow("grad", grad);
 		moveWindow("grad", 50+w+50, 50);
@@ -200,7 +201,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 }
 
-// density: 希望采集xx个点  recursionLeft：递归采集剩余次数（=1表示允许递归采集1次） thFactor:thresholdFactor 梯度阈值因子(默认=1)
+// density: 希望采集xx个点  recursionLeft：递归采集剩余次数（默认=1表示允许递归采集1次） thFactor:thresholdFactor 梯度阈值因子(默认=1)
 // 返回成功采集的点
 int PixelSelector::makeMaps(
 		const FrameHessian* const fh,
@@ -250,6 +251,7 @@ int PixelSelector::makeMaps(
 			// 		currentPotential,
 			// 		idealPotential);
 
+			printf("\t - (点太少)currPot change from %d to %d\n", currentPotential, idealPotential);
 			currentPotential = idealPotential;
 			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
 		}
@@ -266,6 +268,7 @@ int PixelSelector::makeMaps(
 			// 		currentPotential,
 			// 		idealPotential);
 
+			printf("\t - (点太多)currPot change from %d to %d\n", currentPotential, idealPotential);
 			currentPotential = idealPotential;
 			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
 
@@ -300,6 +303,8 @@ int PixelSelector::makeMaps(
 //			idealPotential,
 //			100*numHaveSub/(float)(wG[0]*hG[0]));
 
+
+	printf("\t - (点正常)currPot change from %d to %d\n", currentPotential, idealPotential);
 	currentPotential = idealPotential;
 
 	if(plot)
@@ -317,22 +322,21 @@ int PixelSelector::makeMaps(
 			img.at(i) = Vec3b(c,c,c);
 		}
 
-
-
-		IOWrap::displayImage("Selector Image", &img);
+		// IOWrap::displayImage("Selector Image", &img);
 
 		for(int y=0; y<h;y++)
 			for(int x=0;x<w;x++)
 			{
 				int i=x+y*w;
 				if(map_out[i] == 1)
-					img.setPixelCirc(x,y,Vec3b(0,255,0));
+					img.setPixel1(x,y,Vec3b(0,255,0));
 				else if(map_out[i] == 2)
-					img.setPixelCirc(x,y,Vec3b(255,0,0));
+					img.setPixel1(x,y,Vec3b(255,0,0));
 				else if(map_out[i] == 4)
-					img.setPixelCirc(x,y,Vec3b(0,0,255));
+					img.setPixel1(x,y,Vec3b(0,0,255));
 			}
 		IOWrap::displayImage("Selector Pixels", &img);
+		cv::waitKey(0);
 	}
 
 	return numHaveSub;
