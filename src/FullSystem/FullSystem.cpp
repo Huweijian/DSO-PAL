@@ -619,7 +619,7 @@ void FullSystem::activatePointsMT()
 			continue;
 
 		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
-		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]); // DSO可太坏了,K和Ki分贝是不同lvl的
+		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]); // DSO可太坏了,K和Ki分别是不同lvl的
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
 		for(unsigned int i=0;i<host->immaturePoints.size();i+=1)
@@ -637,7 +637,7 @@ void FullSystem::activatePointsMT()
 				continue;
 			}
 
-			//激活未熟点的条件：上次跟踪还行 & 上次跟踪极线误差较小 & 上次跟踪质量还行（最佳匹配/二佳匹配）& 上次跟踪大于零
+			//激活未熟点的条件：上次跟踪还行 & 上次跟踪极线误差较小(和梯度方向在极线方向的投影有关) & 上次跟踪质量还行（最佳匹配/二佳匹配）& 上次跟踪大于零
 			// can activate only if this is true.
 			bool canActivate = (ph->lastTraceStatus == IPS_GOOD
 					|| ph->lastTraceStatus == IPS_SKIPPED
@@ -1058,19 +1058,40 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 			// 如果位姿或者光度变化足够大 || 当前误差大于第一次误差的2倍 就创建新的关键帧
 			if(allFrameHistory.size()== 1){
 				needToMakeKF = true;
-				printf("\n创建新关键帧(allFrameHistory = 1)\n");
+				printf("\n创建新关键帧(allFrameHistory = 1)");
 			}
 			else if(setting_kfGlobalWeight*setting_maxShiftWeightT *  sqrtf((double)tres[1]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightR *  sqrtf((double)tres[2]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxShiftWeightRT * sqrtf((double)tres[3]) / (wG[0]+hG[0]) +
 					setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) > 1 ){
-				needToMakeKF = true;
-				printf("\n创建新关键帧(位姿或光度变化过大)\n");
+				float t = setting_kfGlobalWeight*setting_maxShiftWeightT *  sqrtf((double)tres[1]) / (wG[0]+hG[0]);
+				float r = setting_kfGlobalWeight*setting_maxShiftWeightR *  sqrtf((double)tres[2]) / (wG[0]+hG[0]);
+				float rt = setting_kfGlobalWeight*setting_maxShiftWeightRT * sqrtf((double)tres[3]) / (wG[0]+hG[0]);
+				float aff = setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) ;
+				
+				// if(ENH_PAL){ //PAL增加判断是否需要创建新关键帧额阈值
+				// 	needToMakeKF = t+r+rt+aff > 1;
+				// }
+				// else
+				
+				{
+					needToMakeKF = true;
+				}
+
+				if(needToMakeKF)
+					printf("\n创建新关键帧(位姿或光度变化过大) t=%.2f r=%.2f rt=%.2f aff=%.2f", t, r, rt, aff);
+
 			}
 			else if(2*coarseTracker->firstCoarseRMSE < tres[0]){
 				needToMakeKF = true;
-				printf("\n创建新关键帧(当前误差 > 第一次跟踪误差的2倍)\n");
+				printf("\n创建新关键帧(当前误差(%.2f) > 第一次跟踪误差的2倍(%.2f))", tres[0], coarseTracker->firstCoarseRMSE);
 			}
+			// hwjdebug ----------
+			static int kfNum = 0;
+			if(needToMakeKF){
+				printf(" [No %d keyframe]\n", kfNum++);
+			}
+			// ----------------
 
 		}
 
@@ -1434,8 +1455,9 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
 		// 运气不好 拜拜
-		if(rand()/(float)RAND_MAX > keepPercentage) 
+		if(rand()/(float)RAND_MAX > keepPercentage){
 			continue;
+		}
 
 		// 运气还行，初始化点海森
 

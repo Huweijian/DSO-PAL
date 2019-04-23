@@ -42,6 +42,7 @@ float setting_kfGlobalWeight = 1;   // general weight on threshold, the larger t
 float setting_maxAffineWeight= 2;
 
 
+
 /* initial hessian values to fix unobservable dimensions / priors on affine lighting parameters.
  */
 float setting_idepthFixPrior = 50*50;

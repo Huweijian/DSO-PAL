@@ -399,7 +399,7 @@ ImageAndExposure* Undistort::undistort(const MinimalImage<T>* image_raw, float e
 	ImageAndExposure* result = new ImageAndExposure(w, h, timestamp);
 	photometricUndist->output->copyMetaTo(*result); // 这个操作有点多余吧，感觉可以删除
 
-	printf("\t - [undistort] passthrough = %s\n", passthrough?"true":"false");
+	// printf("\t - [undistort] passthrough = %s\n", passthrough?"true":"false");
 	// not passthrough
 	if (!passthrough)
 	{

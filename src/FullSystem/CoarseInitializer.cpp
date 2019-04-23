@@ -549,7 +549,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float maxstep ;
 // #ifdef PAL
 			if(USE_PAL){
-				if(ENH_PAL){
+				if(ENH_PAL){ // 初始化部分,直接法GN优化部分增加pal视场的权重
 					hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
 				}
 
@@ -1003,8 +1003,8 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		// 修改点的密度
 		// 因为mask以外的点不需要搜索
 		if(USE_PAL){
-			int r0 = pal_model_g->mask_radius[0];
-			int r1 = pal_model_g->mask_radius[1];
+			int r0 = pal_model_g->sensing_radius[0];
+			int r1 = pal_model_g->sensing_radius[1];
 			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / (w[0]*h[0]);
 		}
 		sel.currentPotential = 3;

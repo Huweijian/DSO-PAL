@@ -253,7 +253,7 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 		
 		if(USE_PAL){
 			my_minRelBS_pal = 0;
-			// my_minRelBS_pal = my_minRelBS / 100; 	// 这里可以选择合适的点筛选条件
+			// my_minRelBS_pal = my_minRelBS ; 	// 这里可以选择合适的点筛选条件
 		}
 
 		if(originalInputSparse[i].relObsBaseline < my_minRelBS_pal)

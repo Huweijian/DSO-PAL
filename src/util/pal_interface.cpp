@@ -89,16 +89,16 @@ bool pal_init(string calibFile){
 
     // pal weight
     pal_weight = Mat::ones(pal->height_, pal->width_, CV_32FC1);
-    float setting_pal_min_weight = 0;
+    float setting_pal_min_weight = 0.9;
     float setting_pal_max_weight = 1;
     for(int u = 0; u<pal->width_; u++){
         for(int v = 0; v<pal->height_; v++){
             float w = 0;
             if(pal_check_valid_sensing(u, v)){
                 float r = (Vector2f(u, v) - Vector2f(pal->xc_, pal->yc_)).norm();
-                float r0 = pal->sensing_radius[0], r1 = pal->sensing_radius[1];
+                float r0 = pal->sensing_radius[0]-5, r1 = pal->sensing_radius[1]+5;
                 float maxw = (r1-r0)*(r1-r0); 
-                w = -(setting_pal_max_weight - setting_pal_min_weight)/maxw*(r-r0)*(r-r0) + setting_pal_max_weight;
+                w = -(setting_pal_max_weight - setting_pal_min_weight) * ((r-r0)*(r-r0)/maxw) + setting_pal_max_weight;
                 // printf(" - (%d, %d) w=%.2f \n", u, v, w);
             }
             pal_weight.at<float>(u, v) = w;

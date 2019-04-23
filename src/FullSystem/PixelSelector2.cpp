@@ -44,7 +44,6 @@ PixelSelector::PixelSelector(int w, int h)
 	randomPattern = new unsigned char[w*h];
 	std::srand(3141592);	// want to be deterministic.
 	for(int i=0;i<w*h;i++) randomPattern[i] = rand() & 0xFF;
-
 	currentPotential=3;
 
 
@@ -119,11 +118,11 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 
-			// mask以外的区域设置为超大阈值
-			if(ENH_PAL){
+			if(ENH_PAL){// mask以外的不选择点
 				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
 					ths[x+y*w32] = 10000;
 			}			
+
 		}
 
 	// 3*3滑动窗口平滑一下,再平方
@@ -150,11 +149,12 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		num++; sum+=ths[x+y*w32];
 
 		// PAL按照视场范围修改阈值,并且不使用滑动窗口
-		// PAL阈值
-		if(ENH_PAL){
+		if(ENH_PAL){ //pal点选择阈值,不使用滑动平均
 			float w = pal_get_weight(Vec2f(x*32, y*32));
 			w = 0.8 + 1*((1-w));
-			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32];
+			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32]; //(阈值高,点选择效果较好)
+			// thsSmoothed[x+y*w32] = w * ths[x+y*w32]; //(阈值低,点选择效果较差)
+			// thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
 		}
 		else{
 			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
@@ -191,10 +191,10 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		resize(thsSmoMat, thsSmoMat, Size(), 32, 32, INTER_NEAREST);
 
 		// imshow("ths", thsMat);
-		imshow("thsSmo", thsSmoMat);
+		// imshow("thsSmo", thsSmoMat);
 
-		imshow("grad", grad);
-		moveWindow("grad", 50+w+50, 50);
+		// imshow("grad", grad);
+		// moveWindow("grad", 50+w+50, 50);
 		waitKey(1);
 	}
 
@@ -211,6 +211,7 @@ int PixelSelector::makeMaps(
 	float numWant=density;
 	float quotia;
 	int idealPotential = currentPotential;
+
 	{
 
 		// the number of selected pixels behaves approximately as
@@ -304,9 +305,6 @@ int PixelSelector::makeMaps(
 //			100*numHaveSub/(float)(wG[0]*hG[0]));
 
 
-	printf("\t - (点正常)currPot change from %d to %d\n", currentPotential, idealPotential);
-	currentPotential = idealPotential;
-
 	if(plot)
 	{
 		int w = wG[0];
@@ -335,9 +333,26 @@ int PixelSelector::makeMaps(
 				else if(map_out[i] == 4)
 					img.setPixel1(x,y,Vec3b(0,0,255));
 			}
-		IOWrap::displayImage("Selector Pixels", &img);
+		
+		// hwjdebug---------------------
+		cv::Mat cvimg = cv::Mat(img.h, img.w, CV_8UC3, img.data);
+
+		// if(currentPotential > 1){
+		// 	for(int x=0; x<img.w; x+=currentPotential){
+		// 		for(int y=0; y<img.h; y+=currentPotential){
+		// 			cvimg.at<cv::Vec3b>(cv::Point(x, y)) = cv::Vec3b(255, 255, 0);
+		// 		}
+		// 	}
+		// }
+		cv::imshow("Selector Pixels", cvimg);
+		// -----------------------------
+		// IOWrap::displayImage("Selector Pixels", &img);
+		cv::moveWindow("Selector Pixels", 100+img.w, 50);
 		cv::waitKey(0);
 	}
+
+	printf("\t - (点正常)currPot change from %d to %d\n", currentPotential, idealPotential);
+	currentPotential = idealPotential;
 
 	return numHaveSub;
 }

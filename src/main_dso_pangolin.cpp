@@ -353,6 +353,9 @@ void parseArgument(char* arg)
 
 int main( int argc, char** argv )
 {
+	// hejdebug 
+	std::srand(3141592);	// want to be deterministic.
+	///----------------
 	//setlocale(LC_ALL, "");
 	for(int i=1; i<argc;i++)
 		parseArgument(argv[i]);
@@ -447,7 +450,7 @@ int main( int argc, char** argv )
         double sInitializerOffset=0;
 
 
-        for(int ii=0;ii<(int)idsToPlay.size(); ii++)
+        for(int ii=0;ii<(int)idsToPlay.size()-1; ii++)
         {
             if(!fullSystem->initialized)	// if not initialized: reset start time.
             {

@@ -36,6 +36,7 @@ ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, Ca
 {
 	// 梯度.T * 梯度
 	gradH.setZero();
+	grad.setZero();
 
 	//枚举每个pattern点
 	for(int idx=0;idx<patternNum;idx++)
@@ -51,11 +52,12 @@ ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, Ca
 			energyTH=NAN; 
 			return;
 		}
-
+		grad += ptc.tail<2>();
 		gradH += ptc.tail<2>()  * ptc.tail<2>().transpose();
 
 		weights[idx] = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + ptc.tail<2>().squaredNorm()));
 	}
+	grad = grad / patternNum;
 
 	// 能量阈值(和pattern点数有关)
 	energyTH = patternNum*setting_outlierTH;
@@ -87,10 +89,25 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	debugPrint = false;//rand()%100==0;
 
 	// hwjdebug ----------------
-	// if(frame->shell->incoming_id >= 9){
+	Mat img_now;
+	// if(frame->shell->incoming_id >= 90){
 	// 	debugPrint = true;
+	// 	img_now = IOWrap::getOCVImg(frame->dI,wG[0], hG[0]);	
+	// 	cvtColor(img_now, img_now, COLOR_GRAY2BGR);
+
 	// }
 	// -------------------
+
+	// // hwjdebug 显示参考帧---------------
+
+	if(debugPrint){
+
+		Mat img_ref = IOWrap::getOCVImg(host->dI, wG[0], hG[0]);	
+		circle(img_ref, Point(u, v), 5, 255);
+		imshow("img_ref", img_ref);
+		moveWindow("img_ref", 50, 50);
+	}
+	// // -------------------
 
 	// 最大极线长度
 	float maxPixSearch = (wG[0]+hG[0])*setting_maxPixSearch;
@@ -131,13 +148,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
-		// hwjdebugsb ----------
-		// else{
-		// 	if(debugPrint) 
-		// 		printf(" $ IN uMin %f %f - %f %f %f (id %f-%f)!\n",
-		// 			u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
-		// }
-		// 00000000000000000000
+
 	}
 	else{
 		// 注意:这里uv是像素坐标,DSO直接在像素坐标系上执行的旋转平移操作
@@ -155,13 +166,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
-		// hwjdebugsb ----------
-		// else{
-		// 	if(debugPrint) 
-		// 		printf(" $ IN uMin %f %f - %f %f %f (id %f-%f)!\n",
-		// 			u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
-		// }
-		// 00000000000000000000
+
 	}
 
 	float dist;
@@ -211,10 +216,21 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		dist = (uMin-uMax)*(uMin-uMax) + (vMin-vMax)*(vMin-vMax);
 		dist = sqrtf(dist);
 		// 极线长度过小
-		if(dist < setting_trace_slackInterval)
+		float minPolarDist = setting_trace_slackInterval;
+		if(ENH_PAL){
+			minPolarDist = pal_get_weight(Vec2f(u, v));
+			minPolarDist = 0.2*setting_trace_slackInterval;
+		}
+		if(dist < minPolarDist)
 		{
-			if(debugPrint)
-				printf("TOO CERTAIN ALREADY (dist %f)!\n", dist);
+			if(debugPrint){
+				// hwjdebug -----------
+				line(img_now, Point(uMax, vMax), Point(uMin, vMin), {255, 255, 255});
+				imshow("img_now", img_now);
+				waitKey();
+				// hwjdebug ------------------
+				printf(" $ skip, TOO CERTAIN ALREADY (dist %f)!\n", dist);
+			}
 
 			lastTraceUV = Vec2f(uMax+uMin, vMax+vMin)*0.5;
 			lastTracePixelInterval=dist;
@@ -262,12 +278,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 				lastTracePixelInterval=0;
 				return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 			}
-			// hwjdebugsb ----------
-			// else{
-			// 	if(debugPrint) 
-			// 		printf(" $ IN uMax-coarse %f %f %f!\n", uMax, vMax,  ptpMax[2]);
-			// }
-			// 00000000000000000000
 
 		}
 		else{
@@ -294,13 +304,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 				lastTracePixelInterval=0;
 				return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 			}
-
-			// hwjdebugsb ----------
-			// else{
-			// 	if(debugPrint) 
-			// 		printf(" $ IN uMax-coarse %f %f %f!\n", uMax, vMax,  ptpMax[2]);
-			// }
-			// 00000000000000000000
 
 			assert(dist>0);
 
@@ -336,8 +339,17 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	// 误差比极线还长,没意义了
 	if(errorInPixel*setting_trace_minImprovementFactor > dist && std::isfinite(idepth_max))
 	{
-		if(debugPrint)
-			printf("NO SIGNIFICANT IMPROVMENT (%f)!\n", errorInPixel);
+		if(debugPrint){
+
+			printf(" $ NO SIGNIFICANT IMPROVMENT (%f)!\n", errorInPixel);
+
+			// hwjdebug -----------
+			line(img_now, Point(uMax, vMax), Point(uMin, vMin), {0, 0, 255});
+			imshow("img_now", img_now);
+			waitKey();
+			// hwjdebug ------------------
+		}
+
 		lastTraceUV = Vec2f(uMax+uMin, vMax+vMin)*0.5;
 		lastTracePixelInterval=dist;
 		return lastTraceStatus = ImmaturePointStatus::IPS_BADCONDITION;
@@ -401,15 +413,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		d_pal = (ptpMax - ptpMin) / numSteps;
 	}
 
-	// // hwjdebug ---------------
-			// Mat img_ref = IOWrap::getOCVImg(host->dI, wG[0], hG[0]);	
-			// circle(img_ref, Point(u, v), 5, 255);
-			// imshow("img_ref", img_ref);
-			// moveWindow("img_ref", 50, 50);
-
-			// waitKey();
-			// debugPrint = false;
-	// // -------------------
 
 	// 沿着极线搜索，把误差保存到error中
 	for(int i=0;i<numSteps;i++)
@@ -595,17 +598,31 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	if(idepth_min > idepth_max) 
 		std::swap<float>(idepth_min, idepth_max);
 
-	// hwjdebug ----------
-	// printf("\t   * new idmin: %.2f idmax: %.2f\n", idepth_min, idepth_max);
-	// Mat img_now = IOWrap::getOCVImg(frame->dI,wG[0], hG[0]);	
-	// line(img_now, Point(uMax, vMax), Point(uMin, vMin), 255);
-	// circle(img_now, Point(bestU, bestV), 5, 255);
-	// imshow("img_now", img_now);
-	// moveWindow("img_now", 50+wG[0]+50, 50);
-	// if(bestIdx > 5)
-	// 	waitKey();
-	// else
-	// 	waitKey(1);	
+	// hwjdebug 显示极线和最佳匹配----------
+	if(debugPrint){
+
+		// hwjdebug -----------
+		line(img_now, Point(uMax, vMax), Point(uMin, vMin), {0, 255, 0});
+		circle(img_now, Point(bestU, bestV), 5, {0, 255, 0});
+		line(img_now, Point(bestU-grad[0], bestV-grad[1]), Point(bestU+grad[0], bestV+grad[1]), {255, 0, 0});
+		float dot = grad[0]*dx + grad[1]*dy;
+		float det = grad[0]*dy - grad[1]*dx;
+		float angle = abs(atan2(det, dot))/3.14*180;
+		if(angle > 90)
+			angle = 180 - angle;		
+
+		static int veryGoodPoints = 0;
+		static int allPoints = 0;
+		allPoints ++;
+		if(angle < 45){
+			veryGoodPoints ++;
+		}
+
+		printf("\t   * new idmin: %.2f idmax: %.2f angle(%.2f) verygood(%d/%d)\n", idepth_min, idepth_max, angle, veryGoodPoints, allPoints);
+		imshow("img_now", img_now);
+		moveWindow("img_now", 50+wG[0]+50, 50);
+		waitKey();
+	}
 	// -------------------
 
 	//如果ideph 是无限大，或者小于0,那么设置为外点
@@ -618,6 +635,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	}
 
 	lastTracePixelInterval=2*errorInPixel;
+	// if(ENH_PAL) //极线搜索误差根据pal模型增大一些
+	// 	lastTracePixelInterval *= 2;
+
 	lastTraceUV = Vec2f(bestU, bestV);
 	return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
 }

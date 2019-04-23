@@ -49,7 +49,8 @@ enum ImmaturePointStatus {
 	IPS_OUTLIER,				// energy too high: if happens again: outlier!
 	IPS_SKIPPED,				// traced well and good (but not actually traced).
 	IPS_BADCONDITION,			// not traced because of bad condition.
-	IPS_UNINITIALIZED};			// not even traced once.
+	IPS_UNINITIALIZED			// not even traced once.
+	};			
 
 
 class ImmaturePoint
@@ -61,9 +62,7 @@ public:
 	float weights[MAX_RES_PER_POINT];
 
 
-
-
-
+	Vec2f grad;
 	Mat22f gradH; // 梯度.T * 梯度
 	Vec2f gradH_ev;
 	Mat22f gradH_eig;
