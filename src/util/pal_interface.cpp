@@ -57,7 +57,8 @@ bool pal_init(string calibFile){
     auto &pal = pal_model_g;
 
     USE_PAL = true;
-    // ENH_PAL = true;
+    ENH_PAL = true;
+
     // max radius check
     if(pal->mask_radius[0] > pal->mask_radius[1] || pal->sensing_radius[0] > pal->sensing_radius[1]){
         return false;
@@ -89,7 +90,7 @@ bool pal_init(string calibFile){
 
     // pal weight
     pal_weight = Mat::ones(pal->height_, pal->width_, CV_32FC1);
-    float setting_pal_min_weight = 0.9;
+    float setting_pal_min_weight = 0.99;
     float setting_pal_max_weight = 1;
     for(int u = 0; u<pal->width_; u++){
         for(int v = 0; v<pal->height_; v++){
@@ -106,6 +107,10 @@ bool pal_init(string calibFile){
     }
     // imshow("weight", pal_weight);
     // waitKey();
+
+    if(ENH_PAL){
+        printf(" ! [ENH_PAL] is on !!!!!\n");
+    }
 
     return true;
 }     

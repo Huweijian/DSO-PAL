@@ -90,12 +90,12 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 
 	// hwjdebug ----------------
 	Mat img_now;
-	// if(frame->shell->incoming_id >= 90){
-	// 	debugPrint = true;
-	// 	img_now = IOWrap::getOCVImg(frame->dI,wG[0], hG[0]);	
-	// 	cvtColor(img_now, img_now, COLOR_GRAY2BGR);
+	if(frame->shell->incoming_id >= 8848){
+		debugPrint = true;
+		img_now = IOWrap::getOCVImg(frame->dI,wG[0], hG[0]);	
+		cvtColor(img_now, img_now, COLOR_GRAY2BGR);
 
-	// }
+	}
 	// -------------------
 
 	// // hwjdebug 显示参考帧---------------
@@ -217,9 +217,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		dist = sqrtf(dist);
 		// 极线长度过小
 		float minPolarDist = setting_trace_slackInterval;
-		if(ENH_PAL){
+		if(ENH_PAL){ // PAL极线匹配阈值降低,即,即使极线没那么长,也试着匹配一下
 			minPolarDist = pal_get_weight(Vec2f(u, v));
-			minPolarDist = 0.2*setting_trace_slackInterval;
+			minPolarDist = 0.5*setting_trace_slackInterval;
 		}
 		if(dist < minPolarDist)
 		{
@@ -228,7 +228,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 				line(img_now, Point(uMax, vMax), Point(uMin, vMin), {255, 255, 255});
 				imshow("img_now", img_now);
 				waitKey();
-				// hwjdebug ------------------
+				// ------------------
 				printf(" $ skip, TOO CERTAIN ALREADY (dist %f)!\n", dist);
 			}
 
@@ -334,6 +334,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	// 反之,是不理想的情况,此时a接近0,b比较大, errInPxl接近最大值 -> +Inf 
 	float a = (Vec2f(dx,dy).transpose() * gradH * Vec2f(dx,dy));
 	float b = (Vec2f(dy,-dx).transpose() * gradH * Vec2f(dy,-dx));
+	// 好坑啊,(a+b)/a 化简之后就是1/(cos(theta)^2) theta是极线和梯度的夹角,这个表达式和梯度,极线的大小无关,之和夹角有关
 	float errorInPixel = 0.2f + 0.2f * (a+b) / a;
 
 	// 误差比极线还长,没意义了

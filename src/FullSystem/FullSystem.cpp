@@ -608,7 +608,7 @@ void FullSystem::activatePointsMT()
 	toOptimize.reserve(20000);
 
 	// hwjdebug ------------------
-	int immature_deleted = 0, immature_notReady = 0, immature_needMarg = 0, immature_want = 0, immature_out = 0;
+	int immature_deleted = 0, immature_notReady = 0, immature_needMarg = 0, immature_out = 0, immature_all = 0;
 
 	// ------------------
 
@@ -624,6 +624,7 @@ void FullSystem::activatePointsMT()
 
 		for(unsigned int i=0;i<host->immaturePoints.size();i+=1)
 		{
+			immature_all ++;
 			ImmaturePoint* ph = host->immaturePoints[i];
 			ph->idxInImmaturePoints = i;
 
@@ -662,7 +663,7 @@ void FullSystem::activatePointsMT()
 
 				immature_notReady ++ ;
 				// hwjdebug ----------------------
-					// printf("\t IMP NRDY (%d): status(%d), lastTraceErr(%.2f), quanlity(%.2f), minid(%.2f)\n", 
+					// printf("\t IM Pt not Ready (%d): status(%d), lastTraceErr(%.2f), quanlity(%.2f), minid(%.2f)\n", 
 					// 	i, ph->lastTraceStatus, ph->lastTracePixelInterval, ph->quality, 0.5*(ph->idepth_max+ph->idepth_min));
 				// -------------
 				continue;
@@ -732,8 +733,8 @@ void FullSystem::activatePointsMT()
 
 	// hwjdebug -------------
     if(!setting_debugout_runquiet)
-		printf(" - ACTIVATE: %d. (del %d, notReady %d, marg %d, good %d, out %d)\n",
-				(int)toOptimize.size(), immature_deleted, immature_notReady, immature_needMarg, immature_want, immature_out);
+		printf(" - ACTIVATE: (to active %d/%d, del %d, notReady %d, marg %d, out %d)\n",
+				(int)toOptimize.size(), immature_all, immature_deleted, immature_notReady, immature_needMarg, immature_out);
 	// -------------------
 
 	// 开始多线程激活未熟点

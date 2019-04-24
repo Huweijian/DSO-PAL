@@ -307,14 +307,14 @@ void PangolinDSOViewer::run()
 
 void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
 
-	// TDDO: 输出点云,定性判断修改前后的结果
 	printf(" ! Output Points cloud ... ");
 	// header 
 	std::time_t t = std::time(nullptr);
 	char filename[20];
 	sprintf(filename, "%lu", t); 
 	std::ofstream of(filename + std::string(".pcd"));
-	of << "# .PCD v.7 - Point Cloud Data file format\nVERSION .7\n";
+	of << "# .PCD v.7 - Point Cloud Data file format\n";
+	// of << "VERSION .7\n"; //不输出这个也行
 	of << "FIELDS x y z rgb\n";
 	of << "SIZE 4 4 4 4\n";
 	of << "TYPE F F F F\n";
@@ -324,6 +324,7 @@ void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
 		//printf(" %d ", keyframes[i]->numGLBufferGoodPoints);
 		numPoints += keyframes[i]->numSparsePoints;
 	}
+	// TODO:这个numPoint并不正确,需要重新修改
 	of << "WIDTH " << numPoints << "\n";
 	of << "HEIGHT 1\n";
 	of << "VIEWPOINT 0 0 0 1 0 0 0\n";
@@ -374,7 +375,7 @@ void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
 			// printf("%f %f %f %f\n", pt[0], pt[1], pt[2], color_pcl); 
 		}
 	}
-	printf(" - MSG:i get %d points, Pangolin get %d points\n", numValidPC, numPoints);
+	printf(" get %d points, Pangolin get %d points\n", numValidPC, numPoints);
 
 	printf("finisned! \n");
 }

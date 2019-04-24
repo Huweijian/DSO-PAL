@@ -151,9 +151,9 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		// PAL按照视场范围修改阈值,并且不使用滑动窗口
 		if(ENH_PAL){ //pal点选择阈值,不使用滑动平均
 			float w = pal_get_weight(Vec2f(x*32, y*32));
-			w = 0.8 + 1*((1-w));
-			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32]; //(阈值高,点选择效果较好)
-			// thsSmoothed[x+y*w32] = w * ths[x+y*w32]; //(阈值低,点选择效果较差)
+			w = 0.0 + 1*((1-w));
+			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32]; //(阈值高,)
+			// thsSmoothed[x+y*w32] = w * ths[x+y*w32]; //(阈值低,)
 			// thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
 		}
 		else{
