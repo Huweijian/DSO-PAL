@@ -1,3 +1,6 @@
+# DSO-PAL(Panoramic Annular Len)
+将DSO移植到PAL相机
+
 # DSO: Direct Sparse Odometry
 
 For more information see
