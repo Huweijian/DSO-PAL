@@ -144,4 +144,4 @@ add_executable(test_dso
 	${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
 	${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
 	)
-target_link_libraries(test_dso  ${OpenCV_LIBS})
+target_link_libraries(test_dso dso ${OpenCV_LIBS})

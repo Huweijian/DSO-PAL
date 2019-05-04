@@ -33,6 +33,8 @@ public:
   double e_;                      // affine parameter
   int mask_radius[2] = {0, 0};    // mask的内径和外经
   int sensing_radius[2] = {0, 0}; // 传感的内径和外经
+  double pin_fx, pin_fy, pin_cx, pin_cy;  // undistort fake pin params
+  int undistort_mode = 0;
 
 public:
   PALCamera(std::string filename);

@@ -481,7 +481,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float Kv; 
 			float new_idepth;
 
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1 2 
 				pt = R * pal_model_g->cam2world(point->u+dx, point->v+dy, lvl) + t*point->idepth_new;
 				p2_pal = pal_model_g->world2cam(pt, lvl);
 				u = pt[0]/pt[2];	// u v 归一化平面坐标
@@ -514,9 +514,19 @@ Vec3f CoarseInitializer::calcResAndGS(
 				Kv = fyl * v + cyl;
 				new_idepth = point->idepth_new/pt[2];
 				// 如果新的点出界或者深度异常，那么点设置为无效
-				if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0)){
-					isGood = false;
-					break;
+				if(USE_PAL == 0){
+					if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0)){
+						isGood = false;
+						break;
+					}
+				}
+				else{
+					if(!(pal_check_in_range_g(Ku, Kv, 2, lvl) && new_idepth > 0))
+					{
+						isGood = false;
+						break;
+					}
+
 				}
 			}
 
@@ -548,7 +558,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float dydd ;
 			float maxstep ;
 // #ifdef PAL
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1
 				if(ENH_PAL){ // 初始化部分,直接法GN优化部分增加pal视场的权重
 					hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
 				}
@@ -1002,7 +1012,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	{
 		// 修改点的密度
 		// 因为mask以外的点不需要搜索
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 1
 			int r0 = pal_model_g->sensing_radius[0];
 			int r1 = pal_model_g->sensing_radius[1];
 			densities[lvl] *= 3.14*(r1*r1 - r0*r0) / (w[0]*h[0]);
@@ -1050,7 +1060,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 				{
 
 					// 排除外部的点
-					if(USE_PAL){
+					if(USE_PAL == 1 || USE_PAL == 2){
 						if(!pal_check_in_range_g(x, y, patternPadding+1, lvl)){
 							continue;
 						}
@@ -1217,7 +1227,7 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
 
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 // #ifdef PAL
 			fx[level] = 1;
 			fy[level] = 1;

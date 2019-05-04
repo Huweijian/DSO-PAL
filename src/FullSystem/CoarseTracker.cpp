@@ -114,7 +114,7 @@ void CoarseTracker::makeK(CalibHessian* HCalib)
 	{
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 // #ifdef PAL
 			fx[level] = 1;
 			fy[level] = 1;
@@ -333,7 +333,7 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 	for(int i=0;i<n;i+=4)
 	{
 // #ifdef PAL
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 
 			float buf_drdSE3[6][4] = {0};
 			for(int k=0; k<4; k++){
@@ -498,7 +498,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 		float Kv;
 
 // #ifdef PAL
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 			pt = RKi * pal_model_g->cam2world(x, y, lvl) + t*id;
 			u = pt[0] / pt[2];
 			v = pt[1] / pt[2];
@@ -530,7 +530,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 			float uT2, vT2, KuT2, KvT2; 
 			float u3, v3, Ku3, Kv3; 
 // #ifdef PAL
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1
 				// translation only (positive)
 				pal_project(x, y, id, Mat33f::Identity(), t, uT, vT, KuT, KvT);
 
@@ -576,7 +576,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 			sumSquaredShiftNum+=2;
 		}
 
-		if(USE_PAL){
+		if(USE_PAL == 1 || USE_PAL == 2){
 			if(!(pal_check_in_range_g(Ku, Kv, 3, lvl) && new_idepth > 0))
 				continue;
 		}
@@ -1106,7 +1106,7 @@ void CoarseDistanceMap::makeDistanceMap(
 			assert(ph->status == PointHessian::ACTIVE);
 
 			int u, v;
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1 2
 				Vec3f ptp_pal = KRKi * pal_model_g->cam2world(ph->u, ph->v, 1) + Kt * ph->idepth_scaled;
 				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp_pal, 1);
 				u = ptp_pal2D[0];
@@ -1118,8 +1118,14 @@ void CoarseDistanceMap::makeDistanceMap(
 				Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt*ph->idepth_scaled;
 				u = ptp[0] / ptp[2] + 0.5f;
 				v = ptp[1] / ptp[2] + 0.5f;
-				if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
-					continue;
+				if(USE_PAL == 0){
+					if(!(u > 0 && v > 0 && u < w[1] && v < h[1])) 
+						continue;
+				}
+				else if(USE_PAL == 2){
+					if(!pal_check_in_range_g(u, v, 1, 1))
+						continue;
+				}
 			}
 			fwdWarpedIDDistFinal[u+w1*v]=0;
 			bfsList1[numItems] = Eigen::Vector2i(u,v);
@@ -1265,7 +1271,7 @@ void CoarseDistanceMap::makeK(CalibHessian* HCalib)
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
 
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 // #ifdef PAL
 			fx[level] = 1;
 			fy[level] = 1;

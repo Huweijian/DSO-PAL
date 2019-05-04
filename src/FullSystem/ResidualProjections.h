@@ -77,21 +77,24 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		// -----------------------------------
 		float &Ku, float &Kv)
 {
-	if(USE_PAL){
-
-	Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
-	Vec2f ptp_2d = pal_model_g->world2cam(ptp);
-	Ku = ptp_2d[0];
-	Kv = ptp_2d[1];
-	return  pal_check_in_range_g(Ku, Kv, 2, 0);
+	if(USE_PAL == 1){ 
+		Vec3f ptp = KRKi * pal_model_g->cam2world(u_pt, v_pt) + Kt*idepth;
+		Vec2f ptp_2d = pal_model_g->world2cam(ptp);
+		Ku = ptp_2d[0];
+		Kv = ptp_2d[1];
+		return  pal_check_in_range_g(Ku, Kv, 2, 0);
 	}
 
 	else{
-
-	Vec3f ptp = KRKi * Vec3f(u_pt,v_pt, 1) + Kt*idepth;
-	Ku = ptp[0] / ptp[2];
-	Kv = ptp[1] / ptp[2];
-	return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+		Vec3f ptp = KRKi * Vec3f(u_pt,v_pt, 1) + Kt*idepth;
+		Ku = ptp[0] / ptp[2];
+		Kv = ptp[1] / ptp[2];
+		if(USE_PAL == 0)
+			return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+		else if(USE_PAL == 2)
+			return  pal_check_in_range_g(Ku, Kv, 2, 0);
+		assert(0);
+		return false;
 	}
 }
 
@@ -106,7 +109,7 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		float &drescale, float &u, float &v, // z变化比例系数；归一化坐标系的值；
 		float &Ku, float &Kv, Vec3f &KliP, float &new_idepth)	// 像素坐标系的值；原始归一化坐标系的值；
 {
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 0 1 2 
 
 		KliP = pal_model_g->cam2world(u_pt+dx, v_pt+dy) / idepth;	
 		Vec3f P2 = R * KliP + t;
@@ -147,7 +150,13 @@ EIGEN_STRONG_INLINE bool projectPoint(
 		Kv = v*HCalib->fyl() + HCalib->cyl();
 
 		// 返回投影后的点是否在图像内
-		return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+		if(USE_PAL == 0)
+			return Ku>1.1f && Kv>1.1f && Ku<wM3G && Kv<hM3G;
+		else if(USE_PAL == 2)
+			return pal_check_in_range_g(Ku, Kv, 2, 0);
+
+		assert(0);
+		return false;
 	}
 }
 

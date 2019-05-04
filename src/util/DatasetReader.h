@@ -292,11 +292,17 @@ private:
 				(exposures.size() == 0 ? 1.0f : exposures[id]),
 				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
 
+		// hwjdebug ------------ 显示矫正畸变后的图像
 		{
 			using namespace cv;
 			auto img = IOWrap::getOCVImg_tem(ret2->image, ret2->w, ret2->h);
 			imshow("after undistort immediately", img);
 			cv::moveWindow("after undistort immediately", 0+100, 50);
+
+			// Mat img_before = IOWrap::getOCVImg_tem(minimg->data, minimg->w, minimg->h);	
+			// imshow("before undistort", img_before);
+			// moveWindow("before undistort", 1000, 100);
+
 			waitKey();
 		}
 

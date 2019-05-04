@@ -119,7 +119,7 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 
 	// 计算这个残差项对深度，相机参数，位姿的导数
 // #ifdef PAL
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 0 1
 
 		Eigen::Matrix<float, 2, 6> dx2dSE;
 		Eigen::Matrix<float, 2, 3> duv2dxyz;

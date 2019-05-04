@@ -501,7 +501,7 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 
 	Mat33f K = Mat33f::Identity();
 	
-	if(!USE_PAL){
+	if(USE_PAL == 0 || USE_PAL == 2){
 		K(0,0) = Hcalib.fxl();
 		K(1,1) = Hcalib.fyl();
 		K(0,2) = Hcalib.cxl();
@@ -675,7 +675,7 @@ void FullSystem::activatePointsMT()
 			Vec3f ptp;
 			int u, v;
 			
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1
 				
 				ptp = KRKi * pal_model_g->cam2world(ph->u, ph->v, 0) + Kt*(0.5f*(ph->idepth_max+ph->idepth_min));
 				Vec2f ptp_pal2D = pal_model_g->world2cam(ptp, 1);
@@ -690,7 +690,7 @@ void FullSystem::activatePointsMT()
 			}
 
 			bool inRange = false;
-			if(USE_PAL){
+			if(USE_PAL == 1 || USE_PAL == 2){
 				if(pal_check_in_range_g(u, v, 1, 1))
 					inRange = true;
 			}
@@ -927,13 +927,6 @@ void FullSystem::flagPointsForRemoval()
 // slam 入口，图像从这里输入
 void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
-
-	// hwjdebug ----------- 显示畸变矫正后的图像
-	// cv::Mat rawimg = IOWrap::getOCVImg_tem(image->image, image->w, image->h);	
-	// cv::imshow("undisImg", rawimg);
-	// cv::moveWindow("undisImg", 0+100, 50);
-	// cv::waitKey();
-
     if(isLost) 
 		return;
 
@@ -1531,7 +1524,7 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 		{
 
 			// 排除外部的点
-			if(USE_PAL){
+			if(USE_PAL == 1 || USE_PAL == 2){
 				if(!pal_check_in_range_g(x, y, patternPadding+1)){
 					continue;
 				}

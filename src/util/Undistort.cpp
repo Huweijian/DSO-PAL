@@ -1250,7 +1250,6 @@ UndistortPAL::UndistortPAL()
 {
 	w = wOrg = pal_model_g->width_;
 	h = hOrg = pal_model_g->height_;
-	K = dso::Mat33::Identity();	
    	remapX = new float[w*h];
     remapY = new float[w*h];
 
@@ -1261,12 +1260,29 @@ UndistortPAL::UndistortPAL()
 			remapY[x+y*w] = y;
 		}
 
-	distortCoordinates(remapX, remapY, remapX, remapY, h*w);
+	if(USE_PAL == 1){
+		K = dso::Mat33::Identity();	
+		distortCoordinates_unify_mode(remapX, remapY, remapX, remapY, h*w);
+	}
+	else if(USE_PAL == 2){
+		K.setIdentity();
+		K(0, 0) = pal_model_g->pin_fx * pal_model_g->width_;
+		K(1, 1) = pal_model_g->pin_fy * pal_model_g->height_;
+		K(0, 2) = pal_model_g->pin_cx * pal_model_g->width_ - 0.5;
+		K(1, 2) = pal_model_g->pin_cy * pal_model_g->height_ - 0.5;
+		distortCoordinates_pin_mode(remapX, remapY, remapX, remapY, h*w);
+	}
+	else{
+		// invalid pal mode
+		assert(0);
+	}
+	
+
 	valid = true;
 	printf("Creating PAL undistorter\n");
 }
 
-void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
+void UndistortPAL::distortCoordinates_unify_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
 {
 	for(int i=0;i<n;i++)
 	{
@@ -1283,5 +1299,37 @@ void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, fl
 	}
 }
 
+void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
+{
+	// 这个函数是const的,使用受限,但是是纯虚函数,又不能删除,所以只能这样了
+	assert(0);
+}
+
+void UndistortPAL::distortCoordinates_pin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
+{
+	// PAL虚拟的K
+	float ocx = pal_model_g->width_ * pal_model_g->pin_cx;
+	float ocy = pal_model_g->height_ * pal_model_g->pin_cy;
+	float ofx = pal_model_g->width_ * pal_model_g->pin_fx; 
+	float ofy = pal_model_g->height_ * pal_model_g->pin_fy;
+
+	for(int i=0;i<n;i++)
+	{
+		float xi = in_x[i];
+		float yi = in_y[i];
+		float x_cam = (xi - ocx) / ofx;
+		float y_cam = (yi - ocy) / ofy;
+		auto pt_ori = pal_model_g->world2cam(Eigen::Vector3f(x_cam, y_cam, 1));
+
+		// 不合法的点映射到(-1, -1)
+		if(!pal_check_valid_sensing(pt_ori[0], pt_ori[1])){
+			pt_ori = Eigen::Vector2f(-1, -1);
+		}
+
+		out_x[i] = pt_ori[0] ;
+		out_y[i] = pt_ori[1] ;
+	}
+	printf(" ! USE_PAL = %d, FOV = %.2f deg\n", USE_PAL, 2*atan2(0.5, pal_model_g->pin_fx) / 3.14 * 180);
+}
 
 }

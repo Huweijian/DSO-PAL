@@ -1,5 +1,5 @@
 #include "pal_interface.h"
-
+#include "IOWrapper/ImageDisplay.h"
 using namespace pal;
 using namespace std;
 using namespace cv;
@@ -7,7 +7,8 @@ cv::Mat pal_mask_g[pal_max_level];
 cv::Mat pal_valid_sensing_mask_g;
 cv::Mat pal_weight;
 PALCamera* pal_model_g = nullptr;
-bool USE_PAL = false;
+
+int USE_PAL = 0;
 bool ENH_PAL = false;
 
 bool pal_check_in_range_g(float u, float v, float padding, int level){
@@ -56,8 +57,11 @@ bool pal_init(string calibFile){
     pal_model_g = new pal::PALCamera(calibFile);
     auto &pal = pal_model_g;
 
-    USE_PAL = true;
-    ENH_PAL = true;
+    USE_PAL = pal_model_g->undistort_mode;
+
+    if(USE_PAL == 1){
+        ENH_PAL = true;
+    }
 
     // max radius check
     if(pal->mask_radius[0] > pal->mask_radius[1] || pal->sensing_radius[0] > pal->sensing_radius[1]){
@@ -70,13 +74,47 @@ bool pal_init(string calibFile){
         pal->mask_radius[1] = maxR_z0;
     }
 
-    // valid mask and buffing
-	pal_mask_g[0] = cv::Mat::zeros(pal->height_, pal->width_, CV_8UC1);
-	cv::circle(pal_mask_g[0], cv::Point(pal->xc_, pal->yc_), pal->mask_radius[1], 255, -1);
-	cv::circle(pal_mask_g[0], cv::Point(pal->xc_, pal->yc_), pal->mask_radius[0], 0, -1);
-	for(int i=1; i<pal_max_level; i++){
-		cv::resize(pal_mask_g[i-1], pal_mask_g[i], cv::Size(), 0.5, 0.5, cv::INTER_NEAREST);
-	}
+    // init mask and buffing
+    int hh = pal->height_, ww = pal->width_;
+    if(USE_PAL == 1){
+        float r1 = pal->mask_radius[1], r0 = pal->mask_radius[0];
+        float cx = pal->xc_, cy = pal->yc_;
+
+        for(int i=0; i<pal_max_level; i++){
+            pal_mask_g[i] = cv::Mat::zeros(hh, ww, CV_8UC1);
+            cv::circle(pal_mask_g[i], cv::Point(cx, cy), r1, 255, -1);
+            cv::circle(pal_mask_g[i], cv::Point(cx, cy), r0, 0, -1);
+            hh/=2; ww/=2; r1/=2.0; r0/=2.0; cx/=2.0; cy/=2.0;
+        }
+    }
+    else if(USE_PAL == 2){
+        float ocx = pal_model_g->width_ * pal_model_g->pin_cx;
+        float ocy = pal_model_g->height_ * pal_model_g->pin_cy;
+        float ofx = pal_model_g->width_ * pal_model_g->pin_fx; 
+        float ofy = pal_model_g->height_ * pal_model_g->pin_fy;
+
+        float xi = pal_model_g->xc_ + pal_model_g->mask_radius[0];
+        float yi = pal_model_g->yc_;
+        float x_cam = (xi - ocx) / ofx;
+        float y_cam = (yi - ocy) / ofy;
+        auto pt_ori = pal_model_g->world2cam(Eigen::Vector3f(x_cam, y_cam, 1));
+        float r_inner = pt_ori[0] - pal_model_g->width_ * pal_model_g->pin_cx; 
+
+        float cx = pal->width_*pal->pin_cx, cy = pal->height_*pal->pin_cy;
+
+        for(int i=0; i<pal_max_level; i++){
+            pal_mask_g[i] = cv::Mat::ones(hh, ww, CV_8UC1)*255;
+            circle(pal_mask_g[i], cv::Point(cx, cy), r_inner, 0, -1);
+            rectangle(pal_mask_g[i], Rect(Point(0, 0), Point(ww-1, hh-1)), 0); 
+            if(i == 0){
+                // TODO: 这个解决方案不太好,先这样把
+                pal_mask_g[i].rowRange(hh/32*32, hh-1) = 0;
+            }
+            hh/=2; ww/=2; cx/=2.0; cy/=2.0; r_inner/=2;
+        }
+
+    }
+
     for(int i=0; i<pal_max_level; i++){
         pal_addMaskbuffer(pal_mask_g[i], (5-i));
         // imshow("mask" + to_string(i), pal_mask_g[i]);
@@ -114,3 +152,15 @@ bool pal_init(string calibFile){
 
     return true;
 }     
+
+bool pal_undistort_mask(dso::Undistort *u){
+    using namespace dso;
+    for(int i=0; i<pal_max_level; i++){
+        MinimalImageB img(pal_mask_g[i].cols, pal_mask_g[i].rows);
+        memcpy(img.data, pal_mask_g[i].data, img.w * img.h);
+        u->undistort<unsigned char>(&img, 1.0f, 0.0);
+        pal_mask_g[i] = IOWrap::getOCVImg_tem(img.data, img.w, img.h);
+        imshow("mask" + to_string(i), pal_mask_g[i]);
+    }
+    waitKey();
+}

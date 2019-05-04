@@ -355,9 +355,9 @@ void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
 
 			float my_minRelBS_pal = minBS;
 			
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 1
 				my_minRelBS_pal = 0;
-				// my_minRelBS_pal = my_minRelBS / 100; 	// 这里可以选择合适的点筛选条件
+				// my_minRelBS_pal = minBS / 100; 	// 这里可以选择合适的点筛选条件
 			}
 
 			if(p.relObsBaseline < my_minRelBS_pal)

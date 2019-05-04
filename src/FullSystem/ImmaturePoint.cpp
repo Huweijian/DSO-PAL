@@ -131,7 +131,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	float uMin;
 	float vMin;
 	// PAL 极线搜索Min点确定
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 0 1 2 
 		pr = hostToFrame_KRKi * pal_model_g->cam2world(u, v);
 		ptpMin = pr + hostToFrame_Kt*idepth_min;
 		Vec2f ptpMin2D = pal_model_g->world2cam(ptpMin);
@@ -158,8 +158,18 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		uMin = ptpMin[0] / ptpMin[2];
 		vMin = ptpMin[1] / ptpMin[2];
 
-		if(!(uMin > 4 && vMin > 4 && uMin < wG[0]-5 && vMin < hG[0]-5))
-		{
+		bool is_oob = false;
+		if(USE_PAL == 0)
+			if(!(uMin > 4 && vMin > 4 && uMin < wG[0]-5 && vMin < hG[0]-5)){
+				is_oob = true;
+			}
+		else if(USE_PAL == 2){
+			if(!(pal_check_in_range_g(uMin, vMin, 5, 0))){
+				is_oob = true;
+			}
+		}
+
+		if(is_oob){
 			if(debugPrint) printf(" $ OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
 					u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
 			lastTraceUV = Vec2f(-1,-1);
@@ -179,13 +189,12 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		ptpMax = pr + hostToFrame_Kt*idepth_max;
 
 		// PAL极线搜索max点确定
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1 2
 			Vec2f ptpMax2D = pal_model_g->world2cam(ptpMax);
 			uMax = ptpMax2D[0];
 			vMax = ptpMax2D[1];
 
-			if(!(pal_check_in_range_g(uMax, vMax, 5, 0)))
-			{
+			if(!(pal_check_in_range_g(uMax, vMax, 5, 0))){
 				if(debugPrint) 
 					printf("OOB uMax  %f %f - %f %f!\n",u,v, uMax, vMax);
 				lastTraceUV = Vec2f(-1,-1);
@@ -197,14 +206,23 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			uMax = ptpMax[0] / ptpMax[2];
 			vMax = ptpMax[1] / ptpMax[2];
 
-			if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
-			{
+			bool is_oob = false;
+			if(USE_PAL == 0){
+				if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
+					is_oob = true;
+			}
+			else if (USE_PAL == 2){
+				if(!(pal_check_in_range_g(uMax, vMax, 5, 0)))
+					is_oob = true;
+			}
+				
+			if(is_oob){
 				if(debugPrint) 
 					printf("OOB uMax  %f %f - %f %f!\n",u,v, uMax, vMax);
 				lastTraceUV = Vec2f(-1,-1);
 				lastTracePixelInterval=0;
 				return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
-			}
+			}	
 
 		}
 
@@ -246,9 +264,8 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 
 		// project to arbitrary depth to get direction.
 		// 在idepthmax为 无穷的情况下确定PAL极线搜索范围
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1 2 
 
-			// TODO: 可以进一步优化
 			float dist_pal = 0, dist_pal_try = 0;
 			float idepth_max_pal = 0.01;
 			float uMax_try = 0, vMax_try = 0;
@@ -296,15 +313,23 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 			vMax = vMin + dist*dy*d;
 
 			// may still be out!
-			if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
-			{
+			bool is_oob = false;
+			if(USE_PAL == 0){
+				if(!(uMax > 4 && vMax > 4 && uMax < wG[0]-5 && vMax < hG[0]-5))
+					is_oob = true;
+			}
+			else if (USE_PAL == 2){
+				if(!(pal_check_in_range_g(uMax, vMax, 5, 0)))
+					is_oob = true;
+			}
+				
+			if(is_oob){
 				if(debugPrint) 
-					printf(" $ OOB uMax-coarse %f %f %f!\n", uMax, vMax,  ptpMax[2]);
+					printf("OOB uMax  %f %f - %f %f!\n",u,v, uMax, vMax);
 				lastTraceUV = Vec2f(-1,-1);
 				lastTracePixelInterval=0;
 				return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
-			}
-
+			}	
 			assert(dist>0);
 
 		}
@@ -408,7 +433,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		numSteps = 99;
 
 	Vec3f d_pal;
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 1
 		ptpMin = ptpMin / ptpMin.norm();
 		ptpMax = ptpMax / ptpMax.norm();
 		d_pal = (ptpMax - ptpMin) / numSteps;
@@ -443,7 +468,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		}
 
 		// PAL极线搜索点计算
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 			Vec2f pt_pal = pal_model_g->world2cam(ptpMin + d_pal*(i+1) );
 			ptx = pt_pal[0];
 			pty = pt_pal[1];
@@ -458,7 +483,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 	}
 	
 	// 根据best匹配点重新计算 dx dy，作为优化方向
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 1
 		Vec2f best_pt_pal1 = pal_model_g->world2cam(ptpMin + d_pal*bestIdx);
 		Vec2f best_pt_pal2 = pal_model_g->world2cam(ptpMin + d_pal*(bestIdx+1));
 		Vec2f best_pt_diff = best_pt_pal2 - best_pt_pal1;
@@ -565,7 +590,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 
 	// pin的三角化在像素坐标系下进行,PAL需要在相机坐标系下进行
 	// 对于Pr变量对于pin,pr的xy是旋转后的参考帧像素坐标,z是反深度； 对于PAL, pr的前两位是相机坐标,z是反深度
-	if(USE_PAL){
+	if(USE_PAL == 1){ // 0 1
 		// 把bestUV转换到相机坐标系,和Pr变量统一坐标系
 		Vec3f bestUVmin_pal = pal_model_g->cam2world(bestU-errorInPixel*dx, bestV-errorInPixel*dy);
 		Vec3f bestUVmax_pal = pal_model_g->cam2world(bestU+errorInPixel*dx, bestV+errorInPixel*dy);
@@ -784,7 +809,7 @@ double ImmaturePoint::linearizeResidual(
 		// depth derivatives.
 		// 对点的深度求导
 		float d_idepth;
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 0 1
 
 			float gx = hitColor[1];
 			float gy = hitColor[2];

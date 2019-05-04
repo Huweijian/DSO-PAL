@@ -182,7 +182,7 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 
 			dabs_l[idx] = dx*dx+dy*dy;
 
-			if(USE_PAL){
+			if(USE_PAL == 1 || USE_PAL == 2){
 				int x = idx % wl;
 				int y = idx / wl;
 				if(!pal_check_in_range_g(x, y, 2, lvl))

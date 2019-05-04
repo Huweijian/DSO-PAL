@@ -45,11 +45,10 @@
 #include "OptimizationBackend/MatrixAccumulators.h"
 #include "FullSystem/PixelSelector2.h"
 
-
-
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
+#include "util/pal_interface.h"
 
 std::string vignette = "";
 std::string gammaCalib = "";
@@ -448,7 +447,6 @@ int main( int argc, char** argv )
         gettimeofday(&tv_start, NULL);
         clock_t started = clock();
         double sInitializerOffset=0;
-
 
         for(int ii=0;ii<(int)idsToPlay.size()-1; ii++)
         {

@@ -4,11 +4,13 @@
 #include "pal_model.h"
 #include <string>
 
+#include "util/Undistort.h"
 // #define PAL // 不再使用，改用USE_PAL 变量以减少编译次数
-extern bool USE_PAL;
+extern int USE_PAL;
 extern bool ENH_PAL;
 const int pal_max_level = 6;
 extern pal::PALCamera* pal_model_g;
+
 
 // inline Eigen::Vector3f cam2world(float x, float y, ocam_model& myocam_model){
 //     double pWorld[3];
@@ -31,6 +33,8 @@ bool pal_check_in_range_g(float u, float v, float padding, int level = 0);
 bool pal_check_valid_sensing(float u, float v);
 
 bool pal_init(std::string calibFile);
+
+bool pal_undistort_mask(dso::Undistort *u);
 
 inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Matrix3f &R, const Eigen::Vector3f t, 
     float &u, float &v, float &Ku, float &Kv)

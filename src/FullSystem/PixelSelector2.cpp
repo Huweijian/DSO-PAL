@@ -23,10 +23,6 @@
 
 
 #include "FullSystem/PixelSelector2.h"
- 
-// 
-
-
 
 #include "util/NumType.h"
 #include "IOWrapper/ImageDisplay.h"
@@ -48,8 +44,11 @@ PixelSelector::PixelSelector(int w, int h)
 
 
 	gradHist = new int[100*(1+w/32)*(1+h/32)];
-	ths = new float[(w/32)*(h/32)+100];
-	thsSmoothed = new float[(w/32)*(h/32)+100];
+	ths = new float[(w/32)*(h/32+1)+100];
+	thsSmoothed = new float[(w/32+1)*(h/32+1)+100];
+
+	memset(thsSmoothed, 0, sizeof(thsSmoothed));
+	memset(ths, 0, sizeof(ths));
 
 	allowFast=false;
 	gradHistFrame=0;
@@ -101,7 +100,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 					int jt = j+32*y;
 
 					// 位于图像边缘的点不加入梯度直方图
-					if(USE_PAL){
+					if(USE_PAL == 1 || USE_PAL == 2){
 						if(!pal_check_in_range_g(it, jt, 1, 0))
 							continue;	
 					}
@@ -118,7 +117,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
 
-			if(ENH_PAL){// mask以外的不选择点
+			if(USE_PAL == 1 || USE_PAL == 2){// mask以外的不选择点
 				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
 					ths[x+y*w32] = 10000;
 			}			
@@ -148,17 +147,16 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		if(y<h32-1) {num++; 	sum+=ths[x+(y+1)*w32];}
 		num++; sum+=ths[x+y*w32];
 
+		thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
+
 		// PAL按照视场范围修改阈值,并且不使用滑动窗口
-		if(ENH_PAL){ //pal点选择阈值,不使用滑动平均
-			float w = pal_get_weight(Vec2f(x*32, y*32));
-			w = 0.0 + 1*((1-w));
-			thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32]; //(阈值高,)
-			// thsSmoothed[x+y*w32] = w * ths[x+y*w32]; //(阈值低,)
-			// thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
-		}
-		else{
-			thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
-		}
+		// if(ENH_PAL){ //pal点选择阈值,不使用滑动平均
+		// 	float w = pal_get_weight(Vec2f(x*32, y*32));
+		// 	w = 0.0 + 1*((1-w));
+		// 	thsSmoothed[x+y*w32] = w * ths[x+y*w32] * ths[x+y*w32]; //(阈值高,)
+		// 	// thsSmoothed[x+y*w32] = w * ths[x+y*w32]; //(阈值低,)
+		// 	// thsSmoothed[x+y*w32] = (sum/num) * (sum/num);
+		// }
 
 	}
 
@@ -195,7 +193,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 		// imshow("grad", grad);
 		// moveWindow("grad", 50+w+50, 50);
-		waitKey(1);
+		// waitKey(1);
 	}
 
 
@@ -441,7 +439,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 					int xf = x1+x234;
 					int yf = y1+y234;
 
-					if(USE_PAL){
+					if(USE_PAL == 1 || USE_PAL == 2){
 						if(!pal_check_in_range_g(xf, yf, 4)) continue;
 					}
 					else{
@@ -449,7 +447,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 					}
 
 					// 三个梯度阈值(一个比一个低0.75)
-					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];
+					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep] > 6 ? thsSmoothed[(xf>>5) + (yf>>5) * thsStep] : 100000;
 					float pixelTH1 = pixelTH0*dw1;
 					float pixelTH2 = pixelTH1*dw2;
 

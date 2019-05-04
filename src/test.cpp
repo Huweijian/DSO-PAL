@@ -36,31 +36,34 @@ class B:public A{
 
 
 int main(void){
+    int x = 700, y = 700;
+    int idx = ((x >> 5) + (y >> 5) * 22);
+    int idx2 = x + y*22;
+    printf("idx = %d\n idx2 = %d\n", idx, idx2);
 
-    float a = 4.2108e+06;
-    unsigned char *argb = 0;
-    // void *p = &a;
-    argb = (unsigned char*)(&a);
-    printf("%u %u %u %u\n", argb[0], argb[1], argb[2], argb[3]);
-
-    uint8_t r = 128;
-    uint8_t g = 128;
-    uint8_t b = 224;
-    int32_t rgb = (r << 16) | (g << 8) | b; 
-    a = *(float *)(&rgb); // makes the point red
-    cout << a << endl;
 
     return -1;
 
-    pal_init("/home/hwj23/Dataset/PAL/calib_results_fish.txt"); 
+    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
+    int u = 100, v = 300;
+    float d = 1.4;
+    Vector3f pt = pal_model_g->cam2world(u, v) * d;
+    Vector3f t(100, 0, 0);
+    float dxdd = (t[0]-t[2]*u); // \rho_2 / \rho1 * (tx - u'_2 * tz)
+    float dydd = (t[1]-t[2]*v); // \rho_2 / \rho1 * (ty - v'_2 * tz)
+    Vec2f dr2duv2(10, 0);
 
-	Eigen::Matrix<float, 2, 6> dx2dSE;
-	Eigen::Matrix<float, 2, 3> duv2dxyz;
 
-    Vec3f pt(0.04, -1.03, 0.98);
-	pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
-    cout << "p = " << pt.transpose() << endl;
-    cout << duv2dxyz << endl;
+    Eigen::Matrix<float, 2, 6> dx2dSE;
+    Eigen::Matrix<float, 2, 3> duv2dxyz;
+    pal_model_g->jacobian_xyz2uv(pt, dx2dSE, duv2dxyz);
+    Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
+
+    // dr/dd
+    Vector2f duvdd = duv2dxyz * dxyzdd; 
+    cout << pt.T << "\n\n";
+    cout << duv2dxyz << "\n\n";
+    cout << duvdd.transpose() << endl;
 
     return 0;
 }

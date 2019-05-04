@@ -69,9 +69,10 @@ KeyFrameDisplay::KeyFrameDisplay()
 void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 {
 	id = frame->id;
-	if(USE_PAL){	//PAL fake camera parameter for visualization
-		fx = 480;
-		fy = 480; 
+	//PAL fake camera parameter for visualization
+	if(USE_PAL == 1){ // 0 1
+		fx = 0.1 * (pal_model_g->width_/2);
+		fy = 0.1 * (pal_model_g->height_/2); 
 		cx = pal_model_g->width_/2;
 		cy = pal_model_g->height_/2;
 	}
@@ -251,9 +252,9 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 
 		float my_minRelBS_pal = my_minRelBS;
 		
-		if(USE_PAL){
+		if(USE_PAL == 1){ // 1
 			my_minRelBS_pal = 0;
-			// my_minRelBS_pal = my_minRelBS ; 	// 这里可以选择合适的点筛选条件
+			// my_minRelBS_pal = my_minRelBS/10 ; 	// 这里可以选择合适的点筛选条件
 		}
 
 		if(originalInputSparse[i].relObsBaseline < my_minRelBS_pal)
@@ -267,7 +268,7 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 			int dx = patternP[pnt][0];
 			int dy = patternP[pnt][1];
 
-			if(USE_PAL){
+			if(USE_PAL == 1){ // 0 1 
 				Vec3f pt_pal = pal_model_g->cam2world((originalInputSparse[i].u+dx), originalInputSparse[i].v+dy) * depth;
 				tmpVertexBuffer[vertexBufferNumPoints][0] = pt_pal[0];
 				tmpVertexBuffer[vertexBufferNumPoints][1] = pt_pal[1];
