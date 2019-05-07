@@ -34,6 +34,7 @@ public:
   int mask_radius[2] = {0, 0};    // mask的内径和外经
   int sensing_radius[2] = {0, 0}; // 传感的内径和外经
   double pin_fx, pin_fy, pin_cx, pin_cy;  // undistort fake pin params
+  float mp_fov[2]; int mp_num, mp_width;  
   int undistort_mode = 0;
 
 public:

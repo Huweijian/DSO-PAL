@@ -167,7 +167,17 @@ public:
 	~UndistortPAL(){};
 	void distortCoordinates_unify_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
 	void distortCoordinates_pin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
+	void distortCoordinates_multipin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
 	void distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
+private:
+	inline Eigen::Matrix3f trans(int xto, int yto, int zto) const{
+		Eigen::Matrix3f trans;
+		trans.setZero();
+		trans(abs(xto)-1, 0) = xto<0 ? -1 : 1;
+		trans(abs(yto)-1, 1) = yto<0 ? -1 : 1;
+		trans(abs(zto)-1, 2) = zto<0 ? -1 : 1;
+		return trans;
+	}
 
 };
 

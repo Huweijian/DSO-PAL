@@ -11,3 +11,9 @@ thirdparty/libzip-1.1.1*
 result.txt
 .vscode/ipch/*
 *.pcd
+manuscript/*
+!manuscript/*.tex
+!manuscript/*.md
+!manuscript/*.cls
+!manuscript/*.clo
+!manuscript/*.sty

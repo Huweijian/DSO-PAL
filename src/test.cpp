@@ -35,19 +35,19 @@ class B:public A{
 };
 
 
+
+
+
 int main(void){
-    int x = 700, y = 700;
-    int idx = ((x >> 5) + (y >> 5) * 22);
-    int idx2 = x + y*22;
-    printf("idx = %d\n idx2 = %d\n", idx, idx2);
+    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
 
+    int u = pal_model_g->xc_;
+    int v = pal_model_g->yc_ + 135;
 
+    Vector3f pt = pal_model_g->cam2world(u, v);
+    cout << atan2(pt[1], pt[2])/3.14*180;    
     return -1;
 
-    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
-    int u = 100, v = 300;
-    float d = 1.4;
-    Vector3f pt = pal_model_g->cam2world(u, v) * d;
     Vector3f t(100, 0, 0);
     float dxdd = (t[0]-t[2]*u); // \rho_2 / \rho1 * (tx - u'_2 * tz)
     float dydd = (t[1]-t[2]*v); // \rho_2 / \rho1 * (ty - v'_2 * tz)

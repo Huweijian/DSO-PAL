@@ -70,10 +70,14 @@ PALCamera::PALCamera(std::string filename)
     wr = fscanf(f,"%d %d %d %d\n", &(this->mask_radius[1]),  &(this->mask_radius[0]), &(this->sensing_radius[1]),  &(this->sensing_radius[0]));
 
     // undistort fake pin parameters
-
     wrc= fgets(buf, CMV_MAX_BUF,f);
     wr = fscanf(f,"\n");
     wr = fscanf(f,"%lf %lf %lf %lf\n", &this->pin_fx,  &this->pin_fy, &this->pin_cx, &this->pin_cy);
+
+    // undistort fake pin parameters
+    wrc= fgets(buf, CMV_MAX_BUF,f);
+    wr = fscanf(f,"\n");
+    wr = fscanf(f,"%f %f %d %d\n", &this->mp_fov[0],  &this->mp_fov[1], &this->mp_num, &this->mp_width);
 
     wrc= fgets(buf, CMV_MAX_BUF,f);
     wr = fscanf(f,"\n");
@@ -110,6 +114,8 @@ PALCamera::PALCamera(std::string filename)
     else if(bufs == "multipin"){
         undistort_mode = 3;
     }
+
+    assert(this->mp_fov[0] < 90);
 }
 
 PALCamera::~PALCamera()

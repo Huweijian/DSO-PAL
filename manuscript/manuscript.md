@@ -1,3 +1,24 @@
+1. Introduction  
+盲人需要定位  
+视觉定位的特点
+PAL的特点,pal为什么适合这个应用  
+
+2. Related works  
+omnidirection camera applications  
+blind localization articles
+
+3. Method  
+- structure
+- camera model : pin unity  
+- tracking: epolar mathching, triangluation 
+- *hole fixing
+
+4. evaluation 
+- localization on pulic dataset(H) [compare different model]
+- blind-folded field experiment 
+
+5. conclusion
+
 ## 必要性  
 - 为什么朝上看:向前看动态物体太多,给视觉定位带来额外的负担
 - 为什么用大市场相机:视场大,适合向上看
@@ -16,7 +37,7 @@
 工作流程：  
 1. 明眼人建立地图
 2. 检测marker判断入口
-3. 根据房间平面图选择合适的相机模型
+3. *根据房间平面图选择合适的相机模型
 
 ## 实验
 #### 上述改进的有效性  

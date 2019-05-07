@@ -37,14 +37,14 @@
 #include "util/Undistort.h"
 #include "pal_interface.h"
 
+
+#define _USE_MATH_DEFINES
+#include <cmath>
+#define d2r(d) (d/180.0*M_PI)
+#define r2d(r) (r/M_PI*180.0)
+
 namespace dso
 {
-
-
-
-
-
-
 
 
 PhotometricUndistorter::PhotometricUndistorter(
@@ -1248,10 +1248,9 @@ void UndistortPinhole::distortCoordinates(float* in_x, float* in_y, float* out_x
 
 UndistortPAL::UndistortPAL()
 {
-	w = wOrg = pal_model_g->width_;
-	h = hOrg = pal_model_g->height_;
-   	remapX = new float[w*h];
-    remapY = new float[w*h];
+	K.setIdentity();
+	wOrg = pal_model_g->width_;
+	hOrg = pal_model_g->height_;
 
 	for(int y=0;y<h;y++)
 		for(int x=0;x<w;x++)
@@ -1260,17 +1259,43 @@ UndistortPAL::UndistortPAL()
 			remapY[x+y*w] = y;
 		}
 
+	// unity
 	if(USE_PAL == 1){
-		K = dso::Mat33::Identity();	
+		w = wOrg; h = hOrg;
+		remapX = new float[w*h];
+		remapY = new float[w*h];
 		distortCoordinates_unify_mode(remapX, remapY, remapX, remapY, h*w);
 	}
+	// pin
 	else if(USE_PAL == 2){
-		K.setIdentity();
+		w = wOrg; h = hOrg;
+		remapX = new float[w*h];
+		remapY = new float[w*h];
 		K(0, 0) = pal_model_g->pin_fx * pal_model_g->width_;
 		K(1, 1) = pal_model_g->pin_fy * pal_model_g->height_;
 		K(0, 2) = pal_model_g->pin_cx * pal_model_g->width_ - 0.5;
 		K(1, 2) = pal_model_g->pin_cy * pal_model_g->height_ - 0.5;
 		distortCoordinates_pin_mode(remapX, remapY, remapX, remapY, h*w);
+	}
+	// multi-pin
+	else if(USE_PAL == 3){
+		auto &cam = pal_model_g;
+		w = cam->mp_width * cam->mp_num; 
+		h = (int)(cam->mp_width / (360.0 / cam->mp_num) * (cam->mp_fov[1]-cam->mp_fov[0]));
+		remapX = new float[w*h];
+		remapY = new float[w*h];
+		// PAL虚拟的K
+		float h_fov = (90 - cam->mp_fov[0])*2;
+		float w_fov = 360 / cam->mp_num;
+		int ww = w/cam->mp_num;
+		int hh = h;
+		float ocx = ww/2;
+		float ocy = w/360.0*h_fov / 2;
+		float ofx = ww/2/tan(d2r(w_fov/2));
+		float ofy = hh/2/tan(d2r(h_fov/2));
+		K << ofx, 0, ocx, 0, ofy, ocy, 0, 0, 1; 
+		distortCoordinates_multipin_mode(remapX, remapY, remapX, remapY, h*w);
+
 	}
 	else{
 		// invalid pal mode
@@ -1328,6 +1353,31 @@ void UndistortPAL::distortCoordinates_pin_mode(float* in_x, float* in_y, float* 
 
 		out_x[i] = pt_ori[0] ;
 		out_y[i] = pt_ori[1] ;
+	}
+	printf(" ! USE_PAL = %d, FOV = %.2f deg\n", USE_PAL, 2*atan2(0.5, pal_model_g->pin_fx) / 3.14 * 180);
+}
+
+void UndistortPAL::distortCoordinates_multipin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
+{
+	using namespace Eigen;
+	Matrix3f Kinv = K.inverse().cast<float>();
+	Matrix3f T[4];
+	T[0] = trans(-2, -3, 1);
+	T[1] = trans(-1, -3, -2);
+	T[2] = trans(2, -3, -1);
+	T[3] = trans(1, -3, 2);
+
+	for(int i=0; i<n; i++){
+		int idx = (int)(in_x[i] / w);
+		float xi = fmod(in_x[i], w);
+		float yi = in_y[i];
+		Vector3f P0(xi, yi, 1);
+		P0 = Kinv * P0;  
+		Vector3f P = T[idx] * P0;
+		Vector2f p = pal_model_g->world2cam(P);
+
+		out_x[i] = p[0];
+		out_y[i] = p[1];
 	}
 	printf(" ! USE_PAL = %d, FOV = %.2f deg\n", USE_PAL, 2*atan2(0.5, pal_model_g->pin_fx) / 3.14 * 180);
 }
