@@ -127,6 +127,7 @@ bool pal_init(string calibFile){
 	pal_valid_sensing_mask_g = cv::Mat::zeros(pal->height_, pal->width_, CV_8UC1);
 	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->xc_, pal->yc_), pal->sensing_radius[1], 255, -1);
 	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->xc_, pal->yc_), pal->sensing_radius[0], 0, -1);
+    // imshow("sensing area", pal_valid_sensing_mask_g); waitKey();
 
     // pal weight
     pal_weight = Mat::ones(pal->height_, pal->width_, CV_32FC1);
@@ -153,16 +154,4 @@ bool pal_init(string calibFile){
     }
 
     return true;
-}     
-
-bool pal_undistort_mask(dso::Undistort *u){
-    using namespace dso;
-    for(int i=0; i<pal_max_level; i++){
-        MinimalImageB img(pal_mask_g[i].cols, pal_mask_g[i].rows);
-        memcpy(img.data, pal_mask_g[i].data, img.w * img.h);
-        u->undistort<unsigned char>(&img, 1.0f, 0.0);
-        pal_mask_g[i] = IOWrap::getOCVImg_tem(img.data, img.w, img.h);
-        imshow("mask" + to_string(i), pal_mask_g[i]);
-    }
-    waitKey();
 }

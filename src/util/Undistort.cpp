@@ -1252,25 +1252,16 @@ UndistortPAL::UndistortPAL()
 	wOrg = pal_model_g->width_;
 	hOrg = pal_model_g->height_;
 
-	for(int y=0;y<h;y++)
-		for(int x=0;x<w;x++)
-		{
-			remapX[x+y*w] = x;
-			remapY[x+y*w] = y;
-		}
-
 	// unity
 	if(USE_PAL == 1){
 		w = wOrg; h = hOrg;
-		remapX = new float[w*h];
-		remapY = new float[w*h];
+		init_remapXY(w, h);
 		distortCoordinates_unify_mode(remapX, remapY, remapX, remapY, h*w);
 	}
 	// pin
 	else if(USE_PAL == 2){
 		w = wOrg; h = hOrg;
-		remapX = new float[w*h];
-		remapY = new float[w*h];
+		init_remapXY(w, h);
 		K(0, 0) = pal_model_g->pin_fx * pal_model_g->width_;
 		K(1, 1) = pal_model_g->pin_fy * pal_model_g->height_;
 		K(0, 2) = pal_model_g->pin_cx * pal_model_g->width_ - 0.5;
@@ -1282,8 +1273,7 @@ UndistortPAL::UndistortPAL()
 		auto &cam = pal_model_g;
 		w = cam->mp_width * cam->mp_num; 
 		h = (int)(cam->mp_width / (360.0 / cam->mp_num) * (cam->mp_fov[1]-cam->mp_fov[0]));
-		remapX = new float[w*h];
-		remapY = new float[w*h];
+		init_remapXY(w, h);
 		// PAL虚拟的K
 		float h_fov = (90 - cam->mp_fov[0])*2;
 		float w_fov = 360 / cam->mp_num;
@@ -1322,6 +1312,7 @@ void UndistortPAL::distortCoordinates_unify_mode(float* in_x, float* in_y, float
 			out_y[i] = -1;
 		}
 	}
+	printf(" ! USE_PAL = %d\n", USE_PAL);
 }
 
 void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
@@ -1379,7 +1370,6 @@ void UndistortPAL::distortCoordinates_multipin_mode(float* in_x, float* in_y, fl
 		out_x[i] = p[0];
 		out_y[i] = p[1];
 	}
-	printf(" ! USE_PAL = %d, FOV = %.2f deg\n", USE_PAL, 2*atan2(0.5, pal_model_g->pin_fx) / 3.14 * 180);
 }
 
 }

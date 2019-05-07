@@ -179,6 +179,17 @@ private:
 		return trans;
 	}
 
+	inline void init_remapXY(int w, int h){
+		remapX = new float[w*h];
+		remapY = new float[w*h];
+		for(int y=0;y<h;y++)
+			for(int x=0;x<w;x++)
+			{
+				remapX[x+y*w] = x;
+				remapY[x+y*w] = y;
+			}
+	}
+
 };
 
 }
