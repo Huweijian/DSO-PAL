@@ -119,8 +119,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 			if(USE_PAL == 1 || USE_PAL == 2){// mask以外的不选择点
 				if(!pal_check_in_range_g(32*x+16, 32*y+16, 1, 0))
-					ths[x+y*w32] = 10000;
-			}			
+					ths[x+y*w32] *= 3;
+			}		
 
 		}
 

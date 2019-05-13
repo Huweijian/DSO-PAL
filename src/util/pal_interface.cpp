@@ -68,7 +68,7 @@ bool pal_init(string calibFile){
         return false;
     }
     auto pt_z0 = pal->world2cam(Vector3f(100, 0, 0));
-    float maxR_z0 = (pt_z0-Vector2f(pal->xc_, pal->yc_)).norm(); 
+    float maxR_z0 = (pt_z0-Vector2f(pal->cx, pal->cy)).norm(); 
     if(maxR_z0 < pal->mask_radius[1]){
         printf(" ! [WARNING] pal mask outer radius is %.2d larger than maximum(%.2f)! force set to maximum\n", pal->mask_radius[1], maxR_z0);
         pal->mask_radius[1] = maxR_z0;
@@ -78,7 +78,7 @@ bool pal_init(string calibFile){
     int hh = pal->height_, ww = pal->width_;
     if(USE_PAL == 1){
         float r1 = pal->mask_radius[1], r0 = pal->mask_radius[0];
-        float cx = pal->xc_, cy = pal->yc_;
+        float cx = pal->cx, cy = pal->cy;
 
         for(int i=0; i<pal_max_level; i++){
             pal_mask_g[i] = cv::Mat::zeros(hh, ww, CV_8UC1);
@@ -93,8 +93,8 @@ bool pal_init(string calibFile){
         float ofx = pal_model_g->width_ * pal_model_g->pin_fx; 
         float ofy = pal_model_g->height_ * pal_model_g->pin_fy;
 
-        float xi = pal_model_g->xc_ + pal_model_g->mask_radius[0];
-        float yi = pal_model_g->yc_;
+        float xi = pal_model_g->cx + pal_model_g->mask_radius[0];
+        float yi = pal_model_g->cy;
         float x_cam = (xi - ocx) / ofx;
         float y_cam = (yi - ocy) / ofy;
         auto pt_ori = pal_model_g->world2cam(Eigen::Vector3f(x_cam, y_cam, 1));
@@ -125,8 +125,8 @@ bool pal_init(string calibFile){
 
     // valid sensing mask
 	pal_valid_sensing_mask_g = cv::Mat::zeros(pal->height_, pal->width_, CV_8UC1);
-	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->xc_, pal->yc_), pal->sensing_radius[1], 255, -1);
-	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->xc_, pal->yc_), pal->sensing_radius[0], 0, -1);
+	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->cx, pal->cy), pal->sensing_radius[1], 255, -1);
+	cv::circle(pal_valid_sensing_mask_g, cv::Point(pal->cx, pal->cy), pal->sensing_radius[0], 0, -1);
     // imshow("sensing area", pal_valid_sensing_mask_g); waitKey();
 
     // pal weight
@@ -137,7 +137,7 @@ bool pal_init(string calibFile){
         for(int v = 0; v<pal->height_; v++){
             float w = 0;
             if(pal_check_valid_sensing(u, v)){
-                float r = (Vector2f(u, v) - Vector2f(pal->xc_, pal->yc_)).norm();
+                float r = (Vector2f(u, v) - Vector2f(pal->cx, pal->cy)).norm();
                 float r0 = pal->sensing_radius[0]-5, r1 = pal->sensing_radius[1]+5;
                 float maxw = (r1-r0)*(r1-r0); 
                 w = -(setting_pal_max_weight - setting_pal_min_weight) * ((r-r0)*(r-r0)/maxw) + setting_pal_max_weight;

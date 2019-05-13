@@ -12,7 +12,7 @@ PALCamera::PALCamera(std::string filename)
 {
     double pol[MAX_POL_LENGTH];
     double invpol[MAX_POL_LENGTH];
-    double xc, yc, c, d, e;
+    double xc_tem, yc_tem, c, d, e;
     int width, height, length_pol, length_invpol;
  
     FILE *f;
@@ -52,7 +52,7 @@ PALCamera::PALCamera(std::string filename)
     wr = fscanf(f, "\n");
     wrc= fgets(buf, CMV_MAX_BUF, f);
     wr = fscanf(f, "\n");
-    wr = fscanf(f, "%lf %lf\n", &xc, &yc);
+    wr = fscanf(f, "%lf %lf\n", &xc_tem, &yc_tem);
 
     //Read affine coefficients
     wrc= fgets(buf, CMV_MAX_BUF, f);
@@ -98,13 +98,16 @@ PALCamera::PALCamera(std::string filename)
     this->width_ = width;
     this->length_pol_ = length_pol;
     this->length_invpol_ = length_invpol;
-    this->xc_ = xc;
-    this->yc_ = yc;
+    this->xc_ = xc_tem;
+    this->yc_ = yc_tem;
+    this->cx = yc_tem;//PAL模型的xy定义和我们常用的方向是相反的
+    this->cy = xc_tem;
     this->c_ = c;
     this->d_ = d;
     this->e_ = e;
 
     std::string bufs(buf);
+    // undistort_mode = 0: not undistort
     if(bufs == "unity"){
         undistort_mode = 1;
     }
@@ -128,6 +131,7 @@ Vector3f PALCamera::cam2world(double x, double y, int lvl) const
     int multi = (int)1 << lvl;
     x = (x+0.5) * multi - 0.5; // 亚像素精度
     y = (y+0.5) * multi - 0.5;  
+    swap(y, x);
 
     Vector3f xyz_f;
     double invdet = 1 / (c_ - d_ * e_); // 1/det(A), where A = [c,d;e,1] as in the Matlab file
@@ -158,6 +162,7 @@ Vector3f PALCamera::cam2world(double x, double y, int lvl) const
 
     // 修改pal坐标系和针孔相机模型一致
     xyz_f[2] = -xyz_f[2];
+    swap(xyz_f[0], xyz_f[1]);
     return xyz_f;
 }
 
@@ -170,6 +175,7 @@ Vector2f PALCamera::world2cam(const Vector3f &xyz_c, int lvl)
 {
     Vector3f p_world = xyz_c;
     // 修改pal坐标系和针孔相机模型一致
+    swap(p_world(0), p_world(1));
     p_world(2) = -p_world(2);
 
     Vector2f px;
@@ -207,7 +213,7 @@ Vector2f PALCamera::world2cam(const Vector3f &xyz_c, int lvl)
     
     float multi = int(1)<<lvl;
     px = (px.array() + 0.5f) / multi - 0.5;
-
+    swap(px(0), px(1));
     return px;
 }
 

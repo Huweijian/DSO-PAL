@@ -19,15 +19,17 @@ class PALCamera
 #define CMV_MAX_BUF 1024
 #define MAX_POL_LENGTH 64
 
+private:
+  double xc_;                     // row coordinate of the center
+  double yc_;                     // column coordinate of the center
 public:
+  double cx, cy;
   double height_;
   double width_;
   double pol_[MAX_POL_LENGTH];    // the polynomial coefficients: pol[0] + x"pol[1] + x^2*pol[2] + ... + x^(N-1)*pol[N-1]
   int length_pol_;                // length of polynomial
   double invpol_[MAX_POL_LENGTH]; // the coefficients of the inverse polynomial
   int length_invpol_;             // length of inverse polynomial
-  double xc_;                     // row coordinate of the center
-  double yc_;                     // column coordinate of the center
   double c_;                      // affine parameter
   double d_;                      // affine parameter
   double e_;                      // affine parameter

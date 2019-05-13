@@ -41,8 +41,8 @@ class B:public A{
 int main(void){
     pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
 
-    int u = pal_model_g->xc_;
-    int v = pal_model_g->yc_ + 135;
+    int u = pal_model_g->cx;
+    int v = pal_model_g->cy + 135;
 
     Vector3f pt = pal_model_g->cam2world(u, v);
     cout << atan2(pt[1], pt[2])/3.14*180;    

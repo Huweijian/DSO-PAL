@@ -559,9 +559,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float maxstep ;
 // #ifdef PAL
 			if(USE_PAL == 1){ // 0 1
-				if(ENH_PAL){ // 初始化部分,直接法GN优化部分增加pal视场的权重
-					hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
-				}
+				// if(ENH_PAL){ // 初始化部分,直接法GN优化部分增加pal视场的权重
+				// 	hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
+				// }
 
 				dxdd = (t[0]-t[2]*u); // \rho_2 / \rho1 * (tx - u'_2 * tz)
 				dydd = (t[1]-t[2]*v); // \rho_2 / \rho1 * (ty - v'_2 * tz)
@@ -577,11 +577,10 @@ Vec3f CoarseInitializer::calcResAndGS(
 				dp4[idx] = dr2dSE[4];
 				dp5[idx] = dr2dSE[5];
 				Vec3f dxyzdd = Vec3f(dxdd, dydd, 0);
-
-				auto dd_scalar = dr2duv2.transpose() * duv2dxyz * dxyzdd; 
+				Vec2f duvdd =  duv2dxyz * dxyzdd;
+				auto dd_scalar = dr2duv2.transpose() * duvdd; 
 				dd[idx] = dd_scalar[0];
-				// FIXME: possible bug
-				maxstep = 1.0f/ dxyzdd.norm();
+				maxstep = 1.0f/ duvdd.norm();
 			}
 			else{
 // #else
@@ -599,7 +598,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 				maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			}
 // #endif
-
 			dp6[idx] = - hw*r2new_aff[0] * rlR;					// dE/d(e^(aj))
 			dp7[idx] = - hw*1;									// dE/d(bj)	
 			r[idx] = hw*residual;								// res
@@ -1178,9 +1176,11 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 		float step = - b * JbBuffer[i][9] / (1+lambda);
 
 
+		// maxstep保证小于1e10
 		float maxstep = maxPixelStep*pts[i].maxstep;
 		if(maxstep > idMaxStep) maxstep=idMaxStep;
 
+		// step不能超过maxstep的值
 		if(step >  maxstep) step = maxstep;
 		if(step < -maxstep) step = -maxstep;
 
