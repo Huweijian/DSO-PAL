@@ -13,7 +13,7 @@ PALCamera::PALCamera(std::string filename)
     double pol[MAX_POL_LENGTH];
     double invpol[MAX_POL_LENGTH];
     double xc_tem, yc_tem, c, d, e;
-    int width, height, length_pol, length_invpol;
+    int length_pol, length_invpol;
  
     FILE *f;
     char buf[CMV_MAX_BUF];
@@ -62,7 +62,7 @@ PALCamera::PALCamera(std::string filename)
     //Read image size
     wrc= fgets(buf, CMV_MAX_BUF, f);
     wr = fscanf(f, "\n");
-    wr = fscanf(f, "%d %d\n", &height, &width);
+    wr = fscanf(f, "%lf %lf %lf\n", &this->in_height, &this->in_width, &this->height_);
 
     // mask size
     wrc= fgets(buf, CMV_MAX_BUF,f);
@@ -94,17 +94,21 @@ PALCamera::PALCamera(std::string filename)
         this->invpol_[i] = invpol[i];
     }
 
-    this->height_ = height;
-    this->width_ = width;
+    this->resize = this->height_ / this->in_height;
+    this->width_ = this->in_width * this->resize;
     this->length_pol_ = length_pol;
     this->length_invpol_ = length_invpol;
     this->xc_ = xc_tem;
     this->yc_ = yc_tem;
-    this->cx = yc_tem;//PAL模型的xy定义和我们常用的方向是相反的
-    this->cy = xc_tem;
+    this->cx = yc_tem*resize;//PAL模型的xy定义和我们常用的方向是相反的
+    this->cy = xc_tem*resize;
     this->c_ = c;
     this->d_ = d;
     this->e_ = e;
+    mask_radius[0]*=resize;
+    mask_radius[1]*=resize;
+    sensing_radius[0] *= resize;
+    sensing_radius[1] *= resize;
 
     std::string bufs(buf);
     // undistort_mode = 0: not undistort
@@ -131,6 +135,8 @@ Vector3f PALCamera::cam2world(double x, double y, int lvl) const
     int multi = (int)1 << lvl;
     x = (x+0.5) * multi - 0.5; // 亚像素精度
     y = (y+0.5) * multi - 0.5;  
+    x /= resize;
+    y /= resize;
     swap(y, x);
 
     Vector3f xyz_f;
@@ -211,9 +217,11 @@ Vector2f PALCamera::world2cam(const Vector3f &xyz_c, int lvl)
         px[1] = yc_;
     }
     
+    swap(px(0), px(1));
+    px(0) *= resize;
+    px(1) *= resize;
     float multi = int(1)<<lvl;
     px = (px.array() + 0.5f) / multi - 0.5;
-    swap(px(0), px(1));
     return px;
 }
 
@@ -353,8 +361,9 @@ void PALCamera::jacobian_xyz2uv(
     A << c_, d_, e_, 1;
 
     Eigen::Matrix<float, 2, 3> dutvt_dxyz;
-    dutvt_dxyz << dut_dx, dut_dy, dut_dz,
-        dvt_dx, dvt_dy, dvt_dz;
+    // 这里乘以了缩放系数(du 乘以resize 而不是 resize,因为这里uv是反的)
+    dutvt_dxyz << dut_dx*resize, dut_dy*resize, dut_dz*resize,
+        dvt_dx*resize, dvt_dy*resize, dvt_dz*resize;
     puv_pxyz = dutvt_dxyz;
 
     Eigen::Matrix<float, 3, 6> dxyz_dT;

@@ -74,13 +74,13 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            // // real pal dataset
-            // "args": [   "files=/home/hwj23/Dataset/PAL/real/s6/images", 
-            //             "calib=/home/hwj23/Dataset/PAL/calib_results_real.txt", 
-            //             "gamma=/home/hwj23/Dataset/PAL/pcalib.txt", 
-            //             "preset=0", 
-            //             "mode=1" 
-            //         ],
+            // real pal dataset
+            "args": [   "files=/home/hwj23/Dataset/PAL/real/s25/images", 
+                        "calib=/home/hwj23/Dataset/PAL/calib_results_real.txt", 
+                        "gamma=/home/hwj23/Dataset/PAL/pcalib.txt", 
+                        "preset=0", 
+                        "mode=1" 
+                    ],
 
             // simu
             // "args": [   "files=/home/hwj23/Dataset/PAL/simu/s2/color/", 
@@ -90,14 +90,14 @@
             //         ],
 
 
-            // tum fisheye
-            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images_720", 
-                        "calib=/home/hwj23/Dataset/TUM/720sml_calib_results_tum_fisheye.txt", 
-                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/720sml_vignette.png", 
-                        "preset=0", 
-                        "mode=0" 
-            ],
+            // // tum fisheye
+            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images_half", 
+            //             "calib=/home/hwj23/Dataset/TUM/sml_calib_results_tum_fisheye.txt", 
+            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/sml_vignette.png", 
+            //             "preset=0", 
+            //             "mode=0" 
+            // ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

@@ -143,7 +143,7 @@ bool pal_init(string calibFile){
                 w = -(setting_pal_max_weight - setting_pal_min_weight) * ((r-r0)*(r-r0)/maxw) + setting_pal_max_weight;
                 // printf(" - (%d, %d) w=%.2f \n", u, v, w);
             }
-            pal_weight.at<float>(u, v) = w;
+            pal_weight.at<float>(v, u) = w;
         }
     }
     // imshow("weight", pal_weight);

@@ -48,6 +48,7 @@
 #include "IOWrapper/Pangolin/PangolinDSOViewer.h"
 #include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
+#include "aruco/aruco.h"
 #include "util/pal_interface.h"
 
 std::string vignette = "";
@@ -488,6 +489,51 @@ int main( int argc, char** argv )
             if(!skipFrame) 
 				fullSystem->addActiveFrame(img, i);
 
+			// ---------------- hwj marker detector ---------------------
+			{
+				using namespace cv;
+				using namespace std;
+				static aruco::MarkerDetector *MDetector = nullptr;
+				static Undistort *ump = nullptr;
+				if(!ump){
+					ump = new UndistortPAL(3);
+					ump->loadPhotometricCalibration("", "", "");
+					MDetector = new aruco::MarkerDetector();
+				}
+
+				MinimalImageB* mpimg = reader->getImageRaw(i);
+				// 校正畸变
+				ImageAndExposure* mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
+				Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
+				flip(mpcv, mpcv, 1);
+				imshow("mp", mpcv);
+				waitKey(0);
+
+
+				// 检测marker
+				int mpw=mpcv.cols / 4;
+				for(int im=0; im<4; im++){
+					Mat smlImg = mpcv.colRange(im*mpw, (im+1)*mpw-1);
+					std::vector<aruco::Marker> Markers;
+					MDetector->detect(smlImg, Markers, cv::Mat(), cv::Mat(), -1, false);
+					if(Markers.size() == 1){
+						for(auto &pt:Markers[0]){
+							circle(smlImg, Point(pt.x, pt.y), 3, 255);
+						}
+						imshow("marker", smlImg);
+						printf("marker id = %d\n", Markers[0].id);
+						waitKey();
+						break;
+					}
+					else{
+
+					}
+				}
+
+				delete mp;
+				delete mpimg;
+			}
+			// --------------------------------------------------
 
             delete img;
 

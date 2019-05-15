@@ -163,7 +163,7 @@ class UndistortPAL : public Undistort
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    UndistortPAL();
+    UndistortPAL(int specificModel = -1);
 	~UndistortPAL(){};
 	void distortCoordinates_unify_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
 	void distortCoordinates_pin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
