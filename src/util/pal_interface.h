@@ -44,3 +44,5 @@ inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Mat
     Ku = Kpt[0];
     Kv = Kpt[1];
 }
+
+int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector3f &t, Eigen::Matrix3f &R);

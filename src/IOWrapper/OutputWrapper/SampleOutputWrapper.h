@@ -46,7 +46,8 @@ namespace IOWrap
 class SampleOutputWrapper : public Output3DWrapper
 {
 public:
-        inline SampleOutputWrapper()
+    std::ofstream camPoseOut;
+        inline SampleOutputWrapper():camPoseOut("logs/hwjcamPoseDso.log")
         {
             printf("OUT: Created SampleOutputWrapper\n");
         }
@@ -100,11 +101,14 @@ public:
 
         virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override
         {
+            using namespace std;
             printf("OUT: Current Frame %d (time %f, internal ID %d). CameraToWorld:\n",
                    frame->incoming_id,
                    frame->timestamp,
                    frame->id);
             std::cout << frame->camToWorld.matrix3x4() << "\n";
+            camPoseOut << frame->incoming_id << " " << frame->marker_id << endl;
+            camPoseOut << frame->camToWorld.matrix3x4() << "\n";
         }
 
 

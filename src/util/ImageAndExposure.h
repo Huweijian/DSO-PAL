@@ -39,6 +39,7 @@ public:
 	int w,h;				// width and height;
 	double timestamp;
 	float exposure_time;	// exposure time in ms.
+	int marker_id = -1;
 	inline ImageAndExposure(int w_, int h_, double timestamp_=0) : w(w_), h(h_), timestamp(timestamp_)
 	{
 		image = new float[w*h];

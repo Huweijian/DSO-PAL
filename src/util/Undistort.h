@@ -87,10 +87,10 @@ public:
 
 	PhotometricUndistorter* photometricUndist;
 
+	Mat33 K;
 protected:
     int w, h, wOrg, hOrg, wUp, hUp;
     int upsampleUndistFactor;
-	Mat33 K;
 	VecX parsOrg;
 	bool valid;
 	bool passthrough = false;

@@ -17,3 +17,4 @@ manuscript/*
 !manuscript/*.cls
 !manuscript/*.clo
 !manuscript/*.sty
+*.log

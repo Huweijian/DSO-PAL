@@ -941,6 +941,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
     shell->incoming_id = id;
+	shell->marker_id = image->marker_id;
 	fh->shell = shell;
 	allFrameHistory.push_back(shell);
 
@@ -1734,6 +1735,18 @@ void FullSystem::printEvalLine()
 	return;
 }
 
+bool FullSystem::loadTrajectory(std::string trajectoryFile)
+{
+	using namespace std;
+	ifstream fin(trajectoryFile);
+	while(!fin.eof()){
+		Vec4f p;
+		fin >> p(0) >> p(1) >> p(2) >> p(3);
+		traj.push_back(p);	
+	}
+
+	return false;
+}
 
 
 

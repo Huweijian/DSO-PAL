@@ -54,6 +54,9 @@ public:
 	int marginalizedAt;
 	double movedByOpt;
 
+	// marker detection
+	int marker_id = -1;
+
 
 	inline FrameShell()
 	{

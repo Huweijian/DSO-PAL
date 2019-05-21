@@ -1,5 +1,8 @@
 #include "pal_interface.h"
 #include "IOWrapper/ImageDisplay.h"
+#include "aruco/aruco.h"
+#include "opencv2/core/eigen.hpp"
+
 using namespace pal;
 using namespace std;
 using namespace cv;
@@ -7,6 +10,7 @@ cv::Mat pal_mask_g[pal_max_level];
 cv::Mat pal_valid_sensing_mask_g;
 cv::Mat pal_weight;
 PALCamera* pal_model_g = nullptr;
+static aruco::MarkerDetector mdetector;
 
 int USE_PAL = 0;
 bool ENH_PAL = false;
@@ -154,4 +158,65 @@ bool pal_init(string calibFile){
     }
 
     return true;
+}
+
+// return marker id(-1 means no marker is detected);
+// warning this is R vector
+int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector3f &t, Eigen::Matrix3f &R){
+    using namespace aruco;
+    const float MARKER_SIZE = 0.139; // m
+
+    int mkid = -1;
+    Mat Kcv(3, 3, CV_32FC1);
+    eigen2cv(K, Kcv);
+
+	vector<Marker> Markers;
+    mdetector.detect(img, Markers, Kcv, Mat(), 0.139, false); // 13.9 cm
+
+	if(Markers.size() == 1){
+        auto &mk = Markers[0];
+        mkid = mk.id;
+
+		for(auto &pt:mk)
+			circle(img, Point(pt.x, pt.y), 3, 255);
+
+        // 自己求解H R t
+        // std::vector<cv::Point2f> ptsP;	// marker的墙壁坐标系
+        // std::vector<cv::Point2f> ptsI; // marker的矫正后归一化图像坐标系
+		// ptsI.push_back(cv::Point2f(mk[0].x, mk[0].y));
+		// ptsI.push_back(cv::Point2f(mk[1].x, mk[1].y));
+		// ptsI.push_back(cv::Point2f(mk[2].x, mk[2].y));
+		// ptsI.push_back(cv::Point2f(mk[3].x, mk[3].y));
+		// ptsP.push_back(cv::Point2f(-MARKER_SIZE/2,MARKER_SIZE/2));
+		// ptsP.push_back(cv::Point2f(MARKER_SIZE/2, MARKER_SIZE/2));
+		// ptsP.push_back(cv::Point2f(MARKER_SIZE/2, -MARKER_SIZE/2));
+		// ptsP.push_back(cv::Point2f(-MARKER_SIZE/2, -MARKER_SIZE/2));
+        // cv::Mat Hcv = cv::findHomography(ptsP, ptsI);
+        // vector<Mat> Rcv; 
+        // vector<Mat> tcv; 
+        // vector<Mat> norm;
+        // int resolution = cv::decomposeHomographyMat(Hcv, Kcv, Rcv, tcv, norm);
+
+        cv::Mat Rcv;
+        Rodrigues(mk.Rvec, Rcv);
+        cv2eigen(Rcv, R);
+        cv2eigen(mk.Tvec, t);
+
+        // 这里的R和t是marker相对于cam的,需要求反
+        Matrix4f T; 
+        T << R, t, 0, 0, 0, 1;
+        // T = T.inverse(); // TODO:这里inverse和在matlab里inverse结果不一样
+        R = T.block(0, 0, 3, 3);
+        t = T.block(0, 3, 3, 1);
+
+        // cout << T << endl;
+        // cout << R << endl;
+        // cout << t << endl;
+        // imshow("aha", img);
+        // waitKey();
+
+	}
+
+
+    return mkid;
 }

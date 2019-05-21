@@ -162,6 +162,10 @@ public:
 	void setGammaFunction(float* BInv);
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
+	// hwj navigation: trajectory
+	std::vector<Vec4f> traj;
+	bool loadTrajectory(std::string trajectoryFile);
+
 private:
 
 	CalibHessian Hcalib;
@@ -315,6 +319,9 @@ private:
 	bool needToKetchupMapping;
 
 	int lastRefStopID;
+
+
+
 };
 }
 

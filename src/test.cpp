@@ -5,6 +5,7 @@
 #include <util/pal_interface.h>
 #include <OptimizationBackend/MatrixAccumulators.h>
 #include <vector>
+#include <opencv2/core/eigen.hpp>
 
 #define T transpose()
 using namespace cv;
@@ -37,13 +38,27 @@ class B:public A{
 
 int main(void){
     pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
-    auto imgOri = imread("/home/hwj23/Dataset/TUM/sequence_19/images_sample/00000.jpg", CV_LOAD_IMAGE_UNCHANGED);
-    auto img720 = imread("/home/hwj23/Dataset/TUM/sequence_19/images_720/00000.jpg", CV_LOAD_IMAGE_UNCHANGED);
-    cout<< imgOri.type() << endl;
-    cout<< img720.type() << endl;
-    imshow("ori", imgOri);
-    imshow("720", img720);
-    waitKey();
+
+    Matrix4f m; 
+    m << 
+    0.0972,    0.8549,   -0.5095,    0.2746,
+    0.9922,   -0.0430,    0.1172,    0.0331,
+    0.0783,   -0.5169,   -0.8524,    0.7169,
+         0,         0,         0,    1.0000;
+    Matrix4f minv = m.inverse();
+    cout << minv << endl;
+    return 0;
+
+    // test cv::rodrigues
+    Vector3f Rv(0, 3.14159/2, 0);
+    Mat Rvcv, Rcv(3, 3, CV_32FC1);
+    cv::eigen2cv(Rv, Rvcv);
+    Rodrigues(Rvcv, Rcv);
+    Matrix3f R;
+    cv2eigen(Rcv, R);
+    cout<< R << endl;
+    
+
     return 0;
 
     // verify pal center

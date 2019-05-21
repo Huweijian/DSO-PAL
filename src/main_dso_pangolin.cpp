@@ -55,6 +55,7 @@ std::string vignette = "";
 std::string gammaCalib = "";
 std::string source = "";
 std::string calib = "";
+std::string trajFile = "";
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -299,6 +300,13 @@ void parseArgument(char* arg)
 		return;
 	}
 
+	if(1==sscanf(arg,"trajectory=%s",buf))
+	{
+		trajFile = buf;
+		printf("loading trajectory from %s!\n", trajFile.c_str());
+		return;
+	}
+
 	if(1==sscanf(arg,"speed=%f",&foption))
 	{
 		playbackSpeed = foption;
@@ -389,16 +397,13 @@ int main( int argc, char** argv )
 		linc = -1;
 	}
 
-
-
 	FullSystem* fullSystem = new FullSystem();
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed==0);
 
-
-
-
-
+	if(!trajFile.empty()){
+		fullSystem->loadTrajectory(trajFile);
+	}
 
 
     IOWrap::PangolinDSOViewer* viewer = 0;
@@ -484,57 +489,65 @@ int main( int argc, char** argv )
                 }
             }
 
+			// ---------------- hwj marker detector ---------------------
+			{
+				using namespace std;
+				using namespace cv;
+
+				Mat33f Kmk;
+				static std::ofstream camPoseMarker("logs/hwjcamPoseMarker.log");
+				if(USE_PAL == 1){
+					static Undistort *ump = nullptr;
+					if(!ump){
+						ump = new UndistortPAL(3);
+						ump->loadPhotometricCalibration("", "", "");
+					}
+
+					MinimalImageB* mpimg = reader->getImageRaw(i);
+
+					// 校正畸变
+					ImageAndExposure* mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
+					Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
+					flip(mpcv, mpcv, 1);
+					imshow("mp", mpcv);
+					waitKey(0);
+
+					cv::Mat Kmp = cv::Mat::eye(3, 3, CV_32FC1);
+					Kmp.at<float>(0, 0) = ump->K(0, 0);
+					Kmp.at<float>(1, 0) = ump->K(1, 0);
+					Kmp.at<float>(0, 2) = ump->K(0, 2);
+					Kmp.at<float>(1, 2) = ump->K(1, 2);
+
+					// 检测marker
+					int mpw=mpcv.cols / 4;
+					for(int im=0; im<4; im++){
+						Mat smlImg = mpcv.colRange(im*mpw, (im+1)*mpw-1);
+
+					}
+
+					delete mp;
+					delete mpimg;
+				}
+				else if (USE_PAL == 0){
+					Mat imgcv = IOWrap::getOCVImg_tem(img->image, img->w, img->h);
+					Kmk = reader->undistort->K.cast<float>();
+
+					Eigen::Vector3f t;
+					Eigen::Matrix3f R;
+					int mkid = getPoseFromMarker(imgcv, Kmk, t, R);
+					camPoseMarker << ii << " " << mkid <<  std::endl;
+					if(mkid != -1){
+						img->marker_id = mkid;
+						camPoseMarker << R << endl << t.transpose() << endl;
+
+					}
+				}
+			}
+			// end of hwj marker detector--------------------------------------------------
 
 			// 图像传入
             if(!skipFrame) 
 				fullSystem->addActiveFrame(img, i);
-
-			// ---------------- hwj marker detector ---------------------
-			{
-				using namespace cv;
-				using namespace std;
-				static aruco::MarkerDetector *MDetector = nullptr;
-				static Undistort *ump = nullptr;
-				if(!ump){
-					ump = new UndistortPAL(3);
-					ump->loadPhotometricCalibration("", "", "");
-					MDetector = new aruco::MarkerDetector();
-				}
-
-				MinimalImageB* mpimg = reader->getImageRaw(i);
-				// 校正畸变
-				ImageAndExposure* mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
-				Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
-				flip(mpcv, mpcv, 1);
-				imshow("mp", mpcv);
-				waitKey(0);
-
-
-				// 检测marker
-				int mpw=mpcv.cols / 4;
-				for(int im=0; im<4; im++){
-					Mat smlImg = mpcv.colRange(im*mpw, (im+1)*mpw-1);
-					std::vector<aruco::Marker> Markers;
-					MDetector->detect(smlImg, Markers, cv::Mat(), cv::Mat(), -1, false);
-					if(Markers.size() == 1){
-						for(auto &pt:Markers[0]){
-							circle(smlImg, Point(pt.x, pt.y), 3, 255);
-						}
-						imshow("marker", smlImg);
-						printf("marker id = %d\n", Markers[0].id);
-						waitKey();
-						break;
-					}
-					else{
-
-					}
-				}
-
-				delete mp;
-				delete mpimg;
-			}
-			// --------------------------------------------------
-
             delete img;
 
             if(fullSystem->initFailed || setting_fullResetRequested)

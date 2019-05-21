@@ -51,5 +51,9 @@
         "typeinfo": "cpp",
         "utility": "cpp",
         "*.ipp": "cpp"
-    }
+    },
+    "cSpell.enabledLanguageIds": [
+        "latex",
+        "markdown",
+    ]
 }
