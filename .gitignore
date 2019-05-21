@@ -12,9 +12,4 @@ result.txt
 .vscode/ipch/*
 *.pcd
 manuscript/*
-!manuscript/*.tex
-!manuscript/*.md
-!manuscript/*.cls
-!manuscript/*.clo
-!manuscript/*.sty
 *.log
