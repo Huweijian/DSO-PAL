@@ -163,9 +163,10 @@ public:
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
 	// hwj navigation: trajectory
-	std::vector<Vec4f> traj;
+	std::vector<Vec3f> traj;
 	bool loadTrajectory(std::string trajectoryFile);
 
+	std::vector<FrameShell*> getAllFrames(){return allFrameHistory;};
 private:
 
 	CalibHessian Hcalib;

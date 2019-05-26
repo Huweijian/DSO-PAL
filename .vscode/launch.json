@@ -4,7 +4,7 @@
     // 欲了解更多信息，请访问: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
-    
+        
         {
             "name": "test",
             "type": "cppdbg",
@@ -31,12 +31,13 @@
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
             // D435
-            "args": [   "files=/home/hwj23/Dataset/D435/s8/images", 
+            "args": [   "files=/home/hwj23/Dataset/D435/s9/images", 
                         "calib=/home/hwj23/Dataset/D435/camera.txt", 
                         "gamma=/home/hwj23/Dataset/D435/pcalib.txt", 
                         "vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png", 
                         "preset=0", 
-                        "mode=0" 
+                        "mode=0",
+                        "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
                     ],
 
             // // TUM S19

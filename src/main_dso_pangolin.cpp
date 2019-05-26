@@ -489,13 +489,21 @@ int main( int argc, char** argv )
                 }
             }
 
+			// 图像传入
+            if(!skipFrame) 
+				fullSystem->addActiveFrame(img, i);
+
 			// ---------------- hwj marker detector ---------------------
 			{
 				using namespace std;
 				using namespace cv;
 
 				Mat33f Kmk;
-				static std::ofstream camPoseMarker("logs/hwjcamPoseMarker.log");
+				Eigen::Vector3f tmk;
+				Eigen::Matrix3f Rmk;
+
+				static ofstream camPoseMarker("logs/hwjcamPoseMarker.log");
+				int mkid = -1;
 				if(USE_PAL == 1){
 					static Undistort *ump = nullptr;
 					if(!ump){
@@ -509,8 +517,8 @@ int main( int argc, char** argv )
 					ImageAndExposure* mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
 					Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
 					flip(mpcv, mpcv, 1);
-					imshow("mp", mpcv);
-					waitKey(0);
+					// imshow("mp", mpcv);
+					// waitKey(0);
 
 					cv::Mat Kmp = cv::Mat::eye(3, 3, CV_32FC1);
 					Kmp.at<float>(0, 0) = ump->K(0, 0);
@@ -532,24 +540,38 @@ int main( int argc, char** argv )
 					Mat imgcv = IOWrap::getOCVImg_tem(img->image, img->w, img->h);
 					Kmk = reader->undistort->K.cast<float>();
 
-					Eigen::Vector3f t;
-					Eigen::Matrix3f R;
-					int mkid = getPoseFromMarker(imgcv, Kmk, t, R);
-					camPoseMarker << ii << " " << mkid <<  std::endl;
-					if(mkid != -1){
-						img->marker_id = mkid;
-						camPoseMarker << R << endl << t.transpose() << endl;
+					mkid = getPoseFromMarker(imgcv, Kmk, tmk, Rmk);
 
+					if(useSampleOutput){
+						camPoseMarker << ii << " " << mkid <<  std::endl;
+						if(mkid != -1){
+							img->marker_id = mkid;
+							camPoseMarker << Rmk << endl << tmk.transpose() << endl;
+						}
 					}
 				}
+
+				if(mkid == 304 && fullSystem->initialized){
+					auto curFrameShell = fullSystem->getAllFrames().back();
+					Eigen::Matrix3f Rdso = curFrameShell->camToWorld.rotationMatrix().cast<float>();
+					Eigen::Vector3f tdso = curFrameShell->camToWorld.translation().cast<float>();
+
+					// TODO: 进一步使用这个变量
+					Sophus::Sim3f dso2global;
+					bool calcRes = calcWorldCoord(Rdso, tdso, Rmk, tmk, dso2global);
+					//---------
+					if(calcRes == true){
+						cout << dso2global.scale() << " " << dso2global.translation().transpose() << endl;
+						return -1;
+					}
+					// ------------
+				}
+
 			}
 			// end of hwj marker detector--------------------------------------------------
 
-			// 图像传入
-            if(!skipFrame) 
-				fullSystem->addActiveFrame(img, i);
-            delete img;
 
+            delete img;
             if(fullSystem->initFailed || setting_fullResetRequested)
             {
                 if(ii < 250 || setting_fullResetRequested)

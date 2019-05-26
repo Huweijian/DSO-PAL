@@ -50,7 +50,9 @@
         "typeindex": "cpp",
         "typeinfo": "cpp",
         "utility": "cpp",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp"
     },
     "cSpell.enabledLanguageIds": [
         "latex",

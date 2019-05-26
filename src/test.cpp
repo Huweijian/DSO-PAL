@@ -12,6 +12,7 @@ using namespace cv;
 using namespace std;
 using namespace Eigen;
 using namespace dso;
+using namespace Sophus;
 
 class A{
     public:
@@ -39,27 +40,33 @@ class B:public A{
 int main(void){
     pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
 
-    Matrix4f m; 
-    m << 
-    0.0972,    0.8549,   -0.5095,    0.2746,
-    0.9922,   -0.0430,    0.1172,    0.0331,
-    0.0783,   -0.5169,   -0.8524,    0.7169,
-         0,         0,         0,    1.0000;
-    Matrix4f minv = m.inverse();
-    cout << minv << endl;
-    return 0;
 
-    // test cv::rodrigues
-    Vector3f Rv(0, 3.14159/2, 0);
-    Mat Rvcv, Rcv(3, 3, CV_32FC1);
-    cv::eigen2cv(Rv, Rvcv);
-    Rodrigues(Rvcv, Rcv);
-    Matrix3f R;
-    cv2eigen(Rcv, R);
-    cout<< R << endl;
+
+    // eigen test 
+
+    Vector4f vv(1, 2, 3 ,4);
+    cout << vv.tail<3>()<<endl;;
+
+    // calc dso coord to mk coord
+    // Matrix3f R_dso2mk = AngleAxisf(0, Vector3f::UnitY()).matrix();
+    // Vector3f t_dso2mk(1, 2, 3);
+    // Sim3f result;
+    // for(int i=0; i<10; i++){
+    //     Matrix3f Rdso, Rmk;
+    //     Vector3f tdso, tmk;
+
+    //     Rdso = AngleAxisf(0, Vector3f::UnitY()).matrix(); 
+    //     tdso << i*0.1, 1, 2;
+
+    //     Rmk = Rdso * R_dso2mk;
+    //     tmk = (0.5 * tdso + t_dso2mk) ;
+    //     cout << i << "  dso:";
+    //     cout << tdso.T << "   |  mk:" << tmk.T << endl;
+
+    //     int ret = calcWorldCoord(Rdso, tdso, Rmk, tmk, result);
+    // }
     
-
-    return 0;
+    // return 0;
 
     // verify pal center
     // auto img = imread("/home/hwj23/Dataset/PAL/real/s6/images/00000.png");

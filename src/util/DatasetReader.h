@@ -303,7 +303,7 @@ private:
 			// imshow("before undistort", img_before);
 			// moveWindow("before undistort", 1000, 100);
 
-			waitKey();
+			// waitKey();
 		}
 
 		delete minimg;

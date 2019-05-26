@@ -3,27 +3,13 @@
 #include <Eigen/Core>
 #include "pal_model.h"
 #include <string>
+#include <sophus/sim3.hpp>
 
 // #define PAL // 不再使用，改用USE_PAL 变量以减少编译次数
 extern int USE_PAL;
 extern bool ENH_PAL;
 const int pal_max_level = 6;
 extern pal::PALCamera* pal_model_g;
-
-
-// inline Eigen::Vector3f cam2world(float x, float y, ocam_model& myocam_model){
-//     double pWorld[3];
-//     double pCam[2] = {x, y};
-//     cam2world(pWorld, pCam, &myocam_model);
-//     return Eigen::Vector3f(pWorld[0], pWorld[1], pWorld[2]);
-// };
-
-// inline Eigen::Vector2f world2cam(float x, float y, float z, ocam_model& my_model){
-//     double pCam[2];
-//     double pWorld[3] = {x, y, z};
-//     world2cam(pCam, pWorld, &my_model);
-//     return Eigen::Vector2f(pCam[0], pCam[1]);
-// };
 
 float pal_get_weight(Eigen::Vector2f pt, int lvl = 0);
 
@@ -46,3 +32,5 @@ inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Mat
 }
 
 int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector3f &t, Eigen::Matrix3f &R);
+
+bool calcWorldCoord(const Eigen::Matrix3f &Rdso, const Eigen::Vector3f &tdso, const Eigen::Matrix3f &Rmk, const Eigen::Vector3f &tmk, Sophus::Sim3f &Sim3_dso_mk);

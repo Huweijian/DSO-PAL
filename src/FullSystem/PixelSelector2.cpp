@@ -303,7 +303,8 @@ int PixelSelector::makeMaps(
 //			100*numHaveSub/(float)(wG[0]*hG[0]));
 
 
-	if(plot)
+	// if(plot)
+	if(false)
 	{
 		int w = wG[0];
 		int h = hG[0];

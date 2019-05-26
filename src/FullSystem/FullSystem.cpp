@@ -1738,12 +1738,21 @@ void FullSystem::printEvalLine()
 bool FullSystem::loadTrajectory(std::string trajectoryFile)
 {
 	using namespace std;
+	printf("start loading trajectory...\n");
 	ifstream fin(trajectoryFile);
+
+	if(!fin.good()){
+		printf(" ! Bad trajcetory file path in ");
+		cout << trajectoryFile << endl;
+		return false;
+	}
 	while(!fin.eof()){
-		Vec4f p;
-		fin >> p(0) >> p(1) >> p(2) >> p(3);
+		static int cnt;
+		Vec3f p;
+		fin >> p(0) >> p(1) >> p(2);
 		traj.push_back(p);	
 	}
+	printf(" ! load trajectory success, %lu points\n", traj.size());
 
 	return false;
 }

@@ -201,11 +201,12 @@ int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector
         Rodrigues(mk.Rvec, Rcv);
         cv2eigen(Rcv, R);
         cv2eigen(mk.Tvec, t);
+        
 
-        // 这里的R和t是marker相对于cam的,需要求反
+
+        // 这里的R和t是marker相对于cam的
         Matrix4f T; 
         T << R, t, 0, 0, 0, 1;
-        // T = T.inverse(); // TODO:这里inverse和在matlab里inverse结果不一样
         R = T.block(0, 0, 3, 3);
         t = T.block(0, 3, 3, 1);
 
@@ -216,7 +217,82 @@ int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector
         // waitKey();
 
 	}
-
-
     return mkid;
 }
+
+// dso: pose cam to dso frame 0
+// mk: pose marker to cam
+bool calcWorldCoord(const Matrix3f &Rdso, const Vector3f &tdso, const Matrix3f &Rmk, const Vector3f &tmk, Sophus::Sim3f &Sim3_dso_mk){
+    using namespace Sophus;
+    const int BUF_NUM = 100;
+    static int cnt = 0;
+    static Eigen::Matrix<float, 3, BUF_NUM> tra_dso; // dso_buf 
+    static Eigen::Matrix<float, 3*BUF_NUM, 1> B; // mk_buf
+    static Vector4f Rv_dso2mk_mean;
+
+    if(cnt > BUF_NUM)
+        return false;
+
+    // locate t variables
+    tra_dso.col(cnt) = tdso;
+    Matrix4f Tmk;
+    Tmk << Rmk, tmk, 0, 0, 0, 1;
+    Matrix4f Tmkinv = Tmk.inverse();
+    B.block(cnt*3, 0, 3, 1) = Tmkinv.block<3, 1>(0, 3);
+
+    // accumulate rotation 
+    cnt ++;
+    Matrix3f R_dso2mk = Rdso * Rmk;
+    AngleAxisf Rv_dso2mk_tem(R_dso2mk);
+    Vector4f Rv_dso2mk;
+    Rv_dso2mk << Rv_dso2mk_tem.axis(), Rv_dso2mk_tem.angle();
+    float w = ((float)(cnt-1)) / cnt;
+    Rv_dso2mk_mean = Rv_dso2mk_mean * w + Rv_dso2mk * (1-w);
+
+    // output rotation vec--------
+    cout << " [$$$] cnt = " << cnt << "  Rv = ";
+    // cout << R_dso2mk << endl;
+    cout << Rv_dso2mk_mean.transpose() << endl;
+    // ------------------
+
+    // calc scale and t through DLT
+    if(cnt == BUF_NUM){
+        // rotate trajectory
+        Vector3f ax = Rv_dso2mk_mean.head<3>();
+        ax.normalize();
+        float angle = Rv_dso2mk_mean(3);
+        Matrix3f R_dso2mk_traj =AngleAxisf(angle, ax).toRotationMatrix().inverse();
+        Sim3_dso_mk.setRotationMatrix(R_dso2mk_traj);
+        Matrix<float, 3, BUF_NUM> tra_dso2 = R_dso2mk_traj * tra_dso;
+
+        // cout << "rotation matrix:" << endl;
+        // cout << R_dso2mk << endl << endl;
+
+        // cout << "t dso:" << endl;
+        // cout << tra_dso2.block(0, (BUF_NUM-6)*3, 3, 5) << endl << endl;
+
+        // cout << "t mk" << endl;
+        // cout << B.block((BUF_NUM-6)*3, 0, 15, 1) << endl;
+
+        // DLT to calc s and t 
+        Matrix<float, BUF_NUM*3, 4> A;
+        A.setZero();
+        for(int i=0; i<BUF_NUM; i++){
+            A.block<3, 1>(i*3, 0) = tra_dso2.col(i);
+            A(i*3, 1) = 1;
+            A(i*3+1, 2) = 1;
+            A(i*3+2, 3) = 1;
+        }
+        Vector4f dlt = (A.transpose()*A).ldlt().solve(A.transpose()*B);
+        // cout << "DLT result = " << dlt.transpose() << endl;
+        Sim3_dso_mk.setScale(dlt(0));
+        Sim3_dso_mk.translation() = dlt.tail<3>();
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+
+}
+
