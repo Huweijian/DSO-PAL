@@ -6,6 +6,7 @@
 #include <OptimizationBackend/MatrixAccumulators.h>
 #include <vector>
 #include <opencv2/core/eigen.hpp>
+#include <util/Undistort.h>
 
 #define T transpose()
 using namespace cv;
@@ -41,12 +42,34 @@ int main(void){
     pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
 
 
+    // // flip
+    // Mat img = imread("/home/hwj23/Dataset/PAL/real/s6/images/00000.png");
+    // flip(img, img, 0);
+    // imshow("img", img);
+    // waitKey();
+    // return -1;
 
-    // eigen test 
+    // // 校正畸变
+	// UndistortPAL *ump = nullptr;
+    // ump = new UndistortPAL(3);
+    // ump->loadPhotometricCalibration("", "", "");
 
-    Vector4f vv(1, 2, 3 ,4);
-    cout << vv.tail<3>()<<endl;;
 
+    // // test SE3 * Vec
+    // Sim3f trans;
+    // Vector6f se3;
+    // // TODO: se3的位移不是真的位移,还要乘以一个J
+    // se3 << 0, 0, 0, M_PI/2, 0, 0;
+    // // trans = SE3f::exp(se3);
+    // trans.setRotationMatrix(AngleAxisf(M_PI/2, Vector3f::UnitX()).matrix());
+    // trans.translation() = Vector3f(1, 1, 1);
+    // trans.setScale(0.5);
+    // Sim3f transinv = trans.inverse();
+    // Vector3f p(1, 2, 3);
+    // Vector3f p2 = transinv * p;
+    // cout<< p2 << endl;
+    // return -1;
+    
     // calc dso coord to mk coord
     // Matrix3f R_dso2mk = AngleAxisf(0, Vector3f::UnitY()).matrix();
     // Vector3f t_dso2mk(1, 2, 3);

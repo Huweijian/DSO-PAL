@@ -169,6 +169,7 @@ public:
 	void distortCoordinates_pin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
 	void distortCoordinates_multipin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
 	void distortCoordinates(float* in_x, float* in_y, float* out_x, float* out_y, int n) const;
+	Eigen::Matrix3f mp2pal[4];
 private:
 	inline Eigen::Matrix3f trans(int xto, int yto, int zto) const{
 		Eigen::Matrix3f trans;

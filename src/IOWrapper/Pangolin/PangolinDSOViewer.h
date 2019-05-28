@@ -83,6 +83,8 @@ public:
 
 	// hwjfunction 保存点云,pcd格式
 	void export_pcd(float scaledTH, float absTH, float minBS);
+	void setNavigationTrajectory(std::vector<Eigen::Vector3f> traj){naviTraj = traj;};
+
 private:
 
 	bool needReset;
@@ -136,6 +138,7 @@ private:
 
 	std::deque<float> lastNTrackingMs;
 	std::deque<float> lastNMappingMs;
+	std::vector<Eigen::Vector3f> naviTraj;
 };
 
 

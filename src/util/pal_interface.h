@@ -34,3 +34,18 @@ inline void pal_project(float u_ori, float v_ori, float idepth, const Eigen::Mat
 int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector3f &t, Eigen::Matrix3f &R);
 
 bool calcWorldCoord(const Eigen::Matrix3f &Rdso, const Eigen::Vector3f &tdso, const Eigen::Matrix3f &Rmk, const Eigen::Vector3f &tmk, Sophus::Sim3f &Sim3_dso_mk);
+
+
+const int COORDINATE_ALIGNMENT_BUF_NUM = 100;
+class CoordinateAlign{
+public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    bool calcWorldCoord(const Eigen::Matrix3f &Rdso, const Eigen::Vector3f &tdso, const Eigen::Matrix3f &Rmk, const Eigen::Vector3f &tmk, Sophus::Sim3f &Sim3_dso_mk);
+    void resetBuf();
+
+private:
+    int cnt = 0;
+    Eigen::Matrix<float, 3, COORDINATE_ALIGNMENT_BUF_NUM> tra_dso_buf; // dso_buf 
+    Eigen::Matrix<float, 3*COORDINATE_ALIGNMENT_BUF_NUM, 1> B; // mk_buf
+    Eigen::Vector4f Rv_dso2mk_mean;
+};

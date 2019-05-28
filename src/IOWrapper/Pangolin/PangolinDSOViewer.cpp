@@ -185,15 +185,21 @@ void PangolinDSOViewer::run()
 			for(KeyFrameDisplay* fh : keyframes)
 			{
 				float blue[3] = {0,0,1};
+				// 画关键帧相机
 				if(this->settings_showKFCameras) 
 					fh->drawCam(1,blue,0.1);
 
-
+				// 更新点云
 				refreshed += (int)(fh->refreshPC(refreshed < 10, this->settings_scaledVarTH, this->settings_absVarTH,
 						this->settings_pointCloudMode, this->settings_minRelBS, this->settings_sparsity));
+				// 画点云
 				fh->drawPC(1);
 			}
-			if(this->settings_showCurrentCamera) currentCam->drawCam(2,0,0.2);
+			// 画红色的相机
+			if(this->settings_showCurrentCamera) {
+				currentCam->drawCam(2,0,0.2);
+			}
+			// 画轨迹,帧约束
 			drawConstraints();
 			lk3d.unlock();
 		}
@@ -479,6 +485,19 @@ void PangolinDSOViewer::drawConstraints()
 					(float)keyframes[i]->camToWorld.translation()[2]);
 		}
 		glEnd();
+
+		const float colorPink[3] = {249.0/255, 204.0/255, 226.0/255};
+		glColor3f(colorPink[0],colorPink[1],colorPink[2]);
+		glLineWidth(3);
+
+		glBegin(GL_LINE_STRIP);
+		for(unsigned int i=0;i<naviTraj.size();i++)
+		{
+			glVertex3f((float)naviTraj[i][0],
+					(float)naviTraj[i][1],
+					(float)naviTraj[i][2]);
+		}
+		glEnd();
 	}
 
 	if(settings_showFullTrajectory)
@@ -495,6 +514,7 @@ void PangolinDSOViewer::drawConstraints()
 					(float)allFramePoses[i][2]);
 		}
 		glEnd();
+	
 	}
 }
 
@@ -627,6 +647,10 @@ void PangolinDSOViewer::pushDepthImage(MinimalImageB3* image)
 	memcpy(internalKFImg->data, image->data, w*h*3);
 	kfImgChanged=true;
 }
+
+
+
+
 
 }
 }

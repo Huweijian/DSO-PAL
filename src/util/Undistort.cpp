@@ -1286,8 +1286,12 @@ UndistortPAL::UndistortPAL(int specificModel)
 		float ofx = ww/2/tan(d2r(w_fov/2));
 		float ofy = hh/2/tan(d2r(h_fov/2));
 		K << ofx, 0, ocx, 0, ofy, ocy, 0, 0, 1; 
-		distortCoordinates_multipin_mode(remapX, remapY, remapX, remapY, h*w);
+		mp2pal[0] = trans(-2, -3, 1);
+		mp2pal[1] = trans(-1, -3, -2);
+		mp2pal[2] = trans(2, -3, -1);
+		mp2pal[3] = trans(1, -3, 2);
 
+		distortCoordinates_multipin_mode(remapX, remapY, remapX, remapY, h*w);
 	}
 	else{
 		// invalid pal mode
@@ -1356,32 +1360,26 @@ void UndistortPAL::distortCoordinates_multipin_mode(float* in_x, float* in_y, fl
 	using namespace std;
 	cout << K << endl;
 	Matrix3f Kinv = K.inverse().cast<float>();
-	Matrix3f T[4];
-	T[0] = trans(-2, -3, 1);
-	T[1] = trans(-1, -3, -2);
-	T[2] = trans(2, -3, -1);
-	T[3] = trans(1, -3, 2);
 
 	int ww = w / pal_model_g->mp_num;
-
 	for(int i=0; i<n; i++){
 		int idx = (int)(in_x[i] / ww);
 		float xi = fmod(in_x[i], ww);
 		float yi = in_y[i];
 		Vector3f P0(xi, yi, 1);
 		P0 = Kinv * P0;  
-		Vector3f P = T[idx] * P0;
+		Vector3f P = mp2pal[idx] * P0;
 		Vector2f uv = pal_model_g->world2cam(P);
 		if(pal_check_in_range_g(uv(0), uv(1), 1)){
 			out_x[i] = uv(0)/pal_model_g->resize;
 			out_y[i] = uv(1)/pal_model_g->resize;
+		// printf("%d (%.2f, %.2f) -> (%.2f %.2f %.2f)-(%2.f %.2f %.2f) -> (%.2f, %.2f)\n", i, in_x[i], in_y[i], P0(0), P0(1), P0(2),P(0), P(1), P(2), out_x[i], out_y[i]);
 		}
 		else{
 			out_x[i] = -1;
 			out_y[i] = -1;
 		}
 
-		// printf("%d (%.2f, %.2f) -> (%.2f %.2f %.2f)-(%2.f %.2f %.2f) -> (%.2f, %.2f)\n", i, in_x[i], in_y[i], P0(0), P0(1), P0(2),P(0), P(1), P(2), out_x[i], out_y[i]);
 	}
 }
 

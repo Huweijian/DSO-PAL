@@ -401,8 +401,10 @@ int main( int argc, char** argv )
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed==0);
 
+	CoordinateAlign *coorAlign = nullptr;
 	if(!trajFile.empty()){
 		fullSystem->loadTrajectory(trajFile);
+		coorAlign = new CoordinateAlign();
 	}
 
 
@@ -489,82 +491,97 @@ int main( int argc, char** argv )
                 }
             }
 
-			// 图像传入
-            if(!skipFrame) 
-				fullSystem->addActiveFrame(img, i);
-
 			// ---------------- hwj marker detector ---------------------
+			int mkid = -1;
+			Mat33f Kmk;
+			Eigen::Vector3f tmk;
+			Eigen::Matrix3f Rmk;
 			{
 				using namespace std;
 				using namespace cv;
-
-				Mat33f Kmk;
-				Eigen::Vector3f tmk;
-				Eigen::Matrix3f Rmk;
+				int mpidx = -1;
 
 				static ofstream camPoseMarker("logs/hwjcamPoseMarker.log");
-				int mkid = -1;
+				// PAL 检测marker
 				if(USE_PAL == 1){
-					static Undistort *ump = nullptr;
+					// 校正畸变
+					static UndistortPAL *ump = nullptr;
 					if(!ump){
 						ump = new UndistortPAL(3);
 						ump->loadPhotometricCalibration("", "", "");
 					}
-
 					MinimalImageB* mpimg = reader->getImageRaw(i);
-
-					// 校正畸变
 					ImageAndExposure* mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
 					Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
-					flip(mpcv, mpcv, 1);
-					// imshow("mp", mpcv);
-					// waitKey(0);
 
-					cv::Mat Kmp = cv::Mat::eye(3, 3, CV_32FC1);
-					Kmp.at<float>(0, 0) = ump->K(0, 0);
-					Kmp.at<float>(1, 0) = ump->K(1, 0);
-					Kmp.at<float>(0, 2) = ump->K(0, 2);
-					Kmp.at<float>(1, 2) = ump->K(1, 2);
+					// 计算marker位姿
+					Kmk = ump->K.cast<float>();
 
 					// 检测marker
-					int mpw=mpcv.cols / 4;
+					int mpw = mpcv.cols / 4;
 					for(int im=0; im<4; im++){
 						Mat smlImg = mpcv.colRange(im*mpw, (im+1)*mpw-1);
-
+						mkid = getPoseFromMarker(smlImg, Kmk, tmk, Rmk);
+						if(mkid != -1){
+							mpidx = im;
+							Rmk = ump->mp2pal[im] * Rmk;
+							tmk = ump->mp2pal[im] * tmk;
+							break;
+						}
 					}
 
 					delete mp;
 					delete mpimg;
 				}
+				// 针孔相机检测marker
 				else if (USE_PAL == 0){
 					Mat imgcv = IOWrap::getOCVImg_tem(img->image, img->w, img->h);
 					Kmk = reader->undistort->K.cast<float>();
-
 					mkid = getPoseFromMarker(imgcv, Kmk, tmk, Rmk);
+					mpidx = 0;
 
-					if(useSampleOutput){
-						camPoseMarker << ii << " " << mkid <<  std::endl;
-						if(mkid != -1){
-							img->marker_id = mkid;
-							camPoseMarker << Rmk << endl << tmk.transpose() << endl;
-						}
-					}
 				}
 
+				// 输出mk位姿
+				if(useSampleOutput){
+					camPoseMarker << ii << " " << mkid << " " << mpidx << std::endl;
+					if(mkid != -1){
+						img->marker_id = mkid;
+						camPoseMarker << Rmk << endl << tmk.transpose() << endl;
+					}
+				}
+			}
+
+			// 图像传入
+            if(!skipFrame) 
+				fullSystem->addActiveFrame(img, i);
+
+			// 坐标系对齐
+			{
+				using namespace std;
+				using namespace cv;
+				// DLT计算坐标系对齐变换
 				if(mkid == 304 && fullSystem->initialized){
 					auto curFrameShell = fullSystem->getAllFrames().back();
 					Eigen::Matrix3f Rdso = curFrameShell->camToWorld.rotationMatrix().cast<float>();
 					Eigen::Vector3f tdso = curFrameShell->camToWorld.translation().cast<float>();
 
-					// TODO: 进一步使用这个变量
 					Sophus::Sim3f dso2global;
-					bool calcRes = calcWorldCoord(Rdso, tdso, Rmk, tmk, dso2global);
-					//---------
+					bool calcRes = coorAlign->calcWorldCoord(Rdso, tdso, Rmk, tmk, dso2global);
+
 					if(calcRes == true){
 						cout << dso2global.scale() << " " << dso2global.translation().transpose() << endl;
-						return -1;
+						Sophus::Sim3f global2dso = dso2global.inverse();
+						// Eigen::Matrix3f R = global2dso.rotationMatrix();
+						// Eigen::Vector3f t = global2dso.translation();
+						float s = global2dso.scale();
+						auto trajdso = fullSystem->traj;
+						for(Eigen::Vector3f &pose : trajdso){
+							pose = global2dso * pose;
+						}
+						viewer->setNavigationTrajectory(trajdso);	
+						waitKey();
 					}
-					// ------------
 				}
 
 			}
@@ -578,6 +595,7 @@ int main( int argc, char** argv )
                 {
                     printf("RESETTING!\n");
 
+
                     std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
                     delete fullSystem;
 
@@ -587,10 +605,12 @@ int main( int argc, char** argv )
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed==0);
 
-
                     fullSystem->outputWrapper = wraps;
 
                     setting_fullResetRequested=false;
+
+					coorAlign->resetBuf();
+					fullSystem->loadTrajectory(trajFile);
                 }
             }
 

@@ -26,6 +26,7 @@
 #include "IOWrapper/ImageRW.h"
 #include <opencv2/highgui/highgui.hpp>
 
+#include <util/pal_interface.h>
 
 namespace dso
 {
@@ -35,6 +36,10 @@ namespace IOWrap
 MinimalImageB* readImageBW_8U(std::string filename)
 {
 	cv::Mat m = cv::imread(filename, CV_LOAD_IMAGE_GRAYSCALE);
+	if(USE_PAL == 1){
+		// !!!我的PAL采集程序会自动上下镜像,所以需要手动反镜像
+		cv::flip(m, m, 0);
+	}
 	if(m.rows*m.cols==0)
 	{
 		printf("cv::imread could not read image %s! this may segfault. \n", filename.c_str());
