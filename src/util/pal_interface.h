@@ -11,6 +11,7 @@ extern bool ENH_PAL;
 const int pal_max_level = 6;
 extern pal::PALCamera* pal_model_g;
 
+float pal_get_weight(float u, float v, int lvl = 0);
 float pal_get_weight(Eigen::Vector2f pt, int lvl = 0);
 
 bool pal_check_in_range_g(float u, float v, float padding, int level = 0);
@@ -49,3 +50,5 @@ private:
     Eigen::Matrix<float, 3*COORDINATE_ALIGNMENT_BUF_NUM, 1> B; // mk_buf
     Eigen::Vector4f Rv_dso2mk_mean;
 };
+
+void outputNavigationMsg(std::vector<Eigen::Vector3f> & trajectory, Eigen::Matrix3f R, Eigen::Vector3f t);

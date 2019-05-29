@@ -439,7 +439,6 @@ int main( int argc, char** argv )
             }
         }
 
-
         std::vector<ImageAndExposure*> preloadedImages;
         if(preload)
         {
@@ -467,14 +466,11 @@ int main( int argc, char** argv )
 
             int i = idsToPlay[ii];
 
-
             ImageAndExposure* img;
             if(preload)
                 img = preloadedImages[ii];
             else
                 img = reader->getImage(i);
-
-
 
             bool skipFrame=false;
             if(playbackSpeed!=0)
@@ -555,13 +551,15 @@ int main( int argc, char** argv )
 			// 图像传入
             if(!skipFrame) 
 				fullSystem->addActiveFrame(img, i);
+			delete img;
 
 			// 坐标系对齐
-			{
+			if(fullSystem->initialized) {
 				using namespace std;
 				using namespace cv;
-				// DLT计算坐标系对齐变换
-				if(mkid == 304 && fullSystem->initialized){
+				static int poseHasInit = false;
+				// 起点:DLT计算坐标系对齐变换
+				if(mkid == 304 && !poseHasInit){
 					auto curFrameShell = fullSystem->getAllFrames().back();
 					Eigen::Matrix3f Rdso = curFrameShell->camToWorld.rotationMatrix().cast<float>();
 					Eigen::Vector3f tdso = curFrameShell->camToWorld.translation().cast<float>();
@@ -570,6 +568,8 @@ int main( int argc, char** argv )
 					bool calcRes = coorAlign->calcWorldCoord(Rdso, tdso, Rmk, tmk, dso2global);
 
 					if(calcRes == true){
+						poseHasInit = true;
+						fullSystem->dso2global = dso2global;
 						cout << dso2global.scale() << " " << dso2global.translation().transpose() << endl;
 						if(!trajFile.empty()){
 							Sophus::Sim3f global2dso = dso2global.inverse();
@@ -582,12 +582,20 @@ int main( int argc, char** argv )
 						}
 					}
 				}
-
+				// 终点:结束
+				else if(mkid == 306){
+					printf("\n\n *恭喜* 你已经到306啦!\n");
+					break;
+				}
+				else if(poseHasInit){
+					auto curFrameShell = fullSystem->getAllFrames().back();
+					Eigen::Matrix3f curPoseR = fullSystem->dso2global.rotationMatrix() * curFrameShell->camToWorld.cast<float>().rotationMatrix();
+					Eigen::Vector3f curPoset = fullSystem->dso2global * curFrameShell->camToWorld.cast<float>().translation();
+					outputNavigationMsg(fullSystem->traj, curPoseR, curPoset);;
+				}
 			}
+
 			// end of hwj marker detector--------------------------------------------------
-
-
-            delete img;
             if(fullSystem->initFailed || setting_fullResetRequested)
             {
                 if(ii < 250 || setting_fullResetRequested)

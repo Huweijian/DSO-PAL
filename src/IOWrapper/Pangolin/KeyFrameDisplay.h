@@ -52,6 +52,7 @@ struct InputPointSparse
 	int numGoodRes;
 	unsigned char color[ppp];
 	unsigned char status;
+	float fov;
 };
 
 struct MyVertex

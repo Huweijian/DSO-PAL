@@ -49,11 +49,16 @@ void pal_addMaskbuffer(cv::Mat &mask, int size) {
 }
 
 float pal_get_weight(Eigen::Vector2f pt, int lvl){
+    return pal_get_weight(pt[0], pt[1], lvl);
+}
+
+float pal_get_weight(float u, float v, int lvl){
     int multi = (int)1 << lvl;
-    int x = (pt[0]+0.5f) * multi - 0.5; // 亚像素精度
-    int y = (pt[1]+0.5f) * multi - 0.5;   
+    int x = (u+0.5f) * multi - 0.5; // 亚像素精度
+    int y = (v+0.5f) * multi - 0.5;   
     return pal_weight.at<float>(y, x);
 }
+
 
 
 bool pal_init(string calibFile){
@@ -135,7 +140,7 @@ bool pal_init(string calibFile){
 
     // pal weight
     pal_weight = Mat::ones(pal->height_, pal->width_, CV_32FC1);
-    float setting_pal_min_weight = 0.99;
+    float setting_pal_min_weight = 0;
     float setting_pal_max_weight = 1;
     for(int u = 0; u<pal->width_; u++){
         for(int v = 0; v<pal->height_; v++){
@@ -143,8 +148,8 @@ bool pal_init(string calibFile){
             if(pal_check_valid_sensing(u, v)){
                 float r = (Vector2f(u, v) - Vector2f(pal->cx, pal->cy)).norm();
                 float r0 = pal->sensing_radius[0]-5, r1 = pal->sensing_radius[1]+5;
-                float maxw = (r1-r0)*(r1-r0); 
-                w = -(setting_pal_max_weight - setting_pal_min_weight) * ((r-r0)*(r-r0)/maxw) + setting_pal_max_weight;
+                float maxw = (r1-r0); 
+                w = setting_pal_min_weight + (setting_pal_max_weight-setting_pal_min_weight) * ((r-r0)/maxw);
                 // printf(" - (%d, %d) w=%.2f \n", u, v, w);
             }
             pal_weight.at<float>(v, u) = w;
@@ -309,4 +314,6 @@ bool CoordinateAlign::calcWorldCoord(const Matrix3f &Rdso, const Vector3f &tdso,
 
 }
 
-
+void outputNavigationMsg(std::vector<Eigen::Vector3f> & trajectory, Eigen::Matrix3f R, Eigen::Vector3f t){
+    printf(" [---] 导航信息\n");
+}

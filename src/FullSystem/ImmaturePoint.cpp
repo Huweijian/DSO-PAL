@@ -235,10 +235,9 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		dist = sqrtf(dist);
 		// 极线长度过小
 		float minPolarDist = setting_trace_slackInterval;
-		if(ENH_PAL){ // PAL极线匹配阈值降低,即,即使极线没那么长,也试着匹配一下
-			minPolarDist = pal_get_weight(Vec2f(u, v));
-			minPolarDist = 0.5*setting_trace_slackInterval;
-		}
+		// if(ENH_PAL){ // PAL极线匹配阈值降低,即,即使极线没那么长,也试着匹配一下
+		// 	minPolarDist = 0.5*setting_trace_slackInterval;
+		// }
 		if(dist < minPolarDist)
 		{
 			if(debugPrint){

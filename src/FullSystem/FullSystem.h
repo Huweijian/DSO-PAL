@@ -165,6 +165,7 @@ public:
 	// hwj navigation: trajectory
 	std::vector<Vec3f> traj;
 	bool loadTrajectory(std::string trajectoryFile);
+	Sophus::Sim3f dso2global;
 
 	std::vector<FrameShell*> getAllFrames(){return allFrameHistory;};
 private:
