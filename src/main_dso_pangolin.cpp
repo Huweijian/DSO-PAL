@@ -404,8 +404,8 @@ int main( int argc, char** argv )
 	CoordinateAlign *coorAlign = nullptr;
 	if(!trajFile.empty()){
 		fullSystem->loadTrajectory(trajFile);
-		coorAlign = new CoordinateAlign();
 	}
+	coorAlign = new CoordinateAlign();
 
 
     IOWrap::PangolinDSOViewer* viewer = 0;
@@ -571,16 +571,15 @@ int main( int argc, char** argv )
 
 					if(calcRes == true){
 						cout << dso2global.scale() << " " << dso2global.translation().transpose() << endl;
-						Sophus::Sim3f global2dso = dso2global.inverse();
-						// Eigen::Matrix3f R = global2dso.rotationMatrix();
-						// Eigen::Vector3f t = global2dso.translation();
-						float s = global2dso.scale();
-						auto trajdso = fullSystem->traj;
-						for(Eigen::Vector3f &pose : trajdso){
-							pose = global2dso * pose;
+						if(!trajFile.empty()){
+							Sophus::Sim3f global2dso = dso2global.inverse();
+							auto trajdso = fullSystem->traj;
+							for(Eigen::Vector3f &pose : trajdso){
+								pose = global2dso * pose;
+							}
+							viewer->setNavigationTrajectory(trajdso);	
+							waitKey();
 						}
-						viewer->setNavigationTrajectory(trajdso);	
-						waitKey();
 					}
 				}
 

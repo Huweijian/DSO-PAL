@@ -14,5 +14,5 @@ vignette=/home/hwj23/Dataset/PAL/vignette.png \
 preset=0 \
 mode=0 \
 start=0 \
-sampleoutput=0 \
-trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt
+# trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt \
+sampleoutput=0
