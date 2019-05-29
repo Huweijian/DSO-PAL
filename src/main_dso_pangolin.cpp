@@ -570,7 +570,6 @@ int main( int argc, char** argv )
 					if(calcRes == true){
 						poseHasInit = true;
 						fullSystem->dso2global = dso2global;
-						cout << dso2global.scale() << " " << dso2global.translation().transpose() << endl;
 						if(!trajFile.empty()){
 							Sophus::Sim3f global2dso = dso2global.inverse();
 							auto trajdso = fullSystem->traj;

@@ -297,11 +297,10 @@ bool CoordinateAlign::calcWorldCoord(const Matrix3f &Rdso, const Vector3f &tdso,
             A(i*3+2, 3) = 1;
         }
         Vector4f dlt = (A.transpose()*A).ldlt().solve(A.transpose()*B);
-        // cout << "DLT result = " << dlt.transpose() << endl;
         
         Matrix<float, COORDINATE_ALIGNMENT_BUF_NUM*3, 1> err;
         err = A*dlt - B;
-        cout << "err = " << err.squaredNorm()/COORDINATE_ALIGNMENT_BUF_NUM << endl;
+        cout << "align err = " << err.squaredNorm()/COORDINATE_ALIGNMENT_BUF_NUM << " " << "dlt result = " << dlt.transpose() <<  endl;
         
         Sim3_dso_mk.setScale(dlt(0));
         Sim3_dso_mk.translation() = dlt.tail<3>();
@@ -315,5 +314,27 @@ bool CoordinateAlign::calcWorldCoord(const Matrix3f &Rdso, const Vector3f &tdso,
 }
 
 void outputNavigationMsg(std::vector<Eigen::Vector3f> & trajectory, Eigen::Matrix3f R, Eigen::Vector3f t){
-    printf(" [---] 导航信息\n");
+
+    int minidx = 0;
+    float minDis = 1000000; 
+    for(int i=0; i<trajectory.size()-1; i++){
+        float dis = (trajectory[i] - t).norm();
+        if(dis < minDis){
+            minDis = dis;
+            minidx = i;
+        }
+    }
+
+	Eigen::Vector3f camFront(-1, 0, 0);
+	camFront = R * camFront;
+
+    Vector3f dir = trajectory[minidx + 1] - trajectory[minidx];
+    dir.normalize();
+    
+    Vector2f camFront2D(camFront(1), camFront(2));
+    Vector2f dir2D(dir(1), dir(2));
+
+    float angle = acos( dir2D.dot(camFront2D) / dir2D.norm() / camFront2D.norm() ) / M_PI * 180;
+
+    printf(" [---] 导航信息 tradID = %d | angle = %.2f dis = %.2fm \n", minidx, angle, minDis);
 }
