@@ -1,5 +1,6 @@
 % clear;
 % addpath(ocam_path) and load calib mat file
+addpath('/home/hwj23/Dataset/PAL'); load('Omni_calib_results.mat');
 cam = calib_data.ocam_model;
 
 % read image
