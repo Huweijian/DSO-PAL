@@ -42,8 +42,6 @@ PixelSelector::PixelSelector(int w, int h)
 	for(int i=0;i<w*h;i++) randomPattern[i] = rand() & 0xFF;
 	currentPotential=3;
 
-
-	gradHist = new int[100*(1+w/32)*(1+h/32)];
 	ths = new float[(w/32)*(h/32+1)+100];
 	thsSmoothed = new float[(w/32+1)*(h/32+1)+100];
 
@@ -57,7 +55,6 @@ PixelSelector::PixelSelector(int w, int h)
 PixelSelector::~PixelSelector()
 {
 	delete[] randomPattern;
-	delete[] gradHist;
 	delete[] ths;
 	delete[] thsSmoothed;
 }
@@ -110,7 +107,12 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 							continue;
 					}
 					int g = sqrtf(map0[i+j*w]);
-					if(g>48) g=48;
+					if(g > 48){
+						g = 48; 
+					}
+					if(g < 0){
+						g = 0;
+					}
 					hist0[g+1]++;
 					hist0[0]++;
 				}

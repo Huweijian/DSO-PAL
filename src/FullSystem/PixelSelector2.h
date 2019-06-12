@@ -58,7 +58,7 @@ private:
 	unsigned char* randomPattern;
 
 
-	int* gradHist;
+	int gradHist[50];
 // hwjdebug
 public:
 	float* ths; // 梯度阈值

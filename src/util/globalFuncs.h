@@ -132,11 +132,15 @@ EIGEN_ALWAYS_INLINE float getInterpolatedElement31(const Eigen::Vector3f* const 
 	float dxdy = dx*dy;
 	const Eigen::Vector3f* bp = mat +ix+iy*width;
 
-
-	return dxdy * (*(const Eigen::Vector3f*)(bp+1+width))[0]
-	        + (dy-dxdy) * (*(const Eigen::Vector3f*)(bp+width))[0]
-	        + (dx-dxdy) * (*(const Eigen::Vector3f*)(bp+1))[0]
-			+ (1-dx-dy+dxdy) * (*(const Eigen::Vector3f*)(bp))[0];
+	float v1 =  (*(const Eigen::Vector3f*)(bp+1+width))[0];
+	float v2 = (*(const Eigen::Vector3f*)(bp+width))[0];
+	float v3 = (*(const Eigen::Vector3f*)(bp+1))[0];
+	float v4 = (*(const Eigen::Vector3f*)(bp))[0];
+	
+	return dxdy * v1
+	        + (dy-dxdy) * v2
+	        + (dx-dxdy) * v3
+			+ (1-dx-dy+dxdy) * v4;
 }
 
 EIGEN_ALWAYS_INLINE Eigen::Vector3f getInterpolatedElement13BiLin(const float* const mat, const float x, const float y, const int width)
