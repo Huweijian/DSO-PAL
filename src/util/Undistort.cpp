@@ -1262,7 +1262,7 @@ UndistortPAL::UndistortPAL(int specificModel)
 	}
 	// pin
 	else if(specificModel == 2){
-		w = wOrg; h = hOrg;
+		w = pal_model_g->width_; h = pal_model_g->height_;
 		init_remapXY(w, h);
 		K(0, 0) = pal_model_g->pin_fx * pal_model_g->width_;
 		K(1, 1) = pal_model_g->pin_fy * pal_model_g->height_;
@@ -1330,10 +1330,10 @@ void UndistortPAL::distortCoordinates(float* in_x, float* in_y, float* out_x, fl
 void UndistortPAL::distortCoordinates_pin_mode(float* in_x, float* in_y, float* out_x, float* out_y, int n) const
 {
 	// PAL虚拟的K
-	float ocx = pal_model_g->width_ * pal_model_g->pin_cx;
-	float ocy = pal_model_g->height_ * pal_model_g->pin_cy;
-	float ofx = pal_model_g->width_ * pal_model_g->pin_fx; 
-	float ofy = pal_model_g->height_ * pal_model_g->pin_fy;
+	float ocx = K(0, 2); //pal_model_g->width_ * pal_model_g->pin_cx;
+	float ocy = K(1, 2); //pal_model_g->height_ * pal_model_g->pin_cy;
+	float ofx = K(0, 0); //pal_model_g->width_ * pal_model_g->pin_fx; 
+	float ofy = K(1, 1); //pal_model_g->height_ * pal_model_g->pin_fy;
 
 	for(int i=0;i<n;i++)
 	{
@@ -1343,13 +1343,15 @@ void UndistortPAL::distortCoordinates_pin_mode(float* in_x, float* in_y, float* 
 		float y_cam = (yi - ocy) / ofy;
 		auto pt_ori = pal_model_g->world2cam(Eigen::Vector3f(x_cam, y_cam, 1));
 
-		// 不合法的点映射到(-1, -1)
-		if(!pal_check_valid_sensing(pt_ori[0], pt_ori[1])){
-			pt_ori = Eigen::Vector2f(-1, -1);
+		if(pal_check_valid_sensing(pt_ori[0], pt_ori[1])){
+			out_x[i] = pt_ori[0] / pal_model_g->resize ;
+			out_y[i] = pt_ori[1] / pal_model_g->resize ;
 		}
-
-		out_x[i] = pt_ori[0] ;
-		out_y[i] = pt_ori[1] ;
+		// 不合法的点映射到(-1, -1)
+		else{
+			out_x[i] = -1;
+			out_y[i] = -1;
+		}
 	}
 	printf(" ! USE_PAL = %d, FOV = %.2f deg\n", USE_PAL, 2*atan2(0.5, pal_model_g->pin_fx) / 3.14 * 180);
 }

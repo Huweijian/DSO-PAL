@@ -21,8 +21,6 @@
 * along with DSO. If not, see <http://www.gnu.org/licenses/>.
 */
 
-
-
 #include "FullSystem/ImmaturePoint.h"
 #include "util/FrameShell.h"
 #include "FullSystem/ResidualProjections.h"
@@ -159,10 +157,11 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		vMin = ptpMin[1] / ptpMin[2];
 
 		bool is_oob = false;
-		if(USE_PAL == 0)
+		if(USE_PAL == 0){
 			if(!(uMin > 4 && vMin > 4 && uMin < wG[0]-5 && vMin < hG[0]-5)){
 				is_oob = true;
 			}
+		}
 		else if(USE_PAL == 2){
 			if(!(pal_check_in_range_g(uMin, vMin, 5, 0))){
 				is_oob = true;
@@ -170,8 +169,8 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian* frame,const Mat33f &hos
 		}
 
 		if(is_oob){
-			if(debugPrint) printf(" $ OOB uMin %f %f - %f %f %f (id %f-%f)!\n",
-					u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
+			if(debugPrint) 
+				printf(" $ OOB uMin %f %f - %f %f %f (id %f-%f)!\n", u,v,uMin, vMin,  ptpMin[2], idepth_min, idepth_max);
 			lastTraceUV = Vec2f(-1,-1);
 			lastTracePixelInterval=0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;

@@ -113,13 +113,17 @@ bool pal_init(string calibFile){
 
         for(int i=0; i<pal_max_level; i++){
             pal_mask_g[i] = cv::Mat::ones(hh, ww, CV_8UC1)*255;
-            circle(pal_mask_g[i], cv::Point(cx, cy), r_inner, 0, -1);
+            if(r_inner > 0){
+                circle(pal_mask_g[i], cv::Point(cx, cy), r_inner, 0, -1);
+            }
             rectangle(pal_mask_g[i], Rect(Point(0, 0), Point(ww-1, hh-1)), 0); 
             if(i == 0){
+                // TODO:
                 // dso的图像尺寸是640*480, 都是32的倍数,所以在点选择的时候,它可以把图像恰好划分为多个32*32的块,对于pal图像,分辨率为720,不能整除,
                 // 下面的代码把不能整除的部分赋值为0.
                 // 这个解决方案不太好,先这样把
-                pal_mask_g[i].rowRange(hh/32*32, hh-1) = 0;
+                if(hh % 32 != 0)
+                    pal_mask_g[i].rowRange(hh/32*32, hh-1) = 0;
             }
             hh/=2; ww/=2; cx/=2.0; cy/=2.0; r_inner/=2;
         }

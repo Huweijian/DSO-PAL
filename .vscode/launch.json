@@ -76,7 +76,7 @@
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
             // // real pal dataset
-            // "args": [   "files=/home/hwj23/Dataset/PAL/real/s26/images", 
+            // "args": [   "files=/home/hwj23/Dataset/PAL/real/s6/images", 
             //             "calib=/home/hwj23/Dataset/PAL/calib_results_real.txt", 
             //             "gamma=/home/hwj23/Dataset/PAL/pcalib.txt", 
             //             "vignette=/home/hwj23/Dataset/PAL/vignette.png",
@@ -85,22 +85,22 @@
             //             // "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
             //         ],
 
-            // // simu
-            // "args": [   "files=/home/hwj23/Dataset/PAL/simu/s2/color/", 
-            //             "calib=/home/hwj23/Dataset/PAL/calib_results_fish.txt", 
-            //             "preset=0", 
-            //             "mode=2" 
-            //         ],
-
-
-            // tum fisheye
-            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip ", 
-                        "calib=/home/hwj23/Dataset/TUM/calib_results_tum_fisheye.txt", 
-                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+            // simu
+            "args": [   "files=/home/hwj23/Dataset/PAL/simu/now/color/", 
+                        "calib=/home/hwj23/Dataset/PAL/calib_results_simu.txt", 
                         "preset=0", 
-                        "mode=0" 
-            ],
+                        "mode=2" 
+                    ],
+
+
+            // // tum fisheye
+            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip ", 
+            //             "calib=/home/hwj23/Dataset/TUM/calib_results_tum_fisheye.txt", 
+            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+            //             "preset=0", 
+            //             "mode=0" 
+            // ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
