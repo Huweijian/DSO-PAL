@@ -929,7 +929,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 {
     if(isLost) 
 		return;
-
+	// cv::waitKey();
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
 	// 初始化图像类型

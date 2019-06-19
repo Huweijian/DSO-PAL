@@ -86,6 +86,9 @@ void FullSystem::flagFramesForMarginalization(FrameHessian* newFH)
 				frameHessians.back()->aff_g2l(), fh->aff_g2l());
 
 		// （ 如果有效的点太少 || 亮度差太大 ） && （也不能删太多FH，还得保留一点）
+		if(USE_PAL == 1){
+			setting_minPointsRemaining = 0.5;
+		}
 		if( (in < setting_minPointsRemaining *(in+out) || fabs(logf((float)refToFh[0])) > setting_maxLogAffFacInWindow)
 				&& ((int)frameHessians.size())-flagged > setting_minFrames)
 		{

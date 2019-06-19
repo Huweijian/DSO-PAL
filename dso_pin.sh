@@ -1,7 +1,7 @@
 #!/bin/bash
 
 ./build/bin/dso_dataset \
-files=/home/hwj23/Dataset/simu/s6/color \
+files=/home/hwj23/Dataset/simu/s9/color \
 calib=/home/hwj23/Dataset/simu/camera.txt \
 preset=0 \
 mode=2 \
