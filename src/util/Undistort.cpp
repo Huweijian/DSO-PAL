@@ -40,8 +40,8 @@
 
 #define _USE_MATH_DEFINES
 #include <cmath>
-#define d2r(d) (d/180.0*M_PI)
-#define r2d(r) (r/M_PI*180.0)
+#define d2r(d) ((d)/180.0*M_PI)
+#define r2d(r) ((r)/M_PI*180.0)
 
 namespace dso
 {
@@ -1274,7 +1274,8 @@ UndistortPAL::UndistortPAL(int specificModel)
 	else if(specificModel == 3){
 		auto &cam = pal_model_g;
 		w = cam->mp_width * cam->mp_num; 
-		h = (int)(cam->mp_width / tan(d2r(360.0 / cam->mp_num/2)) * (tan(d2r(cam->mp_fov[1]/2))-tan(d2r(cam->mp_fov[0]/2))));
+		h =(int)(cam->mp_width / (2*tan(d2r(360.0 / cam->mp_num/2))) * (tan(d2r(90 - cam->mp_fov[0])) + tan(d2r(cam->mp_fov[1]-90))) );
+
 		init_remapXY(w, h);
 		// PAL虚拟的K
 		float h_fov = (90 - cam->mp_fov[0])*2;
@@ -1282,9 +1283,9 @@ UndistortPAL::UndistortPAL(int specificModel)
 		int ww = w/cam->mp_num;
 		int hh = h;
 		float ocx = ww/2;
-		float ocy = ww/tan(d2r(360/cam->mp_num/2))*tan(d2r(h_fov/2)) / 2;
+		float ocy = ww/2 / tan(d2r(w_fov/2)) * tan(d2r(h_fov/2));
 		float ofx = ww/2/tan(d2r(w_fov/2));
-		float ofy = hh/2/tan(d2r(h_fov/2));
+		float ofy = ofx;
 		K << ofx, 0, ocx, 0, ofy, ocy, 0, 0, 1; 
 		mp2pal[0] = trans(-2, -3, 1);
 		mp2pal[1] = trans(-1, -3, -2);
