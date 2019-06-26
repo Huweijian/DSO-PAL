@@ -1,8 +1,10 @@
-clc;clear;
+clc;
+% clear;
+clearvars -except tra_dso_all_s33 tra_dso_all_s34 tra_dso_all_s35 tra_dso_all_s36 tra_dso_all_s38 tra_dso_all_s37
 
-MAX_LEN = 1000; % max len
-MARKER_ID = 304;
-seq_dir = 'pal_s26_2';
+MAX_LEN = 2000; % max len
+MARKER_ID = 223;
+seq_dir = 'pal_s38';
 
 mkfile = [seq_dir '/hwjcamPoseMarker.log'];
 mkfileid = fopen(mkfile);
@@ -86,10 +88,10 @@ end
 %% calse
 trajectoryAlign;
 %% 可视化原始位移
-figure(1)
-plot(idx, tt_dso', '.');
-figure(2)
-plot(idx, tt_mk', '.');
+% figure(1)
+% plot(idx, tt_dso', '.');
+% figure(2)
+% plot(idx, tt_mk', '.');
 
 %% 可视化原始旋转数据
 % ST = 1;

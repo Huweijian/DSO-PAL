@@ -34,7 +34,7 @@ tra_mk = tt_mk ;
 
 tra_dso_all = tt_dso_raw(:, ~isnan(tt_dso_raw(1, :)));
 tra_dso_all = inv(R_d_m) * (tra_dso_all*s_dlt) + t_dlt;
-tra_start = idx(end);
+tra_start = idx(1);
 tra_dso_all = tra_dso_all(:, tra_start:end);
 
 resfileid = fopen([seq_dir '/trajectory.txt'], 'w');

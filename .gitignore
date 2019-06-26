@@ -13,3 +13,7 @@ result.txt
 *.pcd
 manuscript/*
 *.log
+matlab/*/*.txt
+matlab/*.fig
+matlab/*.mat
+*.m~
