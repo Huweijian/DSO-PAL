@@ -94,11 +94,11 @@ public:
         return (id < other.id);
     }
 
-
-private:
+public:
 	float fx,fy,cx,cy;
 	float fxi,fyi,cxi,cyi;
 	int width, height;
+private:
 
 	float my_scaledTH, my_absTH, my_scale;
 	int my_sparsifyFactor;

@@ -109,12 +109,11 @@ public:
             std::cout << frame->camToWorld.matrix3x4() << "\n";
 
             // for trajectory alignment 
-            // camPoseOut << frame->incoming_id << " " << frame->marker_id << endl;
-            // camPoseOut << frame->camToWorld.matrix3x4() << "\n";
-
+            camPoseOut << frame->incoming_id << " " << frame->marker_id << endl;
+            camPoseOut << frame->camToWorld.matrix3x4() << "\n";
 
             // for evaluation precision
-            camPoseOut <<frame->incoming_id << " " << frame->camToWorld.translation().transpose() << endl;
+            // camPoseOut <<frame->incoming_id << " " << frame->camToWorld.translation().transpose() << endl;
         }
 
 

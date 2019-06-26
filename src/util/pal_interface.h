@@ -37,7 +37,7 @@ int getPoseFromMarker(const cv::Mat &img,const Eigen::Matrix3f &K, Eigen::Vector
 bool calcWorldCoord(const Eigen::Matrix3f &Rdso, const Eigen::Vector3f &tdso, const Eigen::Matrix3f &Rmk, const Eigen::Vector3f &tmk, Sophus::Sim3f &Sim3_dso_mk);
 
 
-const int COORDINATE_ALIGNMENT_BUF_NUM = 100;
+const int COORDINATE_ALIGNMENT_BUF_NUM = 50;
 class CoordinateAlign{
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW

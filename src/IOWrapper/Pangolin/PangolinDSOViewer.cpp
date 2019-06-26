@@ -369,7 +369,16 @@ void PangolinDSOViewer::export_pcd(float scaledTH, float absTH, float minBS){
 			if(p.relObsBaseline < my_minRelBS_pal)
 				continue;
 
-			Vec3f ptf = pal_model_g->cam2world(p.u, p.v) / p.idepth;
+			Vec3f ptf;
+			if(USE_PAL == 1){
+				ptf = pal_model_g->cam2world(p.u, p.v) / p.idepth;
+			}
+			else{
+				ptf(0) = ((p.u)*kfd->fxi + kfd->cxi) / p.idepth;
+				ptf(1) = ((p.v)*kfd->fyi + kfd->cyi) / p.idepth;
+				ptf(2) = 1.0/p.idepth;
+
+			}
 			Vec3 pt = kfd->camToWorld.rotationMatrix() * ptf.cast<double>() + kfd->camToWorld.translation();
 			uint32_t color_pcl_32 = 0;
 			uint8_t r, g, b;

@@ -559,7 +559,7 @@ int main( int argc, char** argv )
 				using namespace cv;
 				static int poseHasInit = false;
 				// 起点:DLT计算坐标系对齐变换
-				if(mkid == 304 && !poseHasInit){
+				if(mkid == 223 && !poseHasInit){
 					auto curFrameShell = fullSystem->getAllFrames().back();
 					Eigen::Matrix3f Rdso = curFrameShell->camToWorld.rotationMatrix().cast<float>();
 					Eigen::Vector3f tdso = curFrameShell->camToWorld.translation().cast<float>();
@@ -570,6 +570,8 @@ int main( int argc, char** argv )
 					if(calcRes == true){
 						poseHasInit = true;
 						fullSystem->dso2global = dso2global;
+						std::ofstream of("logs/dsoLocal2WorldSim3.log");
+						of << dso2global.matrix() << std::endl;	
 						if(!trajFile.empty()){
 							Sophus::Sim3f global2dso = dso2global.inverse();
 							auto trajdso = fullSystem->traj;
@@ -582,15 +584,14 @@ int main( int argc, char** argv )
 					}
 				}
 				// 终点:结束
-				else if(mkid == 306){
+				else if(mkid == 231){
 					printf("\n\n *恭喜* 你已经到306啦!\n");
-					break;
 				}
 				else if(poseHasInit){
 					auto curFrameShell = fullSystem->getAllFrames().back();
 					Eigen::Matrix3f curPoseR = fullSystem->dso2global.rotationMatrix() * curFrameShell->camToWorld.cast<float>().rotationMatrix();
 					Eigen::Vector3f curPoset = fullSystem->dso2global * curFrameShell->camToWorld.cast<float>().translation();
-					outputNavigationMsg(fullSystem->traj, curPoseR, curPoset);;
+					// outputNavigationMsg(fullSystem->traj, curPoseR, curPoset);;
 				}
 			}
 

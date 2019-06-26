@@ -16,14 +16,14 @@
 # mode=2 \
 # sampleoutput=1
 
-real dataset
+# real dataset
 ./build/bin/dso_dataset \
-files=/home/hwj23/Dataset/PAL/real/s29/images \
+files=/home/hwj23/Dataset/PAL/real/s38/images \
 calib=/home/hwj23/Dataset/PAL/calib_results_real.txt \
 gamma=/home/hwj23/Dataset/PAL/pcalib.txt \
 vignette=/home/hwj23/Dataset/PAL/vignette.png \
 preset=0 \
 mode=0 \
 start=0 \
-# trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt \
-sampleoutput=1
+trajectory=/home/hwj23/Dataset/PAL/trajectory_223_231.txt \
+sampleoutput=1 \
