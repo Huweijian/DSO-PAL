@@ -1,6 +1,6 @@
 # DSO-PAL(Panoramic Annular Len)
-将DSO移植到PAL相机
-
+将DSO移植到PAL相机  
+An indoor positioning framework based on panoramic visual odometry for visually impaired people
 # DSO: Direct Sparse Odometry
 
 For more information see
