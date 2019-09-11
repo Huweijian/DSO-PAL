@@ -579,7 +579,7 @@ int main( int argc, char** argv )
 								pose = global2dso * pose;
 							}
 							viewer->setNavigationTrajectory(trajdso);	
-							waitKey();
+							// waitKey();
 						}
 					}
 				}

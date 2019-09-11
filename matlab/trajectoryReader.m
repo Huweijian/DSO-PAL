@@ -1,10 +1,10 @@
 clc;
 % clear;
-clearvars -except tra_dso_all_s33 tra_dso_all_s34 tra_dso_all_s35 tra_dso_all_s36 tra_dso_all_s38 tra_dso_all_s37
+clearvars -except tra_dso_all_s*
 
 MAX_LEN = 2000; % max len
 MARKER_ID = 223;
-seq_dir = 'pal_s38';
+seq_dir = 'pal_s40';
 
 mkfile = [seq_dir '/hwjcamPoseMarker.log'];
 mkfileid = fopen(mkfile);

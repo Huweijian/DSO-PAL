@@ -49,14 +49,21 @@ gt = cumsum(gtinc, 2);
 hold on;
 % plot(tra_dso_all(3, :), tra_dso_all(2, :));
 
-plot(tra_dso_all_s33(3, :), tra_dso_all_s33(2, :));
-plot(tra_dso_all_s34(3, :), tra_dso_all_s34(2, :));
-plot(tra_dso_all_s35(3, :), tra_dso_all_s35(2, :));
-plot(tra_dso_all_s37(3, :), tra_dso_all_s37(2, :));
-plot(tra_dso_all_s38(3, :), tra_dso_all_s38(2, :)); % not good 
-plot(tra_dso_all_s36(3, :), tra_dso_all_s36(2, :), 'LineWidth', 3, 'Color', 'r');
-axis([-10 10 -15 5])
+plot(tra_dso_all_s33(3, :), tra_dso_all_s33(2, :)); % day
+plot(tra_dso_all_s34(3, :), tra_dso_all_s34(2, :)); % night
+plot(tra_dso_all_s35(3, :), tra_dso_all_s35(2, :)); % day
+plot(tra_dso_all_s36(3, :), tra_dso_all_s36(2, :)); % night
+plot(tra_dso_all_s37(3, :), tra_dso_all_s37(2, :)); % night
+% plot(tra_dso_all_s38(3, :), tra_dso_all_s38(2, :)); % not good 
 
+% plot(tra_dso_all_s39(3, :), tra_dso_all_s39(2, :));
+% plot(tra_dso_all_s40(3, :), tra_dso_all_s40(2, :)); % day
+% plot(tra_dso_all_s41(3, :), tra_dso_all_s41(2, :));
+% plot(tra_dso_all_s42(3, :), tra_dso_all_s42(2, :)); % day
+% plot(gt(1, :), gt(2, :));
+axis([-10+4 15-4 -20+4 5-4])
+
+legend('route 1','route 2','route 3','route 4','route 5')
 
 
 
