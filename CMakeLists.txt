@@ -5,8 +5,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 # set(BUILD_TYPE RelWithDebInfo)
 
-set(BUILD_TYPE Release)
-# set(BUILD_TYPE Debug)
+# set(BUILD_TYPE Release)
+set(BUILD_TYPE Debug)
 
 if(${BUILD_TYPE} MATCHES "Debug")
 	message("!!!Debug mode!!!")

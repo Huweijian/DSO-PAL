@@ -88,15 +88,15 @@ public:
 	PhotometricUndistorter* photometricUndist;
 
 	Mat33 K;
-protected:
+	float* remapX;
+	float* remapY;
     int w, h, wOrg, hOrg, wUp, hUp;
+protected:
     int upsampleUndistFactor;
 	VecX parsOrg;
 	bool valid;
 	bool passthrough = false;
 
-	float* remapX;
-	float* remapY;
 
 	void applyBlurNoise(float* img) const;
 

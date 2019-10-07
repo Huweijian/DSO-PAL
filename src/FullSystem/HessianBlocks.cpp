@@ -155,8 +155,7 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 			int wlm1 = wG[lvlm1];
 			Eigen::Vector3f* dI_lm = dIp[lvlm1];
 
-
-
+			// 初始化金字塔图像
 			for(int y=0;y<hl;y++)
 				for(int x=0;x<wl;x++)
 				{
@@ -167,6 +166,7 @@ void FrameHessian::makeImages(float* color, CalibHessian* HCalib)
 				}
 		}
 
+		// 计算梯度
 		for(int idx=wl;idx < wl*(hl-1);idx++)
 		{
 

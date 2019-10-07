@@ -37,6 +37,44 @@ class B:public A{
     }
 };
 
+void imshow32f(const std::string &winname, const cv::Mat &img, float alpha = 1.0){
+    Mat img_show;
+    img.convertTo(img_show, CV_8U, alpha);
+    imshow(winname, img_show);
+}
+
+void imshow32mp(const std::string &winname, const cv::Mat &img, float alpha = 1.0){
+
+}
+
+
+void testmpslam(){
+	UndistortPAL *ump = nullptr;
+    ump = new UndistortPAL(3);
+    ump->loadPhotometricCalibration("", "", "");
+    Mat raw_img2 = imread("02200.png", 0);
+    Mat raw_img;
+    raw_img2.convertTo(raw_img, CV_32FC1);
+
+    Mat remapX = Mat(ump->h, ump->w, CV_32FC1, ump->remapX);
+    Mat remapY = Mat(ump->h, ump->w, CV_32FC1, ump->remapY);
+
+    Mat mpimg(ump->h, ump->w, CV_32FC1);
+
+    remap(raw_img, mpimg, remapX, remapY, CV_INTER_LINEAR, BORDER_CONSTANT, 0);
+    vector<Mat> mpimgs;
+    for(int i=0; i<4; i++){
+        Mat img = mpimg.colRange(i*pal_model_g->mp_width, (i+1)*pal_model_g->mp_width - 1);
+        mpimgs.push_back(img);
+        imshow32f("img", img);
+        waitKey();
+    }
+    
+    imshow32f("img_raw", raw_img);
+    waitKey();
+    imshow32f("img", mpimg);
+    waitKey();
+}
 
 int main(void){
     pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
@@ -49,11 +87,12 @@ int main(void){
     // waitKey();
     // return -1;
 
-    // // 校正畸变
-	// UndistortPAL *ump = nullptr;
-    // ump = new UndistortPAL(3);
-    // ump->loadPhotometricCalibration("", "", "");
 
+    // 测试mp去畸变
+    testmpslam();
+
+    // ImageAndExposure *mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
+    // Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
 
     // // test SE3 * Vec
     // Sim3f trans;
