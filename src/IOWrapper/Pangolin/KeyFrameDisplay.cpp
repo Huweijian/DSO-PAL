@@ -71,8 +71,8 @@ void KeyFrameDisplay::setFromF(FrameShell* frame, CalibHessian* HCalib)
 	id = frame->id;
 	//PAL fake camera parameter for visualization
 	if(USE_PAL == 1){ // 0 1
-		fx = 0.1 * (pal_model_g->width_/2);
-		fy = 0.1 * (pal_model_g->height_/2); 
+		fx = 0.5 * (pal_model_g->width_/2);
+		fy = 0.5 * (pal_model_g->height_/2); 
 		cx = pal_model_g->width_/2;
 		cy = pal_model_g->height_/2;
 	}
