@@ -69,7 +69,7 @@ void testmpslam(){
     // convertMaps(remapX, remapY, dstmap1, dstmap2, CV_32FC1);
     // cout << dstmap1.size() << " " << dstmap2.size() <<endl;
 
-    auto lsd = createLineSegmentDetectorMy(1, 1, 0.6, 0.3, 10);
+    auto lsd = new LineSegmentDetectorMy(1, 1, 0.6, 1, 10);
 
     vector<Mat> mpimgs;
     for(int i=0; i<4; i++){
@@ -85,6 +85,7 @@ void testmpslam(){
         cvtColor(img, img_show, COLOR_GRAY2RGB);
         lsd->drawSegments(img_show, lines);
         imshow("img", img_show);
+        imshow("angle", lsd->angle_rgb_);
         waitKey();
     }
 
