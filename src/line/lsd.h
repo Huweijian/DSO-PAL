@@ -230,6 +230,8 @@ private:
 public:
 // hwj debug variables here
 	Mat angle_rgb_;
+    Mat valid_grad_;
+    Mat region_mask_;
 
 };
 

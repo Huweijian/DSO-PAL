@@ -52,7 +52,9 @@
         "utility": "cpp",
         "*.ipp": "cpp",
         "condition_variable": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "algorithm": "cpp",
+        "cfenv": "cpp"
     },
     "cSpell.enabledLanguageIds": [
         "latex",

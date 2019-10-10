@@ -85,7 +85,12 @@ void testmpslam(){
         cvtColor(img, img_show, COLOR_GRAY2RGB);
         lsd->drawSegments(img_show, lines);
         imshow("img", img_show);
+        moveWindow("img", 100, 100);
         imshow("angle", lsd->angle_rgb_);
+        moveWindow("angle", 100*2+img.cols, 100);
+        imshow("valid_grad", lsd->valid_grad_);
+        moveWindow("valid_grad", 100*3+img.cols*2, 100);
+
         waitKey();
     }
 

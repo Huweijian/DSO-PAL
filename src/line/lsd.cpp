@@ -138,6 +138,8 @@ void LineSegmentDetectorMy::detect(InputArray _image, OutputArray _lines,
     image = _image.getMat();
     CV_Assert(!image.empty() && image.type() == CV_8UC1);
 
+    region_mask_ = Mat::zeros(image.size(), CV_8UC1);
+
     std::vector<Vec4f> lines;
     std::vector<double> w, p, n;
     w_needed = _width.needed();
@@ -204,6 +206,14 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
 
             // Ignore small regions
             if(reg.size() < min_reg_size) { continue; }
+
+            for (auto &p : reg)
+            {
+                region_mask_.at<uchar>(p.y, p.x) = 255;
+            }
+
+            imshow("region", region_mask_);
+            waitKey(100);
 
             // Construct rectangular approximation for the region
             rect rec;
@@ -276,22 +286,31 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
             double norm = std::sqrt((gx * gx + gy * gy) / 4.0); // gradient norm
 
             modgrad_row[x] = norm;    // store gradient
-
-            if (norm <= threshold)  // norm too small, gradient no defined
+            angles_row[x] = fastAtan2(float(gx), float(-gy)) * DEG_TO_RADS; // gradient angle computation
+            if (norm > max_grad)
             {
-                angles_row[x] = NOTDEF;
-            }
-            else
-            {
-                angles_row[x] = fastAtan2(float(gx), float(-gy)) * DEG_TO_RADS;  // gradient angle computation
-                if (norm > max_grad) { max_grad = norm; }
+                max_grad = norm;
             }
 
         }
     }
 
-	// hwjdebug ---------------------------
-	{
+    Mat valid_grad, modgrad1b;
+    modgrad.convertTo(modgrad1b, CV_8UC1);
+
+    // 计算可以考虑的阈值
+    adaptiveThreshold(modgrad1b, valid_grad, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 31, 0);
+    angles.setTo(NOTDEF, ~valid_grad);
+    valid_grad_ = valid_grad;
+
+
+    // hwjdebug ---------------------------
+    // {
+    //     imshow("thres", valid_grad);
+    //     imshow("grad", modgrad1b);
+    //     waitKey();
+    // }
+    {
 		using namespace std;
 		Mat angles_deg = angles / DEG_TO_RADS;
 		double ang_min, ang_max;
@@ -882,11 +901,15 @@ double LineSegmentDetectorMy::nfa(const int& n, const int& k, const double& p) c
 
 inline bool LineSegmentDetectorMy::isAligned(int x, int y, const double& theta, const double& prec) const
 {
+    // 图像边界
     if(x < 0 || y < 0 || x >= angles.cols || y >= angles.rows) { return false; }
+    
+    // 是否有角度
     const double& a = angles.at<double>(y, x);
     if(a == NOTDEF) { return false; }
 
     // It is assumed that 'theta' and 'a' are in the range [-pi,pi]
+    // 角度差,缩放到[-pi, pi]
     double n_theta = theta - a;
     if(n_theta < 0) { n_theta = -n_theta; }
     if(n_theta > M_3_2_PI)
