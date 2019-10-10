@@ -9,7 +9,7 @@ class LineSegmentDetectorMy
 public:
 
 /**
- * Create a LineSegmentDetectorImpl object. Specifying scale, number of subdivisions for the image, should the lines be refined and other constants as follows:
+ * Create a LineSegmentDetectorMy object. Specifying scale, number of subdivisions for the image, should the lines be refined and other constants as follows:
  *
  * @param _refine       How should the lines found be refined?
  *                      LSD_REFINE_NONE - No refinement applied.
@@ -104,14 +104,13 @@ private:
         double modgrad;
     };
 
-
-    struct coorlist
+    struct normPoint
     {
         Point2i p;
-        struct coorlist* next;
+        int norm;
     };
 
-    std::vector<coorlist> list;
+    std::vector<normPoint> ordered_points;
 
     struct rect
     {
@@ -147,10 +146,10 @@ private:
 /**
  * Finds the angles and the gradients of the image. Generates a list of pseudo ordered points.
  *
- * @param threshold The minimum value of the angle that is considered defined, otherwise NOTDEF
- * @param n_bins    The number of bins with which gradients are ordered by, using bucket sort.
- * @param list      Return: Vector of coordinate points that are pseudo ordered by magnitude.
- *                  Pixels would be ordered by norm value, up to a precision given by max_grad/n_bins.
+ * @param threshold      The minimum value of the angle that is considered defined, otherwise NOTDEF
+ * @param n_bins         The number of bins with which gradients are ordered by, using bucket sort.
+ * @param ordered_points Return: Vector of coordinate points that are pseudo ordered by magnitude.
+ *                       Pixels would be ordered by norm value, up to a precision given by max_grad/n_bins.
  */
     void ll_angle(const double& threshold, const unsigned int& n_bins);
 
@@ -226,6 +225,12 @@ private:
  */
     bool isAligned(int x, int y, const double& theta, const double& prec) const;
 
+public:
+    // Compare norm
+    static inline bool compare_norm( const normPoint& n1, const normPoint& n2 )
+    {
+        return (n1.norm > n2.norm);
+    }
 
 public:
 // hwj debug variables here
