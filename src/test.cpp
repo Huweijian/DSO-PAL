@@ -1,12 +1,16 @@
-#include <iostream>
-#include <string>
-#include <Eigen/Core>
 #include <util/pal_model.h>
 #include <util/pal_interface.h>
-#include <OptimizationBackend/MatrixAccumulators.h>
-#include <vector>
-#include <opencv2/core/eigen.hpp>
 #include <util/Undistort.h>
+#include <OptimizationBackend/MatrixAccumulators.h>
+#include <line/lsd.h>
+
+#include <Eigen/Core>
+#include <opencv2/core/eigen.hpp>
+#include <opencv2/line_descriptor.hpp>
+
+#include <vector>
+#include <iostream>
+#include <string>
 
 #define T transpose()
 using namespace cv;
@@ -52,28 +56,38 @@ void testmpslam(){
 	UndistortPAL *ump = nullptr;
     ump = new UndistortPAL(3);
     ump->loadPhotometricCalibration("", "", "");
-    Mat raw_img2 = imread("02200.png", 0);
-    Mat raw_img;
-    raw_img2.convertTo(raw_img, CV_32FC1);
+    Mat raw_img = imread("02200.png", 0);
+    raw_img.convertTo(raw_img, CV_32FC1);
 
     Mat remapX = Mat(ump->h, ump->w, CV_32FC1, ump->remapX);
     Mat remapY = Mat(ump->h, ump->w, CV_32FC1, ump->remapY);
-
     Mat mpimg(ump->h, ump->w, CV_32FC1);
-
     remap(raw_img, mpimg, remapX, remapY, CV_INTER_LINEAR, BORDER_CONSTANT, 0);
+
+    // convert map
+    // Mat dstmap1, dstmap2;
+    // convertMaps(remapX, remapY, dstmap1, dstmap2, CV_32FC1);
+    // cout << dstmap1.size() << " " << dstmap2.size() <<endl;
+
+    auto lsd = createLineSegmentDetectorMy(1, 1, 0.6, 0.3, 10);
+
     vector<Mat> mpimgs;
     for(int i=0; i<4; i++){
         Mat img = mpimg.colRange(i*pal_model_g->mp_width, (i+1)*pal_model_g->mp_width - 1);
+        img.convertTo(img, CV_8UC1);
         mpimgs.push_back(img);
-        imshow32f("img", img);
+
+        vector<cv::Vec4f> lines;
+        lsd->detect(img, lines);
+        cout << lines.size() << endl;
+
+        Mat img_show;
+        cvtColor(img, img_show, COLOR_GRAY2RGB);
+        lsd->drawSegments(img_show, lines);
+        imshow("img", img_show);
         waitKey();
     }
-    
-    imshow32f("img_raw", raw_img);
-    waitKey();
-    imshow32f("img", mpimg);
-    waitKey();
+
 }
 
 int main(void){

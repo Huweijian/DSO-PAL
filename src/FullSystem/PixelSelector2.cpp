@@ -193,9 +193,9 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		// imshow("ths", thsMat);
 		// imshow("thsSmo", thsSmoMat);
 
-		// imshow("grad", grad);
-		// moveWindow("grad", 50+w+50, 50);
-		// waitKey(1);
+		imshow("grad", grad);
+		moveWindow("grad", 50+w+50, 50);
+		waitKey(0);
 	}
 
 
