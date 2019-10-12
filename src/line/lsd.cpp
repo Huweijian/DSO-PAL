@@ -168,6 +168,12 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
     const double prec = CV_PI * ANG_TH / 180;
     const double p = ANG_TH / 180;
     const double rho = QUANT / sin(prec);    // gradient magnitude threshold
+    const double max_prec = prec * 3;
+
+    // hwjdebug output parameters
+    {
+        printf("ANG_TH = %.2f\n", ANG_TH);
+    }
 
     if(SCALE != 1)
     {
@@ -202,18 +208,22 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
         if((used.at<uchar>(point) == NOTUSED) && (angles.at<double>(point) != NOTDEF))
         {
             double reg_angle;
-            region_grow(ordered_points[i].p, reg, reg_angle, prec);
+            region_grow(ordered_points[i].p, reg, reg_angle, prec, max_prec);
 
             // Ignore small regions
             if(reg.size() < min_reg_size) { continue; }
 
-            for (auto &p : reg)
-            {
-                region_mask_.at<uchar>(p.y, p.x) = 255;
-            }
+            // hwjdebug =====================
+            // {
+            //     for (auto &p : reg)
+            //     {
+            //         region_mask_.at<uchar>(p.y, p.x) = 255;
+            //     }
 
-            imshow("region", region_mask_);
-            waitKey(100);
+            //     imshow("region", region_mask_);
+            //     waitKey();
+            // }
+            // =================================
 
             // Construct rectangular approximation for the region
             rect rec;
@@ -313,9 +323,10 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
     {
 		using namespace std;
 		Mat angles_deg = angles / DEG_TO_RADS;
-		double ang_min, ang_max;
-		cv::minMaxIdx(angles_deg, &ang_min, &ang_max);
-		printf("ang min=%.2f max=%.2f\n", ang_min, ang_max);
+
+		// double ang_min, ang_max;
+		// cv::minMaxIdx(angles_deg, &ang_min, &ang_max);
+		// printf("ang min=%.2f max=%.2f\n", ang_min, ang_max);
 		
 		Mat v = (angles >= 0);
 		Mat s(angles.size(), CV_8UC1, Scalar(200));
@@ -327,20 +338,17 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
 		cv::merge(hsv_vec, hsv);
 		cvtColor(hsv, angle_rgb, COLOR_HSV2BGR);
 
-
-
 		Mat grad1b;
 		modgrad.convertTo(grad1b, CV_8UC1);
 
         angle_rgb_ = angle_rgb;
+        angle_degd2_ = h;
 		// imshow("angle", angle_rgb);
 		// imshow("grad", grad1b);
 		// waitKey();
         }
 
     // ----------------
-
-
 
     // Compute histogram of gradient values
     double bin_coef = (max_grad > 0) ? double(n_bins - 1) / max_grad : 0; // If all image is smooth, max_grad <= 0
@@ -362,7 +370,7 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
 }
 
 void LineSegmentDetectorMy::region_grow(const Point2i& s, std::vector<RegionPoint>& reg,
-                                      double& reg_angle, const double& prec)
+                                      double& reg_angle, double prec, double max_prec)
 {
     reg.clear();
 
@@ -380,12 +388,15 @@ void LineSegmentDetectorMy::region_grow(const Point2i& s, std::vector<RegionPoin
     float sumdy = float(std::sin(reg_angle));
     *seed.used = USED;
 
+    int forgive_count = 0;
+
     //Try neighboring regions
     for (size_t i = 0;i<reg.size();i++)
     {
         const RegionPoint& rpoint = reg[i];
         int xx_min = std::max(rpoint.x - 1, 0), xx_max = std::min(rpoint.x + 1, img_width - 1);
         int yy_min = std::max(rpoint.y - 1, 0), yy_max = std::min(rpoint.y + 1, img_height - 1);
+        int curSize = reg.size();
         for(int yy = yy_min; yy <= yy_max; ++yy)
         {
             uchar* used_row = used.ptr<uchar>(yy);
@@ -547,7 +558,8 @@ bool LineSegmentDetectorMy::refine(std::vector<RegionPoint>& reg, double reg_ang
     double tau = 2.0 * sqrt((s_sum - 2.0 * mean_angle * sum) / double(n) + mean_angle * mean_angle);
 
     // Try new region
-    region_grow(Point(reg[0].x, reg[0].y), reg, reg_angle, tau);
+    // TODO: reg_angle 需要修改
+    region_grow(Point(reg[0].x, reg[0].y), reg, reg_angle, prec, prec);
 
     if (reg.size() < 2) { return false; }
 
@@ -906,29 +918,31 @@ void LineSegmentDetectorMy::drawSegments(InputOutputArray _image, InputArray lin
 
     CV_Assert(_lines.depth() == CV_32F || _lines.depth() == CV_32S);
 
-    // Draw segments
-    if (_lines.depth() == CV_32F)
+
+    for (int i = 0; i < N; ++i)
     {
-        for (int i = 0; i < N; ++i)
+        // Draw segments
+        int R = (rand() % (int)(255 + 1));
+        int G = (rand() % (int)(255 + 1));
+        int B = (rand() % (int)(255 + 1));
+        Scalar lineColor = Scalar(R, G, B);
+
+        if (_lines.depth() == CV_32F)
         {
-            const Vec4f& v = _lines.at<Vec4f>(i);
+            const Vec4f &v = _lines.at<Vec4f>(i);
             const Point2f b(v[0], v[1]);
             const Point2f e(v[2], v[3]);
-            line(_image, b, e, Scalar(0, 0, 255), 1);
+            line(_image, b, e, lineColor, 1);
         }
-    }
-    else
-    {
-        for (int i = 0; i < N; ++i)
+        else
         {
-            const Vec4i& v = _lines.at<Vec4i>(i);
+            const Vec4i &v = _lines.at<Vec4i>(i);
             const Point2i b(v[0], v[1]);
             const Point2i e(v[2], v[3]);
-            line(_image, b, e, Scalar(0, 0, 255), 1);
+            line(_image, b, e, lineColor, 1);
         }
     }
 }
-
 
 int LineSegmentDetectorMy::compareSegments(const Size& size, InputArray lines1, InputArray lines2, InputOutputArray _image)
 {

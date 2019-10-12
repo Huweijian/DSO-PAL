@@ -163,7 +163,7 @@ private:
  * @param prec      The precision by which each region angle should be aligned to the mean.
  */
     void region_grow(const Point2i& s, std::vector<RegionPoint>& reg,
-                     double& reg_angle, const double& prec);
+                     double& reg_angle, double prec, double max_prec);
 
 /**
  * Finds the bounding rotated rectangle of a region.
@@ -235,6 +235,7 @@ public:
 public:
 // hwj debug variables here
 	Mat angle_rgb_;
+    Mat angle_degd2_; // deg devide 2
     Mat valid_grad_;
     Mat region_mask_;
 

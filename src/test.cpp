@@ -7,6 +7,7 @@
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/line_descriptor.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
 #include <vector>
 #include <iostream>
@@ -19,41 +20,63 @@ using namespace Eigen;
 using namespace dso;
 using namespace Sophus;
 
-class A{
-    public:
+class A
+{
+public:
     int a;
-    virtual int func(int aa){
-        a = aa*10;
+    virtual int func(int aa)
+    {
+        a = aa * 10;
         printf("A::func() called\n");
         return a;
     }
-    void printa(){
-        cout <<"A::printa() a=" <<  a << endl;
+    void printa()
+    {
+        cout << "A::printa() a=" << a << endl;
     }
 };
 
-class B:public A{
-    public:
-    int func(int bb){
+class B : public A
+{
+public:
+    int func(int bb)
+    {
         a = bb;
         printf("B::func() called\n");
         return a;
     }
 };
 
-void imshow32f(const std::string &winname, const cv::Mat &img, float alpha = 1.0){
+void imshow32f(const std::string &winname, const cv::Mat &img, float alpha = 1.0)
+{
     Mat img_show;
     img.convertTo(img_show, CV_8U, alpha);
     imshow(winname, img_show);
 }
 
-void imshow32mp(const std::string &winname, const cv::Mat &img, float alpha = 1.0){
-
+void imshow32mp(const std::string &winname, const cv::Mat &img, float alpha = 1.0)
+{
 }
 
 
-void testmpslam(){
-	UndistortPAL *ump = nullptr;
+const int param_line_pos_thres = 3;
+
+struct Line
+{
+    enum Position{
+        COMMON,
+        LEFT,
+        RIGHT,
+    };
+    float x1, y1, x2, y2;
+    float length;
+    float angle;
+    Position posflag;
+};
+
+void testmpslam()
+{
+    UndistortPAL *ump = nullptr;
     ump = new UndistortPAL(3);
     ump->loadPhotometricCalibration("", "", "");
     Mat raw_img = imread("02200.png", 0);
@@ -69,36 +92,83 @@ void testmpslam(){
     // convertMaps(remapX, remapY, dstmap1, dstmap2, CV_32FC1);
     // cout << dstmap1.size() << " " << dstmap2.size() <<endl;
 
-    auto lsd = new LineSegmentDetectorMy(1, 1, 0.6, 1, 10);
+    auto lsd = new LineSegmentDetectorMy(0, 1, 0.6, 1, 20);
+    // auto lsd = createLineSegmentDetector(0, 1, 0.6, 1, 45);
 
-    vector<Mat> mpimgs;
-    for(int i=0; i<4; i++){
-        Mat img = mpimg.colRange(i*pal_model_g->mp_width, (i+1)*pal_model_g->mp_width - 1);
+    vector<Mat> mpimg_showv;
+    vector<vector<cv::Vec4f>> linesv4(4);
+    vector<vector<Line>> lines(4);
+    for (int i = 0; i < 4; i++)
+    {
+        Mat img = mpimg.colRange(i * pal_model_g->mp_width, (i + 1) * pal_model_g->mp_width - 1);
+        img = img.rowRange(0, img.rows - 20);
         img.convertTo(img, CV_8UC1);
-        mpimgs.push_back(img);
 
-        vector<cv::Vec4f> lines;
-        lsd->detect(img, lines);
-        cout << lines.size() << endl;
+        lsd->detect(img, linesv4[i]);
+        int width = img.cols, height = img.rows;
+
+        for (auto &l : linesv4[i])
+        {
+            float x1 = l[0], y1 = l[1], x2 = l[2], y2 = l[3];
+            if (x1 > x2)
+            {
+                std::swap(x1, x2);
+                std::swap(y1, y2);
+            }
+
+            float len = std::sqrt(std::pow(x1 - x2, 2) + std::pow(y1 - y2, 2));
+            float angle = std::atan2(y2 - y1, x2 - x1);
+            Line::Position pos = Line::Position::COMMON;
+            if(x1 < param_line_pos_thres){
+                pos = Line::Position::LEFT;
+            }
+            else if(x2 > width-1 - param_line_pos_thres){
+                pos = Line::Position::RIGHT;
+            }
+                
+            Line ll{x1, y1, x2, y2, len, angle, pos};
+            lines[i].emplace_back(ll);
+        }
 
         Mat img_show;
         cvtColor(img, img_show, COLOR_GRAY2RGB);
-        lsd->drawSegments(img_show, lines);
-        imshow("img", img_show);
-        moveWindow("img", 100, 100);
-        imshow("angle", lsd->angle_rgb_);
-        moveWindow("angle", 100*2+img.cols, 100);
-        imshow("valid_grad", lsd->valid_grad_);
-        moveWindow("valid_grad", 100*3+img.cols*2, 100);
+        lsd->drawSegments(img_show, linesv4[i]);
 
-        waitKey();
+        // imshow("img", img_show);
+        // moveWindow("img", 100, 100);
+        // imshow("angle_rgb", lsd->angle_rgb_);
+        // moveWindow("angle_rgb", 100*2+img.cols, 100);
+        // imshow("angle_d2", lsd->angle_degd2_);
+        // moveWindow("angle_d2", 100*2+img.cols, 100*2 + img.rows);
+        // imshow("valid_grad", lsd->valid_grad_);
+        // moveWindow("valid_grad", 100*3+img.cols*2, 100);
+
+        waitKey(1);
+        mpimg_showv.push_back(img_show);
     }
 
+    // TODO: 融合当前pinhole中靠边的直线
+    // 1. 角度排序 
+    // 2. 判断边沿直线和相邻角度有无合并可能性
+    // 直接上2,先不考虑效率
+    for (int i = 0; i < 4; i++) {
+        auto cur_line = lines[i];
+        for(auto &l : cur_line){
+            if(l.posflag != 0){
+
+            }
+        }
+    }
+
+    Mat mpimg_show;
+    hconcat(mpimg_showv, mpimg_show);
+    imshow("mp", mpimg_show);
+    waitKey();
 }
 
-int main(void){
-    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt"); 
-
+int main(void)
+{
+    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
     // // flip
     // Mat img = imread("/home/hwj23/Dataset/PAL/real/s6/images/00000.png");
@@ -106,7 +176,6 @@ int main(void){
     // imshow("img", img);
     // waitKey();
     // return -1;
-
 
     // 测试mp去畸变
     testmpslam();
@@ -128,7 +197,7 @@ int main(void){
     // Vector3f p2 = transinv * p;
     // cout<< p2 << endl;
     // return -1;
-    
+
     // calc dso coord to mk coord
     // Matrix3f R_dso2mk = AngleAxisf(0, Vector3f::UnitY()).matrix();
     // Vector3f t_dso2mk(1, 2, 3);
@@ -137,7 +206,7 @@ int main(void){
     //     Matrix3f Rdso, Rmk;
     //     Vector3f tdso, tmk;
 
-    //     Rdso = AngleAxisf(0, Vector3f::UnitY()).matrix(); 
+    //     Rdso = AngleAxisf(0, Vector3f::UnitY()).matrix();
     //     tdso << i*0.1, 1, 2;
 
     //     Rmk = Rdso * R_dso2mk;
@@ -147,7 +216,7 @@ int main(void){
 
     //     int ret = calcWorldCoord(Rdso, tdso, Rmk, tmk, result);
     // }
-    
+
     // return 0;
 
     // verify pal center
@@ -160,7 +229,7 @@ int main(void){
     // waitKey();
     // return -1;
 
-    // resize vignette image 
+    // resize vignette image
     // auto img = cv::imread("/home/hwj23/Dataset/TUM/sequence_19/sml_vignette.png", cv::IMREAD_UNCHANGED);
     // int h = 512, w = 640;
     // img = img.colRange(w/2-h/2-1, w/2+h/2-2);
@@ -175,8 +244,7 @@ int main(void){
     // }
     // return -1;
 
-
-    // // create vignette image for pal 
+    // // create vignette image for pal
     // cv::Mat img = cv::Mat::ones(720, 720, CV_16UC1)*60000;
     // imwrite("/home/hwj23/Dataset/PAL/vignette.png", img);
     // return -1;
@@ -217,7 +285,7 @@ int main(void){
 
     // // dr/dd ---------------------------
     // Vector3f dxyzdd(0, 0, 1);
-    // Vector2f duvdd = duv2dxyz * dxyzdd; 
+    // Vector2f duvdd = duv2dxyz * dxyzdd;
     // cout << pt.T << "\n\n";
     // cout << duv2dxyz << "\n\n";
     // cout << duvdd.transpose() << endl;
