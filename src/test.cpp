@@ -72,7 +72,52 @@ struct Line
     float length;
     float angle;
     Position posflag;
+    bool isMerged;
 };
+
+inline double distSq_euc(const double x1, const double y1, const double x2, const double y2) {
+    return (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+}
+
+inline double dist_euc(const double x1, const double y1, const double x2, const double y2) {
+    return sqrt(distSq_euc(x1, y1, x2, y2));
+}
+
+void expandLine(vector<Line> &lines, int il, vector<Line>long_edge_lines){
+    auto l = lines[il]; 
+    assert(l.posflag != Line::COMMON);
+    float angle_th = 3;
+    float merge_dist_th = 2;
+
+    vector<Line> ready_merge; 
+    ready_merge.reserve(lines.size());
+    for(int i=0; i<lines.size(); i++){
+        if(i == il) continue;
+
+        float angle_d = abs(l.angle - lines[i].angle);
+        if(angle_d < angle_th || (180 - angle_d) < angle_th){
+            ready_merge.emplace_back(lines[i]);
+        }
+    }
+
+    if(l.posflag == Line::LEFT){
+        std::sort(ready_merge.begin(), ready_merge.end(), [](const Line &lhs, const Line &rhs){return lhs.x1 < rhs.x1;});
+    }
+    else{
+        std::sort(ready_merge.begin(), ready_merge.end(), [](const Line &lhs, const Line &rhs){return lhs.x2 > rhs.x2;});
+    }
+
+    for(int i=0; i<ready_merge.size(); i++){
+        if(l.posflag == Line::LEFT){
+            double dist = dist_euc(l.x2, l.y2, ready_merge[i].x1, ready_merge[i].y2);
+            if(dist < merge_dist_th){
+                // TODO 先别着急写直线融合,先看看LSD对直线的refine需不需要修改
+            }
+
+        }
+    }
+
+}
 
 void testmpslam()
 {
@@ -92,7 +137,8 @@ void testmpslam()
     // convertMaps(remapX, remapY, dstmap1, dstmap2, CV_32FC1);
     // cout << dstmap1.size() << " " << dstmap2.size() <<endl;
 
-    auto lsd = new LineSegmentDetectorMy(0, 1, 0.6, 1, 20);
+    // auto lsd = new LineSegmentDetectorMy(cv::LSD_REFINE_ADV, 1, 0.6, 1, 20);
+    auto lsd = new LineSegmentDetectorMy(cv::LSD_REFINE_ADV, 1, 0.6, 1.0, 22.5, 0, 0.5);
     // auto lsd = createLineSegmentDetector(0, 1, 0.6, 1, 45);
 
     vector<Mat> mpimg_showv;
@@ -107,31 +153,30 @@ void testmpslam()
         lsd->detect(img, linesv4[i]);
         int width = img.cols, height = img.rows;
 
-        for (auto &l : linesv4[i])
-        {
+        for (auto &l : linesv4[i]) {
             float x1 = l[0], y1 = l[1], x2 = l[2], y2 = l[3];
-            if (x1 > x2)
-            {
+            if (x1 > x2) {
                 std::swap(x1, x2);
                 std::swap(y1, y2);
             }
 
             float len = std::sqrt(std::pow(x1 - x2, 2) + std::pow(y1 - y2, 2));
-            float angle = std::atan2(y2 - y1, x2 - x1);
+            float angle = std::atan2(y2 - y1, x2 - x1) / M_PI * 180.0f;
             Line::Position pos = Line::Position::COMMON;
-            if(x1 < param_line_pos_thres){
+            if (x1 < param_line_pos_thres) {
                 pos = Line::Position::LEFT;
-            }
-            else if(x2 > width-1 - param_line_pos_thres){
+            } else if (x2 > width - 1 - param_line_pos_thres) {
                 pos = Line::Position::RIGHT;
             }
-                
-            Line ll{x1, y1, x2, y2, len, angle, pos};
+
+            Line ll{x1, y1, x2, y2, len, angle, pos, false};
             lines[i].emplace_back(ll);
+
+
         }
 
         Mat img_show;
-        cvtColor(img, img_show, COLOR_GRAY2RGB);
+        cv::cvtColor(img, img_show, COLOR_GRAY2RGB);
         lsd->drawSegments(img_show, linesv4[i]);
 
         // imshow("img", img_show);
@@ -151,11 +196,13 @@ void testmpslam()
     // 1. 角度排序 
     // 2. 判断边沿直线和相邻角度有无合并可能性
     // 直接上2,先不考虑效率
+    vector<vector<Line>> long_edge_lines(4);
     for (int i = 0; i < 4; i++) {
-        auto cur_line = lines[i];
-        for(auto &l : cur_line){
-            if(l.posflag != 0){
-
+        auto cur_lines = lines[i];
+        for(int il=0, sz = cur_lines.size(); il<sz; il++){
+            auto &l = cur_lines[il];
+            if(l.isMerged == false && l.posflag != Line::Position::COMMON){
+                expandLine(cur_lines, il, long_edge_lines[i]); 
             }
         }
     }

@@ -163,7 +163,7 @@ private:
  * @param prec      The precision by which each region angle should be aligned to the mean.
  */
     void region_grow(const Point2i& s, std::vector<RegionPoint>& reg,
-                     double& reg_angle, double prec, double max_prec);
+                     double& reg_angle, double prec);
 
 /**
  * Finds the bounding rotated rectangle of a region.
@@ -204,7 +204,7 @@ private:
  * Try some rectangles variations to improve NFA value. Only if the rectangle is not meaningful (i.e., log_nfa <= log_eps).
  * @return      The new NFA value.
  */
-    double rect_improve(rect& rec) const;
+    double rect_improve(rect& rec);
 
 /**
  * Calculates the number of correctly aligned points within the rectangle.
@@ -238,6 +238,10 @@ public:
     Mat angle_degd2_; // deg devide 2
     Mat valid_grad_;
     Mat region_mask_;
+    std::vector<int> line_refine_times_;
+    int cur_refine_times_ = 0;
+    Mat image_line_3b_;
+    Mat image_reg_3b_;
 
 };
 

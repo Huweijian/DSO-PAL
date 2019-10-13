@@ -137,6 +137,8 @@ void LineSegmentDetectorMy::detect(InputArray _image, OutputArray _lines,
 {
     image = _image.getMat();
     CV_Assert(!image.empty() && image.type() == CV_8UC1);
+    cvtColor(_image, image_line_3b_, COLOR_GRAY2BGR);
+    image_reg_3b_ = image_line_3b_.clone(); 
 
     region_mask_ = Mat::zeros(image.size(), CV_8UC1);
 
@@ -168,7 +170,6 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
     const double prec = CV_PI * ANG_TH / 180;
     const double p = ANG_TH / 180;
     const double rho = QUANT / sin(prec);    // gradient magnitude threshold
-    const double max_prec = prec * 3;
 
     // hwjdebug output parameters
     {
@@ -208,26 +209,31 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
         if((used.at<uchar>(point) == NOTUSED) && (angles.at<double>(point) != NOTDEF))
         {
             double reg_angle;
-            region_grow(ordered_points[i].p, reg, reg_angle, prec, max_prec);
+            cur_refine_times_ = 0;
+            region_grow(ordered_points[i].p, reg, reg_angle, prec);
 
             // Ignore small regions
             if(reg.size() < min_reg_size) { continue; }
 
-            // hwjdebug =====================
-            // {
-            //     for (auto &p : reg)
-            //     {
-            //         region_mask_.at<uchar>(p.y, p.x) = 255;
-            //     }
-
-            //     imshow("region", region_mask_);
-            //     waitKey();
-            // }
-            // =================================
-
             // Construct rectangular approximation for the region
             rect rec;
             region2rect(reg, reg_angle, prec, p, rec);
+
+
+            // hwjdebug  显示原始区域
+            {
+                int R = (rand() % (int)(205 + 1)) + 50;
+                int G = (rand() % (int)(205 + 1)) + 50;
+                int B = (rand() % (int)(205 + 1)) + 50;
+                Vec3b reg_color = Vec3b(B, G, R);
+                for(auto &p : reg){
+                    image_reg_3b_.at<Vec3b>(p.y, p.x) = reg_color;
+                }           
+                Mat show;
+                resize(image_reg_3b_, show, Size(), 2, 2, INTER_NEAREST);
+                imshow("region", show);
+            }
+            
 
             double log_nfa = -1;
             if(doRefine > LSD_REFINE_NONE)
@@ -242,11 +248,30 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
                     if(log_nfa <= LOG_EPS) { continue; }
                 }
             }
-            // Found new line
 
             // Add the offset
             rec.x1 += 0.5; rec.y1 += 0.5;
             rec.x2 += 0.5; rec.y2 += 0.5;
+
+            // // hwjdebug =====================
+            {
+                int R, G, B;
+                R = cur_refine_times_ % 10 * 10;  //密度不足,除了降低角度阈值之外又进行了半径缩小的次数
+                G = cur_refine_times_ / 100 % 10 * 50;  // NFA 优化次数
+                B = cur_refine_times_ / 1000 % 10 * 128;  // 密度不足,需要调整
+                Scalar lineColor = Scalar(B, G, R);
+                // convert black to red (perfect line)
+                if(lineColor == Scalar(0, 0, 0)){
+                    lineColor = Scalar(0, 0, 255);
+                }
+                line(image_line_3b_, Point(rec.x1, rec.y1), Point(rec.x2, rec.y2), lineColor);
+
+                Mat image_show;
+                resize(image_line_3b_, image_show, Size(), 2, 2, INTER_NEAREST);
+                imshow("detected", image_show);
+                waitKey();
+            }
+            // // =================================
 
             // scale the result values if a sub-sampling was performed
             if(SCALE != 1)
@@ -261,6 +286,7 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
             if(w_needed) widths.push_back(rec.width);
             if(p_needed) precisions.push_back(rec.p);
             if(n_needed && doRefine >= LSD_REFINE_ADV) nfas.push_back(log_nfa);
+            line_refine_times_.push_back(cur_refine_times_);
         }
     }
 }
@@ -310,6 +336,7 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
 
     // 计算可以考虑的阈值
     adaptiveThreshold(modgrad1b, valid_grad, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 31, 0);
+    // cv::threshold(modgrad1b, valid_grad, threshold, 255, THRESH_BINARY);
     angles.setTo(NOTDEF, ~valid_grad);
     valid_grad_ = valid_grad;
 
@@ -370,7 +397,7 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
 }
 
 void LineSegmentDetectorMy::region_grow(const Point2i& s, std::vector<RegionPoint>& reg,
-                                      double& reg_angle, double prec, double max_prec)
+                                      double& reg_angle, double prec)
 {
     reg.clear();
 
@@ -532,6 +559,7 @@ bool LineSegmentDetectorMy::refine(std::vector<RegionPoint>& reg, double reg_ang
     double density = double(reg.size()) / (dist(rec.x1, rec.y1, rec.x2, rec.y2) * rec.width);
 
     if (density >= density_th) { return true; }
+    cur_refine_times_+=1000;
 
     // Try to reduce angle tolerance
     double xc = double(reg[0].x);
@@ -558,9 +586,9 @@ bool LineSegmentDetectorMy::refine(std::vector<RegionPoint>& reg, double reg_ang
     double tau = 2.0 * sqrt((s_sum - 2.0 * mean_angle * sum) / double(n) + mean_angle * mean_angle);
 
     // Try new region
-    // TODO: reg_angle 需要修改
-    region_grow(Point(reg[0].x, reg[0].y), reg, reg_angle, prec, prec);
+    region_grow(Point(reg[0].x, reg[0].y), reg, reg_angle, tau);
 
+    // 一个点也扩展不出来,直接gg
     if (reg.size() < 2) { return false; }
 
     region2rect(reg, reg_angle, prec, p, rec);
@@ -568,10 +596,12 @@ bool LineSegmentDetectorMy::refine(std::vector<RegionPoint>& reg, double reg_ang
 
     if (density < density_th)
     {
+        // 密度依然不足
         return reduce_region_radius(reg, reg_angle, prec, p, rec, density, density_th);
     }
     else
     {
+        // 二次区域生长后密度足够大了
         return true;
     }
 }
@@ -588,6 +618,7 @@ bool LineSegmentDetectorMy::reduce_region_radius(std::vector<RegionPoint>& reg, 
 
     while(density < density_th)
     {
+        cur_refine_times_++;
         radSq *= 0.75*0.75; // Reduce region's radius to 75% of its value
         // Remove points from the region and update 'used' map
         for (size_t i = 0; i < reg.size(); ++i)
@@ -615,7 +646,7 @@ bool LineSegmentDetectorMy::reduce_region_radius(std::vector<RegionPoint>& reg, 
     return true;
 }
 
-double LineSegmentDetectorMy::rect_improve(rect& rec) const
+double LineSegmentDetectorMy::rect_improve(rect& rec) 
 {
     double delta = 0.5;
     double delta_2 = delta / 2.0;
@@ -624,6 +655,7 @@ double LineSegmentDetectorMy::rect_improve(rect& rec) const
 
     if(log_nfa > LOG_EPS) return log_nfa; // Good rectangle
 
+    cur_refine_times_+=100;
     // Try to improve
     // Finer precision
     rect r = rect(rec); // Copy
@@ -640,6 +672,7 @@ double LineSegmentDetectorMy::rect_improve(rect& rec) const
     }
     if(log_nfa > LOG_EPS) return log_nfa;
 
+    cur_refine_times_+=100;
     // Try to reduce width
     r = rect(rec);
     for(unsigned int n = 0; n < 5; ++n)
@@ -656,7 +689,7 @@ double LineSegmentDetectorMy::rect_improve(rect& rec) const
         }
     }
     if(log_nfa > LOG_EPS) return log_nfa;
-
+    cur_refine_times_+=100;
     // Try to reduce one side of rectangle
     r = rect(rec);
     for(unsigned int n = 0; n < 5; ++n)
@@ -677,7 +710,7 @@ double LineSegmentDetectorMy::rect_improve(rect& rec) const
         }
     }
     if(log_nfa > LOG_EPS) return log_nfa;
-
+    cur_refine_times_+=100;
     // Try to reduce other side of rectangle
     r = rect(rec);
     for(unsigned int n = 0; n < 5; ++n)
@@ -698,7 +731,7 @@ double LineSegmentDetectorMy::rect_improve(rect& rec) const
         }
     }
     if(log_nfa > LOG_EPS) return log_nfa;
-
+    cur_refine_times_+=100;
     // Try finer precision
     r = rect(rec);
     for(unsigned int n = 0; n < 5; ++n)
@@ -922,10 +955,15 @@ void LineSegmentDetectorMy::drawSegments(InputOutputArray _image, InputArray lin
     for (int i = 0; i < N; ++i)
     {
         // Draw segments
-        int R = (rand() % (int)(255 + 1));
-        int G = (rand() % (int)(255 + 1));
-        int B = (rand() % (int)(255 + 1));
-        Scalar lineColor = Scalar(R, G, B);
+        // int R = (rand() % (int)(255 + 1));
+        // int G = (rand() % (int)(255 + 1));
+        // int B = (rand() % (int)(255 + 1));
+
+        int R, G, B;
+        R = line_refine_times_[i]%10 * 10; //密度不足,除了降低角度阈值之外又进行了半径缩小的次数
+        G = line_refine_times_[i]/100 % 10 * 50;//NFA 优化次数
+        B = line_refine_times_[i]/1000 % 10 * 128;// 密度不足,需要调整
+        Scalar lineColor = Scalar(B, G, R);
 
         if (_lines.depth() == CV_32F)
         {
