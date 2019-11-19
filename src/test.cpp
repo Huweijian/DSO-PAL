@@ -8,10 +8,13 @@
 #include <opencv2/core/eigen.hpp>
 #include <opencv2/line_descriptor.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
-
+#include <opencv2/ximgproc/slic.hpp>
 #include <vector>
 #include <iostream>
 #include <string>
+
+#include "tic_toc.h"
+// #include <opencv2/ximageproc.hpp>
 
 #define T transpose()
 using namespace cv;
@@ -83,12 +86,14 @@ inline double dist_euc(const double x1, const double y1, const double x2, const 
     return sqrt(distSq_euc(x1, y1, x2, y2));
 }
 
-void expandLine(vector<Line> &lines, int il, vector<Line>long_edge_lines){
+// 尝试把编号为il的直线变成长直线
+void expandLine(vector<Line> &lines, int il, Line &long_edge_lines){
     auto l = lines[il]; 
     assert(l.posflag != Line::COMMON);
     float angle_th = 3;
     float merge_dist_th = 2;
 
+    // 根据斜率,筛选可能融合的直线
     vector<Line> ready_merge; 
     ready_merge.reserve(lines.size());
     for(int i=0; i<lines.size(); i++){
@@ -100,6 +105,7 @@ void expandLine(vector<Line> &lines, int il, vector<Line>long_edge_lines){
         }
     }
 
+    // 端点排序
     if(l.posflag == Line::LEFT){
         std::sort(ready_merge.begin(), ready_merge.end(), [](const Line &lhs, const Line &rhs){return lhs.x1 < rhs.x1;});
     }
@@ -107,13 +113,13 @@ void expandLine(vector<Line> &lines, int il, vector<Line>long_edge_lines){
         std::sort(ready_merge.begin(), ready_merge.end(), [](const Line &lhs, const Line &rhs){return lhs.x2 > rhs.x2;});
     }
 
+    // 依次尝试融合
     for(int i=0; i<ready_merge.size(); i++){
         if(l.posflag == Line::LEFT){
             double dist = dist_euc(l.x2, l.y2, ready_merge[i].x1, ready_merge[i].y2);
             if(dist < merge_dist_th){
-                // TODO 先别着急写直线融合,先看看LSD对直线的refine需不需要修改
+                // TODO 先别着急写直线融合,先看看LSD对直线的refine需不需要修
             }
-
         }
     }
 
@@ -138,7 +144,7 @@ void testmpslam()
     // cout << dstmap1.size() << " " << dstmap2.size() <<endl;
 
     // auto lsd = new LineSegmentDetectorMy(cv::LSD_REFINE_ADV, 1, 0.6, 1, 20);
-    auto lsd = new LineSegmentDetectorMy(cv::LSD_REFINE_ADV, 1, 0.6, 1.0, 22.5, 0, 0.5);
+    auto lsd = new LineSegmentDetectorMy(cv::LSD_REFINE_NONE, 1, 0.6, 1.0, 22.5, 0, 0.5);
     // auto lsd = createLineSegmentDetector(0, 1, 0.6, 1, 45);
 
     vector<Mat> mpimg_showv;
@@ -149,6 +155,7 @@ void testmpslam()
         Mat img = mpimg.colRange(i * pal_model_g->mp_width, (i + 1) * pal_model_g->mp_width - 1);
         img = img.rowRange(0, img.rows - 20);
         img.convertTo(img, CV_8UC1);
+        imwrite(to_string(i)+".png", img);
 
         lsd->detect(img, linesv4[i]);
         int width = img.cols, height = img.rows;
@@ -172,12 +179,12 @@ void testmpslam()
             Line ll{x1, y1, x2, y2, len, angle, pos, false};
             lines[i].emplace_back(ll);
 
-
         }
 
         Mat img_show;
         cv::cvtColor(img, img_show, COLOR_GRAY2RGB);
-        lsd->drawSegments(img_show, linesv4[i]);
+        if(!linesv4[i].empty())
+            lsd->drawSegments(img_show, linesv4[i]);
 
         // imshow("img", img_show);
         // moveWindow("img", 100, 100);
@@ -202,7 +209,9 @@ void testmpslam()
         for(int il=0, sz = cur_lines.size(); il<sz; il++){
             auto &l = cur_lines[il];
             if(l.isMerged == false && l.posflag != Line::Position::COMMON){
-                expandLine(cur_lines, il, long_edge_lines[i]); 
+                Line long_line;
+                expandLine(cur_lines, il, long_line); 
+                long_edge_lines[i].push_back(long_line);
             }
         }
     }
@@ -225,7 +234,26 @@ int main(void)
     // return -1;
 
     // 测试mp去畸变
-    testmpslam();
+    // testmpslam();
+
+
+    // // test slic 
+    // TicToc t;
+    // using namespace cv::ximgproc;
+    // while(1){
+    //     Mat img = imread("/home/hwj23/Desktop/color11.png");
+    //     t.tic(); 
+    //     Ptr<SuperpixelSLIC> slic = createSuperpixelSLIC(img, SLICO, 20);
+    //     slic->iterate(5);
+    //     cout << 1000 / t.toc() << endl;
+
+    //     Mat mask;
+    //     slic->getLabelContourMask(mask, true);
+    //     img.setTo(Scalar(0, 0, 255), mask);
+        
+    //     imshow("res", img);
+    //     waitKey(1);
+    // }
 
     // ImageAndExposure *mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
     // Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);
@@ -233,7 +261,7 @@ int main(void)
     // // test SE3 * Vec
     // Sim3f trans;
     // Vector6f se3;
-    // // TODO: se3的位移不是真的位移,还要乘以一个J
+    // // se3的位移不是真的位移,还要乘以一个J
     // se3 << 0, 0, 0, M_PI/2, 0, 0;
     // // trans = SE3f::exp(se3);
     // trans.setRotationMatrix(AngleAxisf(M_PI/2, Vector3f::UnitX()).matrix());

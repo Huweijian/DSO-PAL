@@ -1028,8 +1028,8 @@ public:
 		  const __m128 J8)
   {
 	  float* pt=SSEData;
-	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J0))); pt+=4;
-	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J1))); pt+=4;
+	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J0))); pt+=4;	// pt = pt + J0 * J0
+	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J1))); pt+=4;	// pt = pt + J0 * J1
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J2))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J3))); pt+=4;
 	  _mm_store_ps(pt, _mm_add_ps(_mm_load_ps(pt),_mm_mul_ps(J0,J4))); pt+=4;

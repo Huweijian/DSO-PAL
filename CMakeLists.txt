@@ -36,7 +36,10 @@ find_package(Boost COMPONENTS system thread)
 # optional libraries
 find_package(LibZip QUIET)
 find_package(Pangolin 0.2 QUIET)
-find_package(OpenCV QUIET)
+
+# set(OpenCV_DIR "/home/hwj23/Dev/opencv-3.4.0/build")
+find_package(OpenCV REQUIRED)
+message(${OpenCV_INCLUDE_DIRS} )
 
 if (MSVC)
      set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")

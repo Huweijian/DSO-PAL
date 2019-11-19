@@ -50,6 +50,7 @@
 
 #include "aruco/aruco.h"
 #include "util/pal_interface.h"
+#include "line/line_init.h"
 
 std::string vignette = "";
 std::string gammaCalib = "";
@@ -304,6 +305,13 @@ void parseArgument(char* arg)
 	{
 		trajFile = buf;
 		printf("loading trajectory from %s!\n", trajFile.c_str());
+		return;
+	}
+
+	if(1==sscanf(arg,"init=%d",&option))
+	{
+		init_method_g = option;
+		printf("INIT %d!\n", init_method_g);
 		return;
 	}
 

@@ -39,10 +39,14 @@
 #include "util/pal_model.h"
 #include "util/pal_interface.h"
 
+#include "line/line_init.h"
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
 #include "SSE2NEON.h"
 #endif
+
+
+extern int init_method_g;
 
 namespace dso
 {
@@ -404,9 +408,13 @@ Vec3f CoarseInitializer::calcResAndGS(
 		const SE3 &refToNew, AffLight refToNew_aff,
 		bool plot)
 {
+
+if(init_method_g == 1){
+	return calcResAndGS_v2(lvl, H_out, b_out, H_out_sc, b_out_sc, refToNew, refToNew_aff, plot);
+}
+else{
 	using namespace std;
 	using namespace cv;
-
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f* colorNew = newFrame->dIp[lvl];
@@ -557,7 +565,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 			float dxdd ; 
 			float dydd ;
 			float maxstep ;
-// #ifdef PAL
 			if(USE_PAL == 1){ // 0 1
 				// if(ENH_PAL){ // 初始化部分,直接法GN优化部分增加pal视场的权重
 				// 	hw *= pal_get_weight(Vec2f(Ku, Kv), lvl) * pal_get_weight(Vec2f(point->u+dx, point->v+dy), lvl);
@@ -583,7 +590,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 				maxstep = 1.0f/ duvdd.norm();
 			}
 			else{
-// #else
 				dxdd = (t[0]-t[2]*u)/pt[2]; // \rho_2 / \rho1 * (tx - u'_2 * tz)
 				dydd = (t[1]-t[2]*v)/pt[2]; // \rho_2 / \rho1 * (ty - v'_2 * tz)
 				float dxInterp = hw*hitColor[1]*fxl;
@@ -597,7 +603,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 				dd[idx] = dxInterp * dxdd  + dyInterp * dydd;		// dE/d(depth)
 				maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			}
-// #endif
+
 			dp6[idx] = - hw*r2new_aff[0] * rlR;					// dE/d(e^(aj))
 			dp7[idx] = - hw*1;									// dE/d(bj)	
 			r[idx] = hw*residual;								// res
@@ -606,7 +612,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 				point->maxstep = maxstep;
 
 			// immediately compute dp*dd1' and dd*dd' in JbBuffer1.
-			// pattern的所有点当作一个点来计算梯度
+			// pattern的所有点都要累加进来计算梯度
 			JbBuffer_new[i][0] += dp0[idx]*dd[idx];
 			JbBuffer_new[i][1] += dp1[idx]*dd[idx];
 			JbBuffer_new[i][2] += dp2[idx]*dd[idx];
@@ -619,7 +625,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			JbBuffer_new[i][9] += dd[idx]*dd[idx];
 		} //枚举一个点的所有pattern
 
-		// 如果跟踪点挂了，或者误差过大
+		// 如果pattern中有一些点挂了，或者总的误差过大
 		if(!isGood || energy > point->outlierTH*20)
 		{
 			// 单纯累计误差，不继续算了
@@ -641,6 +647,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 		point->energy_new[0] = energy;
 
 		// update Hessian matrix.
+		// pattern每个小点的J都用SSE的方式累计到H中
 		// 尽可能SSE，剩余的单独加入
 		for(int i=0;i+3<patternNum;i+=4)
 			acc9.updateSSE(
@@ -666,8 +673,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	// 累加energy[1]到E中
 	// calculate alpha energy, and decide if we cap it.
-	Accumulator11 EAlpha;
-	EAlpha.initialize();
 	for(int i=0;i<npts;i++)
 	{
 		Pnt* point = ptsl+i;
@@ -683,17 +688,15 @@ Vec3f CoarseInitializer::calcResAndGS(
 			E.updateSingle((float)(point->energy_new[1]));
 		}
 	}
-	EAlpha.finish();
 
-	// 这个Ealpha似乎没用，恒等于0，
 	// 计算alphaEnergy = alphaW * norm(t) * npts 
 	// AlphaEnergy用来表征当前估计的质量（位移越大，点数越多，质量越高）
 	// 	等于位移乘以点数
-	float alphaEnergy = alphaW*(EAlpha.A + refToNew.translation().squaredNorm() * npts);
+	float alphaEnergy = alphaW*(refToNew.translation().squaredNorm() * npts);
 
 	// compute alpha opt.
 	float alphaOpt;
-	// 如果位移乘以点数足够大，也就是位移足够多(和点数无关)
+	// 如果位移足够多
 	if(alphaEnergy > alphaK*npts)
 	{
 		// hwjdebug---------------------------------------
@@ -722,7 +725,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 		if(!point->isGood_new)
 			continue;
 
-		point->lastHessian_new = JbBuffer_new[i][9];
+		point->lastHessian_new = JbBuffer_new[i][9];	// dd*dd
 
 		// 更新JBuffer8和9
 		// 如果alphaOpt不等于0 （位移不够大）那么增加一点噪声(150*150)
@@ -736,16 +739,19 @@ Vec3f CoarseInitializer::calcResAndGS(
 			JbBuffer_new[i][9] += couplingWeight;
 		}
 
-		JbBuffer_new[i][9] = 1/(1+JbBuffer_new[i][9]);
+		JbBuffer_new[i][9] = 1/(1 + JbBuffer_new[i][9]); // 防止dd=0? 
 		acc9SC.updateSingleWeighted(
-				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2],(float)JbBuffer_new[i][3],
-				(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],
-				(float)JbBuffer_new[i][8],(float)JbBuffer_new[i][9]);
+				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2], 	// d(SE3) * dd
+				(float)JbBuffer_new[i][3],(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],	
+				(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],							// d(AB) * dd
+				(float)JbBuffer_new[i][8],														// r * dd
+				(float)JbBuffer_new[i][9]);														// (weight) dd * dd
 	}
 	acc9SC.finish();
 
 	// 分块取出海森矩阵
 	//printf("nelements in H: %d, in E: %d, in Hsc: %d / 9!\n", (int)acc9.num, (int)E.num, (int)acc9SC.num*9);
+
 	H_out = acc9.H.topLeftCorner<8,8>();// / acc9.num;
 	b_out = acc9.H.topRightCorner<8,1>();// / acc9.num;
 	H_out_sc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
@@ -773,6 +779,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 	// // -------------------------
 
 	return Vec3f(E.A, alphaEnergy ,E.num);
+}
+
 }
 
 float CoarseInitializer::rescale()
@@ -1228,20 +1236,17 @@ void CoarseInitializer::makeK(CalibHessian* HCalib)
 		h[level] = h[0] >> level;
 
 		if(USE_PAL == 1){ // 0 1
-// #ifdef PAL
 			fx[level] = 1;
 			fy[level] = 1;
 			cx[level] = 0;
 			cy[level] = 0;
 		}
 		else{
-// #else
 			fx[level] = fx[level-1] * 0.5;
 			fy[level] = fy[level-1] * 0.5;
 			cx[level] = (cx[0] + 0.5) / ((int)1<<level) - 0.5;
 			cy[level] = (cy[0] + 0.5) / ((int)1<<level) - 0.5;
 		}
-// #endif
 
 	}
 

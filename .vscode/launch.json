@@ -30,24 +30,24 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            // D435
-            "args": [   "files=/home/hwj23/Dataset/D435/s9/images", 
-                        "calib=/home/hwj23/Dataset/D435/camera.txt", 
-                        "gamma=/home/hwj23/Dataset/D435/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png", 
-                        "preset=0", 
-                        "mode=0",
-                        "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
-                    ],
-
-            // // TUM S19
-            // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
-            //             "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
-            //             "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
-            //             "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+            // // D435
+            // "args": [   "files=/home/hwj23/Dataset/D435/s9/images", 
+            //             "calib=/home/hwj23/Dataset/D435/camera.txt", 
+            //             "gamma=/home/hwj23/Dataset/D435/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png", 
             //             "preset=0", 
-            //             "mode=0" 
+            //             "mode=0",
+            //             "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
             //         ],
+
+            // TUM S19
+            "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
+                        "calib=/home/hwj23/Dataset/TUM/sequence_19/camera.txt", 
+                        "gamma=/home/hwj23/Dataset/TUM/sequence_19/pcalib.txt", 
+                        "vignette=/home/hwj23/Dataset/TUM/sequence_19/vignette.png", 
+                        "preset=0", 
+                        "mode=0" 
+                    ],
 
             // SIMU movex
             // "args": [   "files=/home/hwj23/Dataset/simu/movex/color/", 

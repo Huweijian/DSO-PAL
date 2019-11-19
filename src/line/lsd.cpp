@@ -222,6 +222,7 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
 
             // hwjdebug  显示原始区域
             {
+
                 int R = (rand() % (int)(205 + 1)) + 50;
                 int G = (rand() % (int)(205 + 1)) + 50;
                 int B = (rand() % (int)(205 + 1)) + 50;
@@ -232,6 +233,7 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
                 Mat show;
                 resize(image_reg_3b_, show, Size(), 2, 2, INTER_NEAREST);
                 imshow("region", show);
+
             }
             
 
@@ -255,6 +257,7 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
 
             // // hwjdebug =====================
             {
+
                 int R, G, B;
                 R = cur_refine_times_ % 10 * 10;  //密度不足,除了降低角度阈值之外又进行了半径缩小的次数
                 G = cur_refine_times_ / 100 % 10 * 50;  // NFA 优化次数
@@ -265,11 +268,11 @@ void LineSegmentDetectorMy::flsd(std::vector<Vec4f>& lines,
                     lineColor = Scalar(0, 0, 255);
                 }
                 line(image_line_3b_, Point(rec.x1, rec.y1), Point(rec.x2, rec.y2), lineColor);
-
                 Mat image_show;
                 resize(image_line_3b_, image_show, Size(), 2, 2, INTER_NEAREST);
                 imshow("detected", image_show);
                 waitKey();
+
             }
             // // =================================
 
@@ -305,6 +308,12 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
     angles.row(img_height - 1).setTo(NOTDEF);
     angles.col(img_width - 1).setTo(NOTDEF);
 
+
+    // hwjtest ---------------
+    Mat gradx(angles.size(), CV_32FC1), grady(angles.size(), CV_32FC1), grad_rot(angles.size(), CV_8UC1);
+    grad_rot.setTo(0);
+    // -----------------------------
+
     // Computing gradient for remaining pixels
     double max_grad = -1;
     for(int y = 0; y < img_height - 1; ++y)
@@ -327,53 +336,124 @@ void LineSegmentDetectorMy::ll_angle(const double& threshold,
             {
                 max_grad = norm;
             }
-
+            // hwjtest-----------------------------
+            gradx.at<float>(y, x) = gx;
+            grady.at<float>(y, x) = gy;
+            // ---------------------------------------
         }
     }
-    
+
+    Mat grad_div;
+    {
+        // 梯度的散度
+        Laplacian(scaled_image, grad_div, CV_8U, 1);
+
+        // 梯度角度的梯度角度
+        Mat ang_gx, ang_gy;
+        double ker_x_[] = {-1, 0, 1};
+        double ker_y_[] = {-1, 0, 1};
+        Mat ker_x(1, 3, CV_64FC1, ker_x_);
+        Mat ker_y(3, 1, CV_64FC1, ker_y_);
+
+        // 梯度角度的梯度
+        filter2D(angles, ang_gx, CV_64F, ker_x);
+        filter2D(angles, ang_gy, CV_64F, ker_y);
+
+        // imshow("ang_gx", ang_gx);
+        // waitKey();
+
+        Mat ang_ang(ang_gx.size(), CV_64FC1);
+        for(int i=0; i<ang_gx.rows; i++){
+            for(int j=0; j<ang_gx.cols; j++){
+                ang_ang.at<double>(i, j) = fastAtan2(ang_gx.at<double>(i, j), -ang_gy.at<double>(i, j)) * DEG_TO_RADS;
+            }
+        }
+
+        // angles = ang_ang;
+    }
+
     Mat valid_grad, modgrad1b;
     modgrad.convertTo(modgrad1b, CV_8UC1);
 
-    // 计算可以考虑的阈值
+    // 计算可以梯度阈值,梯度大的点,角度才有意义
     adaptiveThreshold(modgrad1b, valid_grad, 255, ADAPTIVE_THRESH_MEAN_C, THRESH_BINARY, 31, 0);
-    // cv::threshold(modgrad1b, valid_grad, threshold, 255, THRESH_BINARY);
+    // cv::threshold(grad_div, valid_grad, threshold, 255, THRESH_BINARY);
+
+    imshow("old", valid_grad);
+    // erode(valid_grad, valid_grad, getStructuringElement(MORPH_RECT, Size(2, 2)));    
+    // dilate(valid_grad, valid_grad, getStructuringElement(MORPH_RECT, Size(4, 4)));    
+    // imshow("new", valid_grad);
+
     angles.setTo(NOTDEF, ~valid_grad);
     valid_grad_ = valid_grad;
 
-
-    // hwjdebug ---------------------------
+    // hwjtest ----------------------
     // {
-    //     imshow("thres", valid_grad);
-    //     imshow("grad", modgrad1b);
-    //     waitKey();
+    //     float angle_rot_[] = {  45, 0, 315,  
+    //                             90, -1, 270, 
+    //                             135, 180, 225};
+    //     // Mat angle_rot(3, 3, CV_32FC1, angle_rot_);
+
+    //     for(int y=2; y<img_height-2; y++){
+    //         for(int x=2; x<img_width-2; x++){
+    //             float grad_rot_val = 0;
+    //             for(int idx=0; idx<9; idx++){
+    //                 if(angle_rot_[idx] < 0)
+    //                     continue;
+    //                 int dx = idx % 3 - 1;
+    //                 int dy = idx / 3 - 1;
+    //                 double angle_val = angles.at<double>(y+dy, x+dx);
+    //                 if(angle_val == NOTDEF)
+    //                     continue;
+
+    //                 grad_rot_val += cos(angle_rot_[idx]*DEG_TO_RADS + angle_val);
+    //                                 // * modgrad.at<double>(y+dy, x+dx);
+    //             }                
+
+    //             if( abs(grad_rot_val) > 255)
+    //                 grad_rot_val = 255;
+
+    //             grad_rot.at<uchar>(y, x) = abs(grad_rot_val*40);
+
+    //             // if( abs(grad_rot_val) > 255)
+    //             //     printf("%.2f\n", grad_rot_val);
+    //         }
+    //     }
+    //     imshow("rot_grad", grad_rot);
+    //     // waitKey();
     // }
+    // -------------------------------
+
+    
+
+
+
+    // 可视化梯度和角度 hwjdebug ---------------------------
     {
 		using namespace std;
 		Mat angles_deg = angles / DEG_TO_RADS;
-
 		// double ang_min, ang_max;
 		// cv::minMaxIdx(angles_deg, &ang_min, &ang_max);
 		// printf("ang min=%.2f max=%.2f\n", ang_min, ang_max);
-		
 		Mat v = (angles >= 0);
 		Mat s(angles.size(), CV_8UC1, Scalar(200));
 		Mat h;
 		angles_deg.convertTo(h, CV_8UC1, 0.5);
 		vector<Mat> hsv_vec{ h, s, v };
-
 		Mat hsv, angle_rgb;
 		cv::merge(hsv_vec, hsv);
 		cvtColor(hsv, angle_rgb, COLOR_HSV2BGR);
-
 		Mat grad1b;
 		modgrad.convertTo(grad1b, CV_8UC1);
-
         angle_rgb_ = angle_rgb;
         angle_degd2_ = h;
-		// imshow("angle", angle_rgb);
-		// imshow("grad", grad1b);
-		// waitKey();
-        }
+		imshow("angle", angle_rgb);
+		imshow("grad", grad1b);
+		waitKey();
+
+
+
+    }
 
     // ----------------
 
@@ -597,6 +677,7 @@ bool LineSegmentDetectorMy::refine(std::vector<RegionPoint>& reg, double reg_ang
     if (density < density_th)
     {
         // 密度依然不足
+        return false;
         return reduce_region_radius(reg, reg_angle, prec, p, rec, density, density_th);
     }
     else
@@ -962,7 +1043,7 @@ void LineSegmentDetectorMy::drawSegments(InputOutputArray _image, InputArray lin
         int R, G, B;
         R = line_refine_times_[i]%10 * 10; //密度不足,除了降低角度阈值之外又进行了半径缩小的次数
         G = line_refine_times_[i]/100 % 10 * 50;//NFA 优化次数
-        B = line_refine_times_[i]/1000 % 10 * 128;// 密度不足,需要调整
+        B = line_refine_times_[i]/1000 % 10 * 128;// 密度不足,降低角度阈值,重新生长
         Scalar lineColor = Scalar(B, G, R);
 
         if (_lines.depth() == CV_32F)

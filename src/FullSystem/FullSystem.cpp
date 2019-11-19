@@ -1064,14 +1064,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 				float rt = setting_kfGlobalWeight*setting_maxShiftWeightRT * sqrtf((double)tres[3]) / (wG[0]+hG[0]);
 				float aff = setting_kfGlobalWeight*setting_maxAffineWeight * fabs(logf((float)refToFh[0])) ;
 				
-				// if(ENH_PAL){ //PAL增加判断是否需要创建新关键帧额阈值
-				// 	needToMakeKF = t+r+rt+aff > 1;
-				// }
-				// else
-				
-				{
-					needToMakeKF = true;
-				}
+				needToMakeKF = true;
 
 				if(needToMakeKF)
 					printf("\n创建新关键帧(位姿或光度变化过大) t=%.2f r=%.2f rt=%.2f aff=%.2f", t, r, rt, aff);
