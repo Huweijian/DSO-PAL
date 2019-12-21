@@ -67,6 +67,7 @@ set(dso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
   ${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
   ${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
+  ${PROJECT_SOURCE_DIR}/src/line/line_init.cpp
 )
 
 

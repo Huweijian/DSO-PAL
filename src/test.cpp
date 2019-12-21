@@ -224,9 +224,16 @@ void testmpslam()
 
 int main(void)
 {
-    pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
+    // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
-    // // flip
+
+    // test Eigen
+    Vector3f a, b;
+    a << 1, 2, 3;
+    cout << a * a.transpose() * 2 << endl;
+
+
+    // // flip image
     // Mat img = imread("/home/hwj23/Dataset/PAL/real/s6/images/00000.png");
     // flip(img, img, 0);
     // imshow("img", img);
@@ -235,25 +242,6 @@ int main(void)
 
     // 测试mp去畸变
     // testmpslam();
-
-
-    // // test slic 
-    // TicToc t;
-    // using namespace cv::ximgproc;
-    // while(1){
-    //     Mat img = imread("/home/hwj23/Desktop/color11.png");
-    //     t.tic(); 
-    //     Ptr<SuperpixelSLIC> slic = createSuperpixelSLIC(img, SLICO, 20);
-    //     slic->iterate(5);
-    //     cout << 1000 / t.toc() << endl;
-
-    //     Mat mask;
-    //     slic->getLabelContourMask(mask, true);
-    //     img.setTo(Scalar(0, 0, 255), mask);
-        
-    //     imshow("res", img);
-    //     waitKey(1);
-    // }
 
     // ImageAndExposure *mp = ump->undistort<unsigned char>(mpimg, 1.0, 1.0);
     // Mat mpcv = IOWrap::getOCVImg_tem(mp->image, mp->w, mp->h);

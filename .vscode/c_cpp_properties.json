@@ -6,7 +6,8 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/src/",
                 "/opt/ros/kinetic/include/opencv-3.3.1-dev",
-                "/usr/include/eigen3"
+                "/usr/include/eigen3",
+                "/home/hwj23/Dev/Pangolin/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/gcc",

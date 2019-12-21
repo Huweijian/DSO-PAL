@@ -36,6 +36,8 @@
 #include "IOWrapper/ImageRW.h"
 #include "IOWrapper/ImageDisplay.h"
 
+#include "line/line_init.h"
+
 #if HAS_ZIPLIB
 	#include "zip.h"
 #endif
@@ -296,8 +298,8 @@ private:
 		{
 			using namespace cv;
 			auto img = IOWrap::getOCVImg_tem(ret2->image, ret2->w, ret2->h);
-			imshow("after undistort immediately", img);
-			cv::moveWindow("after undistort immediately", 0+100, 50);
+			// imshow("after undistort immediately", img);
+			// cv::moveWindow("after undistort immediately", 0+100, 50);
 
 			// Mat img_before = IOWrap::getOCVImg_tem(minimg->data, minimg->w, minimg->h);	
 			// imshow("before undistort", img_before);
@@ -305,6 +307,25 @@ private:
 
 			// waitKey();
 		}
+
+		if(init_method_g == "line"){
+			using namespace cv;
+			if(line_mask_g.empty()){
+				printf(" - 初始化前赋予直线检测真值\n");
+
+				std::string line_gt_file = path + "/../line_gt2.png";
+				auto line_mask_img = IOWrap::readImageBW_8U(line_gt_file);
+
+				ImageAndExposure* line_undist = undistort->undistort<unsigned char>(line_mask_img, 0.0, 0.0, 1);
+				Mat img = IOWrap::getOCVImg_tem(line_undist->image, line_undist->w, line_undist->h);
+				line_mask_g = Mat::zeros(img.size(), CV_8UC1);
+				line_mask_g.setTo(1, (img == 255));
+				line_mask_g.setTo(2, (img == 128));
+				// imshow("hi", line_mask_g);
+				// waitKey();
+			}
+		}
+		
 
 		delete minimg;
 		return ret2;

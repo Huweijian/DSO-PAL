@@ -54,7 +54,8 @@
         "condition_variable": "cpp",
         "mutex": "cpp",
         "algorithm": "cpp",
-        "cfenv": "cpp"
+        "cfenv": "cpp",
+        "string": "cpp"
     },
     "cSpell.enabledLanguageIds": [
         "latex",

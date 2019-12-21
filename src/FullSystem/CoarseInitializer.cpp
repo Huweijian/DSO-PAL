@@ -46,7 +46,7 @@
 #endif
 
 
-extern int init_method_g;
+extern std::string init_method_g;
 
 namespace dso
 {
@@ -65,7 +65,7 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 
 	frameID=-1;
 	fixAffine=true;
-	printDebug=false;
+	printDebug=true;
 
 	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
 	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
@@ -184,7 +184,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 		if(printDebug)
 		{
-			printf("lvl %d, it %d (l=%f) %s: [%.3f->%.3f] %.3f+%.5f -> %.3f+%.5f  (|inc| = %f)! \n\t",
+			printf("lvl %d, it %d (l=%f) %s: [%.3f->%.3f] %.3f+%.5f -> %.3f+%.5f  (|inc| = %f)! \n\t - ",
 					lvl, 0, lambda,
 					"INITIA",
 					(resOld[0]+resOld[1]) / resOld[2],
@@ -234,14 +234,14 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 			// 累计总的能量
 			float eTotalNew = (resNew[0]+resNew[1]+regEnergy[1]);
-			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]);
-				
+			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]); 
+
 
 			bool accept = eTotalOld > eTotalNew;
 
 			if(printDebug)
 			{
-				printf("lvl %d, it %d (l=%.5f) %s: [%.2f->%.2f] (%.3f + %.3f + %.3f -> %.3f + %.3f + %.3f) (|inc| = %f)! \n\t",
+				printf("lvl %d, it %d (l=%.5f) %s: [%.2f->%.2f] (%.3f + %.3f + %.3f -> %.3f + %.3f + %.3f) (|inc| = %f)! \n\t - ",
 						lvl, iteration, lambda,
 						(accept ? "ACCEPT" : "REJECT"),
 						eTotalOld / resNew[2],
@@ -253,13 +253,15 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 						sqrtf((float)(regEnergy[1] / regEnergy[2])),
 						sqrtf((float)(resNew[1] / resNew[2])),
 						inc.norm());
-				std::cout << refToNew_new.log().transpose() << " AFF " << refToNew_aff_new.vec().transpose() <<"\n";
+				std::cout 	<< refToNew_new.log().transpose() <<"(|t|="<<refToNew_new.translation().squaredNorm()
+							<< ") AFF " << refToNew_aff_new.vec().transpose() <<"\n";
 				// debugPlot(lvl, wraps, true);
 			}
 
 			if(accept)
 			{
 
+				// 位移足够多,resNew[1],才等于alphaK*numPts, snapped为true
 				if(resNew[1] == alphaK*numPoints[lvl]){
 					snapped = true;
 				}
@@ -325,14 +327,15 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 	// 输出深度图
 	// hwjdebug -------------------- 
-    debugPlot(0,wraps);
-	cv::waitKey(1);
+    debugPlot(0, wraps, true);
+	cv::waitKey(0);
 	// -----------------------------
 
 	// 打断后连续估计5帧，初始化成功
 	return snapped && frameID > snappedAt+5;
 }
 
+// TODO:在这里可以把直线点(存储在line_pts中)的深度显示出来
 void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps, bool playCVImg)
 {
 	bool onlyCVImg = false;
@@ -409,7 +412,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 		bool plot)
 {
 
-if(init_method_g == 1){
+if(init_method_g == "line"){
 	return calcResAndGS_v2(lvl, H_out, b_out, H_out_sc, b_out_sc, refToNew, refToNew_aff, plot);
 }
 else{
@@ -701,7 +704,7 @@ else{
 	{
 		// hwjdebug---------------------------------------
 		if(printDebug) 
-			printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, 
+			printf("\t * SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, 
 				refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
 		// --------------------------------------------
 
@@ -1025,6 +1028,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 		}
 		sel.currentPotential = 3;
 		int npts;
+
 		if(lvl == 0)
 			// 对于原始图像，选择一些梯度较大的点
 			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl]*w[0]*h[0], 1, true, 2);
@@ -1093,6 +1097,11 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 						int dy = patternP[idx][1];
 						float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm(); //pattern点的梯度绝对值
 						sumGrad2 += absgrad;
+					}
+
+					if(lvl == 0 && line_mask_g.at<uchar>(y, x) != 0){
+						int line_idx = line_mask_g.at<uchar>(y, x);
+						line_pts[line_idx-1].push_back(&(pl[nl]));	
 					}
 
 					nl++;

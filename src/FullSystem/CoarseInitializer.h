@@ -92,6 +92,7 @@ public:
 	bool printDebug;
 
 	Pnt* points[PYR_LEVELS]; // 选中的点
+	std::vector<Pnt*> line_pts[2];	// 测试用_标记为直线的点
 	int numPoints[PYR_LEVELS]; // 选中点的数目
 	AffLight thisToNext_aff;
 	SE3 thisToNext;

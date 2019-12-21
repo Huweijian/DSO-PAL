@@ -8,7 +8,8 @@
 #include "util/pal_model.h"
 #include "util/pal_interface.h"
 
-int init_method_g = 0;
+std::string init_method_g = "default";
+cv::Mat line_mask_g;
 
 namespace dso{
 
@@ -19,6 +20,7 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 		const SE3 &refToNew, AffLight refToNew_aff,
 		bool plot)
 {
+
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f* colorNew = newFrame->dIp[lvl];
@@ -41,8 +43,10 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 	float cxl = cx[lvl];
 	float cyl = cy[lvl];
 
+	Mat88f JTJ; JTJ.setZero();
+	Vec8f JTr; JTr.setZero();
+
 	Accumulator11 E;
-	acc9.initialize();
 	E.initialize();
 
 	int npts = numPoints[lvl];
@@ -251,28 +255,16 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 		point->energy_new[0] = energy;
 
 		// update Hessian matrix.
-		// pattern每个小点的J都用SSE的方式累计到H中
-		// 尽可能SSE，剩余的单独加入
-		for(int i=0;i+3<patternNum;i+=4)
-			acc9.updateSSE(
-					_mm_load_ps(((float*)(&dp0))+i),
-					_mm_load_ps(((float*)(&dp1))+i),
-					_mm_load_ps(((float*)(&dp2))+i),
-					_mm_load_ps(((float*)(&dp3))+i),
-					_mm_load_ps(((float*)(&dp4))+i),
-					_mm_load_ps(((float*)(&dp5))+i),
-					_mm_load_ps(((float*)(&dp6))+i),
-					_mm_load_ps(((float*)(&dp7))+i),
-					_mm_load_ps(((float*)(&r))+i));
-		for(int i=((patternNum>>2)<<2); i < patternNum; i++)
-			acc9.updateSingle(
-					(float)dp0[i],(float)dp1[i],(float)dp2[i],(float)dp3[i],
-					(float)dp4[i],(float)dp5[i],(float)dp6[i],(float)dp7[i],
-					(float)r[i]);
+		for(int i=0; i<patternNum; i++){
+			Vec8f Jac;
+			Jac << dp0[i], dp1[i], dp2[i], dp3[i], dp4[i], dp5[i], dp6[i], dp7[i];
+			Mat88f JTJ_t = Jac*Jac.transpose();
+			JTJ = JTJ + JTJ_t; 
+			JTr = JTr + Jac * r[i];
+		}
 	} // 枚举所有点
 
 	E.finish();
-	acc9.finish();
 
 
 	// 累加energy[1]到E中
@@ -294,18 +286,20 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 	}
 
 	// 计算alphaEnergy = alphaW * norm(t) * npts 
-	// AlphaEnergy用来表征当前估计的质量（位移越大，点数越多，质量越高）
+	// alphaW = 150*150
+	// AlphaEnergy用来表征当前估计的质量（位移越大，点数越多，质量越高）,超过阈值后会触发snapped
 	// 	等于位移乘以点数
 	float alphaEnergy = alphaW*(refToNew.translation().squaredNorm() * npts);
 
+	bool isMoveSmall = false;
 	// compute alpha opt.
 	float alphaOpt;
-	// 如果位移足够多
+	// 如果位移足够多 ==>  norm(t) > alphaK/alphaW(0.00027)
 	if(alphaEnergy > alphaK*npts)
 	{
 		// hwjdebug---------------------------------------
 		if(printDebug) 
-			printf("\t  SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, 
+			printf("\t * SNAPPING (lvl %d)  |t|=%.4f npts=%d alphaE=%.2f (th=%.2f)\n", lvl, 
 				refToNew.translation().squaredNorm(), npts, alphaEnergy, alphaK*npts);
 		// --------------------------------------------
 
@@ -318,11 +312,14 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 	{
 		// 位移不够大，需要进行alpha操作，值等于alphaW(150*150)
 		alphaOpt = alphaW;
+		isMoveSmall = true;
 	}
 
 	// 更新每个点的lastH，更新JBuffer[8 9]
 	// 累加新的JBuffer
-	acc9SC.initialize();
+	Mat88f JTJ_sc; JTJ_sc.setZero();
+	Vec8f JTr_sc; JTr_sc.setZero();
+
 	for(int i=0;i<npts;i++)
 	{
 		Pnt* point = ptsl+i;
@@ -331,45 +328,43 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 
 		point->lastHessian_new = JbBuffer_new[i][9];	// dd*dd
 
-		// 更新JBuffer8和9
-		// 如果alphaOpt不等于0 （位移不够大）那么增加一点噪声(150*150)
-		JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
-		JbBuffer_new[i][9] += alphaOpt;
-
-		// 如果alphaOpt=0 (位移足够大) 也增加一点耦合噪声 couplingWeight=1
-		if(alphaOpt==0)
-		{
+		if(isMoveSmall == true){
+			JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
+			JbBuffer_new[i][9] += alphaOpt;
+		}
+		else{
 			JbBuffer_new[i][8] += couplingWeight*(point->idepth_new - point->iR);
 			JbBuffer_new[i][9] += couplingWeight;
 		}
 
 		JbBuffer_new[i][9] = 1/(1 + JbBuffer_new[i][9]); // 防止dd=0? 
-		acc9SC.updateSingleWeighted(
-				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2], 	// d(SE3) * dd
-				(float)JbBuffer_new[i][3],(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],	
-				(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],							// d(AB) * dd
-				(float)JbBuffer_new[i][8],														// r * dd
-				(float)JbBuffer_new[i][9]);														// (weight) dd * dd
+
+		Vec8f W_T;
+		W_T << 	JbBuffer_new[i][0],JbBuffer_new[i][1],JbBuffer_new[i][2],JbBuffer_new[i][3],
+				JbBuffer_new[i][4],JbBuffer_new[i][5],JbBuffer_new[i][6],JbBuffer_new[i][7]; 
+
+		JTJ_sc = JTJ_sc + (W_T * W_T.transpose() * JbBuffer_new[i][9]);
+		JTr_sc = JTr_sc + W_T * JbBuffer_new[i][8] * JbBuffer_new[i][9];
+
 	}
-	acc9SC.finish();
+	H_out = JTJ;
+	H_out_sc = JTJ_sc;
+
+	b_out = JTr;
+	b_out_sc = JTr_sc;
 
 	// 分块取出海森矩阵
 	//printf("nelements in H: %d, in E: %d, in Hsc: %d / 9!\n", (int)acc9.num, (int)E.num, (int)acc9SC.num*9);
 
-	H_out = acc9.H.topLeftCorner<8,8>();// / acc9.num;
-	b_out = acc9.H.topRightCorner<8,1>();// / acc9.num;
-	H_out_sc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
-	b_out_sc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
+	// // 更新H和b的一些值 
+	// H_out(0,0) += alphaOpt*npts;
+	// H_out(1,1) += alphaOpt*npts;
+	// H_out(2,2) += alphaOpt*npts;
 
-	// 更新H和b的一些值 
-	H_out(0,0) += alphaOpt*npts;
-	H_out(1,1) += alphaOpt*npts;
-	H_out(2,2) += alphaOpt*npts;
-
-	Vec3f tlog = refToNew.log().head<3>().cast<float>();
-	b_out[0] += tlog[0]*alphaOpt*npts;
-	b_out[1] += tlog[1]*alphaOpt*npts;
-	b_out[2] += tlog[2]*alphaOpt*npts;
+	// Vec3f tlog = refToNew.log().head<3>().cast<float>();
+	// b_out[0] += tlog[0]*alphaOpt*npts;
+	// b_out[1] += tlog[1]*alphaOpt*npts;
+	// b_out[2] += tlog[2]*alphaOpt*npts;
 
 	// // hwjdebug ===================
 	// Mat resImg_toshow, projImg_show;
@@ -382,7 +377,7 @@ Vec3f CoarseInitializer::calcResAndGS_v2(
 	// waitKey();
 	// // -------------------------
 
-	return Vec3f(E.A, alphaEnergy ,E.num);
+	return Vec3f(E.A, alphaEnergy, E.num);
 }
 
 }

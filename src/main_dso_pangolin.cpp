@@ -308,10 +308,10 @@ void parseArgument(char* arg)
 		return;
 	}
 
-	if(1==sscanf(arg,"init=%d",&option))
+	if(1==sscanf(arg,"init=%s",buf))
 	{
-		init_method_g = option;
-		printf("INIT %d!\n", init_method_g);
+		init_method_g = buf;
+		printf(" * INIT Method: %s!\n", init_method_g.c_str());
 		return;
 	}
 

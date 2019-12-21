@@ -193,9 +193,9 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 		// imshow("ths", thsMat);
 		// imshow("thsSmo", thsSmoMat);
 
-		imshow("grad", grad);
-		moveWindow("grad", 50+w+50, 50);
-		waitKey(0);
+		// imshow("grad", grad);
+		// moveWindow("grad", 50+w+50, 50);
+		// waitKey(0);
 	}
 
 
@@ -345,11 +345,11 @@ int PixelSelector::makeMaps(
 		// 		}
 		// 	}
 		// }
-		cv::imshow("Selector Pixels", cvimg);
-		// -----------------------------
+		// cv::imshow("Selector Pixels", cvimg);
 		// IOWrap::displayImage("Selector Pixels", &img);
-		cv::moveWindow("Selector Pixels", 100+img.w, 50);
-		cv::waitKey(0);
+		// cv::moveWindow("Selector Pixels", 100+img.w, 50);
+		// cv::waitKey(0);
+		// -----------------------------
 	}
 
 	printf("\t - (点正常)currPot change from %d to %d\n", currentPotential, idealPotential);
