@@ -327,8 +327,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 	// 输出深度图
 	// hwjdebug -------------------- 
-    debugPlot(0, wraps, true);
-	cv::waitKey(0);
+    // debugPlot(0, wraps, true);
+	// cv::waitKey(0);
 	// -----------------------------
 
 	// 打断后连续估计5帧，初始化成功
@@ -351,18 +351,18 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 		playCVImg = true;
 	}
 
-
 	int wl= w[lvl], hl = h[lvl];
 	Eigen::Vector3f* colorRef = firstFrame->dIp[lvl];
 
 	MinimalImageB3 iRImg(wl,hl);
-	// 取出图像的所有像素
+	// 取出原始图像的所有像素
 	for(int i=0;i<wl*hl;i++)
 		iRImg.at(i) = Vec3b(colorRef[i][0],colorRef[i][0],colorRef[i][0]);
+	cv::Mat line_img =  cv::Mat(hl, wl, CV_8UC3, iRImg.data).clone();
+	cv::Mat line_img_d = cv::Mat::zeros(hl, wl, CV_8UC1);
 
-
+	// 取出所有跟踪的点
 	int npts = numPoints[lvl];
-
 	float nid = 0, sid=0;
 	for(int i=0;i<npts;i++)
 	{
@@ -375,7 +375,6 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	}
 	float fac = nid / sid;
 
-
 	int goodCnt = 0, badCnt = 0;
 	for(int i=0;i<npts;i++)
 	{
@@ -385,15 +384,29 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 			badCnt ++;
 			iRImg.setPixel9(point->u+0.5f,point->v+0.5f,Vec3b(0,0,0));
 		}
-
 		else{
 			goodCnt ++;
 			iRImg.setPixel9(point->u+0.5f,point->v+0.5f,makeRainbow3B(point->iR*fac));
 		}
+		
+		// 显示直线
+		Vec3b line_color_table[2] = {{255, 0, 0}, {0, 255, 0}};
+		if(point->line_index != -1){
+			line_img.at<Vec3b>(point->v, point->u) = line_color_table[point->line_index];
+			line_img_d.at<uchar>(point->v, point->u) = (1.0 / point->iR)*100;
+		}
+		// for(auto &p : line_pts[0]){
+		// 	line_img.at<Vec3b>(p->v, p->u) = Vec3b(255, 0, 0);
+		// }
+
 	}
 
-	if(playCVImg)
+	if(playCVImg){
 		IOWrap::displayImage("idepth-R", &iRImg, true);
+		// cv::imshow("line", line_img);
+		// cv::imshow("line_dep", line_img_d);
+		// cv::waitKey();
+	}
 
 	if(onlyCVImg)
 		return ;	
@@ -412,10 +425,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 		bool plot)
 {
 
-if(init_method_g == "line"){
-	return calcResAndGS_v2(lvl, H_out, b_out, H_out_sc, b_out_sc, refToNew, refToNew_aff, plot);
-}
-else{
+// if(init_method_g == "line"){
+// 	return calcResAndGS_v2(lvl, H_out, b_out, H_out_sc, b_out_sc, refToNew, refToNew_aff, plot);
+// }
+// else
+{
 	using namespace std;
 	using namespace cv;
 	int wl = w[lvl], hl = h[lvl];
@@ -1091,8 +1105,7 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 
 					Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
 					float sumGrad2=0;// 所有pattern点的梯度和
-					for(int idx=0;idx<patternNum;idx++)
-					{
+					for(int idx=0;idx<patternNum;idx++){
 						int dx = patternP[idx][0];
 						int dy = patternP[idx][1];
 						float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm(); //pattern点的梯度绝对值
@@ -1100,8 +1113,9 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 					}
 
 					if(lvl == 0 && line_mask_g.at<uchar>(y, x) != 0){
-						int line_idx = line_mask_g.at<uchar>(y, x);
-						line_pts[line_idx-1].push_back(&(pl[nl]));	
+						int line_idx = line_mask_g.at<uchar>(y, x)-1;
+						line_pts[line_idx].push_back(&(pl[nl]));	
+						pl[nl].line_index = line_idx;
 					}
 
 					nl++;

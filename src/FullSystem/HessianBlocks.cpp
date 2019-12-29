@@ -61,7 +61,7 @@ PointHessian::PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hc
 
 	efPoint=0;
 
-
+	this->line_index = rawPoint->line_index;
 }
 
 

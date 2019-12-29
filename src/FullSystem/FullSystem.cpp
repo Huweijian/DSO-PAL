@@ -55,6 +55,7 @@
 
 #include "util/ImageAndExposure.h"
 #include "util/pal_interface.h"
+#include "line/line_estimate.h"
 #include <cmath>
 
 namespace dso
@@ -1000,7 +1001,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 			coarseInitializer->setFirst(&Hcalib, fh);
 		}
 		// 后续帧初始化，尝试track
-		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if SNAPPED
+		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if 跟踪成功 
 		{
 
 			initializeFromInitializer(fh); //初始第一帧加入fh
@@ -1439,31 +1440,30 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
         printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100*keepPercentage,
                 (int)(setting_desiredPointDensity), coarseInitializer->numPoints[0] );
 
+
 	// 枚举每个点
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
-		// 运气不好 拜拜
-		if(rand()/(float)RAND_MAX > keepPercentage){
+		// 运气不好 并且不是直线点,拜拜
+		if(rand()/(float)RAND_MAX > keepPercentage && coarseInitializer->points[0][i].line_index == -1){
 			continue;
 		}
 
 		// 运气还行，初始化点海森
-
 		// 尝试初始化未熟点
 		Pnt* point = coarseInitializer->points[0]+i;
-		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f, point->v+0.5f, firstFrame, point->my_type, &Hcalib);
+		ImmaturePoint* pt = new ImmaturePoint(point->u+0.5f, point->v+0.5f, firstFrame, point->my_type, &Hcalib, point->line_index);
 		if(!std::isfinite(pt->energyTH)) 
 			{ delete pt; continue; }
 
 
-		// 尝试初始化点海森
+		// 利用未熟点初始化点海森
 		pt->idepth_max=pt->idepth_min=1;
 		PointHessian* ph = new PointHessian(pt, &Hcalib);
-		// 蛤？ 直接诶删掉未熟点？
-		delete pt;
+		delete pt; // 立刻删除未熟点
 		if(!std::isfinite(ph->energyTH)) {delete ph; continue;}
 
-		// 设置点海森，激活
+		// 设置ph的深度
 		ph->setIdepthScaled(point->iR*rescaleFactor);
 		ph->setIdepthZero(ph->idepth);
 		ph->hasDepthPrior=true;
@@ -1472,6 +1472,33 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		// 点海森添加到帧海森中
 		firstFrame->pointHessians.push_back(ph);
 		ef->insertPoint(ph);
+
+	}
+
+	for (int k = 0; k < 2; k++) {
+		std::vector<dso::Pnt*> &lpt = coarseInitializer->line_pts[k];
+		Eigen::MatrixXf mat_lps;
+		int lpt_size = lpt.size();
+		mat_lps.resize(lpt_size, 3);
+		mat_lps.setConstant(0);
+		int cnt = 0;
+		for (int i=0; i<lpt_size; i++) {
+			if(lpt[i]->isGood == false){
+				continue;
+			}
+			float z = 1.0f / (lpt[i]->iR * rescaleFactor);
+			float x = ((lpt[i]->u +0.5f) - Hcalib.cxl()) * Hcalib.fxli() * z;
+			float y = ((lpt[i]->v +0.5f) - Hcalib.cyl()) * Hcalib.fyli() * z;
+			mat_lps.block<1, 3>(cnt, 0) = Vec3f(x, y, z); 
+			cnt ++ ;
+		}
+
+		// printf("size = %d\n", cnt);
+		// std::cout <<  mat_lps << std::endl << std::endl;
+		Vec3f x0, u;
+		float inlier_part = dso_line::line_estimate_g(mat_lps, x0, u);
+		firstFrame->line_x0.push_back(x0);
+		firstFrame->line_u.push_back(u);
 	}
 
 	// 位移缩放
@@ -1495,6 +1522,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		newFrame->shell->camToTrackingRef = firstToNew.inverse();
 
 	}
+
 
 	initialized=true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());

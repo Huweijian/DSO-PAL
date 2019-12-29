@@ -77,16 +77,18 @@ public:
 
 	float idepth_min;
 	float idepth_max;
-	ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib);
-	~ImmaturePoint();
-
-	ImmaturePointStatus traceOn(FrameHessian* frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine, CalibHessian* HCalib, bool debugPrint=false);
 
 	ImmaturePointStatus lastTraceStatus;
 	Vec2f lastTraceUV;
 	float lastTracePixelInterval; // 上次跟踪的误差
-
 	float idepth_GT;
+
+	int line_index;
+
+	ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib, int line_index = -1);
+	~ImmaturePoint();
+
+	ImmaturePointStatus traceOn(FrameHessian* frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt, const Vec2f &hostToFrame_affine, CalibHessian* HCalib, bool debugPrint=false);
 
 	double linearizeResidual(
 			CalibHessian *  HCalib, const float outlierTHSlack,

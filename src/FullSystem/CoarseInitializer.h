@@ -74,6 +74,9 @@ public:
 
 	float my_type; //第n轮选中的点
 	float outlierTH;
+	
+	// 线的label
+	int line_index = -1;
 };
 
 class CoarseInitializer {

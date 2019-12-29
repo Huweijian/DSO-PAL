@@ -29,8 +29,8 @@
 namespace dso
 {
 //计算总梯度海森，每个pattern点的权重，计算能量阈值
-ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib)
-: u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED)
+ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian* host_, float type, CalibHessian* HCalib, int line_index)
+: u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED), line_index(line_index)
 {
 	// 梯度.T * 梯度
 	gradH.setZero();

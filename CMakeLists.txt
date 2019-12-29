@@ -5,8 +5,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 # set(BUILD_TYPE RelWithDebInfo)
 
-# set(BUILD_TYPE Release)
-set(BUILD_TYPE Debug)
+set(BUILD_TYPE Release)
+# set(BUILD_TYPE Debug)
 
 if(${BUILD_TYPE} MATCHES "Debug")
 	message("!!!Debug mode!!!")
@@ -32,6 +32,7 @@ find_package(aruco REQUIRED)
 find_package(SuiteParse REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(Boost COMPONENTS system thread) 
+find_package(Ceres REQUIRED)
 
 # optional libraries
 find_package(LibZip QUIET)
@@ -77,6 +78,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
+  ${CERES_INCLUDE_DIR}
 ) 
 
 
@@ -152,5 +154,6 @@ add_executable(test_dso
 	${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
 	${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
 	${PROJECT_SOURCE_DIR}/src/line/lsd.cpp
+	${PROJECT_SOURCE_DIR}/src/line/line_estimate.cpp
 	)
-target_link_libraries(test_dso dso ${OpenCV_LIBS} ${aruco_LIBS})
+target_link_libraries(test_dso dso ${OpenCV_LIBS} ${aruco_LIBS} ${CERES_LIBS})

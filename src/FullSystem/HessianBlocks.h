@@ -123,11 +123,6 @@ struct FrameHessian
 	// 梯度绝对值(dx^2+dy^2)
 	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
-
-
-
-
-
 	int frameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
 	int idx;
@@ -143,7 +138,6 @@ struct FrameHessian
 	std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
 	std::vector<ImmaturePoint*> immaturePoints;		// contains all OUTLIER points (= discarded.).
 
-
 	Mat66 nullspaces_pose;
 	Mat42 nullspaces_affine;
 	Vec6 nullspaces_scale;
@@ -158,27 +152,56 @@ struct FrameHessian
 	Vec10 state_backup;
 
 
-    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();}
-
-
 	// precalc values
 	SE3 PRE_worldToCam;
 	SE3 PRE_camToWorld;
 	std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
 	MinimalImageB3* debugImage;
 
+	// line
+	std::vector<Vec3f> line_x0;
+	std::vector<Vec3f> line_u;
+
+    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
+    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
+    EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
+    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;}
+    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();}
 
     inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
     inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
     inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
 
-
-
 	void setStateZero(const Vec10 &state_zero);
+	void release();
+    void makeImages(float* color, CalibHessian* HCalib);
+
+	inline FrameHessian()
+	{
+		instanceCounter++;
+		flaggedForMarginalization=false;
+		frameID = -1;
+		efFrame = 0;
+		frameEnergyTH = 8*8*patternNum;
+
+		debugImage=0;
+	};
+
+	inline ~FrameHessian()
+	{
+		assert(efFrame==0);
+		release(); instanceCounter--;
+		for(int i=0;i<pyrLevelsUsed;i++)
+		{
+			delete[] dIp[i];
+			delete[]  absSquaredGrad[i];
+
+		}
+
+		if(debugImage != 0) 
+			delete debugImage;
+	};
+
 
 	inline void setState(const Vec10 &state)
 	{
@@ -222,8 +245,6 @@ struct FrameHessian
 		setStateZero(state);
 	};
 
-
-
 	inline void setEvalPT_scaled(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l)
 	{
 		Vec10 initial_state = Vec10::Zero();
@@ -235,37 +256,6 @@ struct FrameHessian
 		setStateZero(this->get_state());
 	};
 
-	void release();
-
-	inline ~FrameHessian()
-	{
-		assert(efFrame==0);
-		release(); instanceCounter--;
-		for(int i=0;i<pyrLevelsUsed;i++)
-		{
-			delete[] dIp[i];
-			delete[]  absSquaredGrad[i];
-
-		}
-
-		if(debugImage != 0) 
-			delete debugImage;
-	};
-	inline FrameHessian()
-	{
-		instanceCounter++;
-		flaggedForMarginalization=false;
-		frameID = -1;
-		efFrame = 0;
-		frameEnergyTH = 8*8*patternNum;
-
-
-
-		debugImage=0;
-	};
-
-
-    void makeImages(float* color, CalibHessian* HCalib);
 
 	inline Vec10 getPrior()
 	{
@@ -419,8 +409,6 @@ struct PointHessian
 	float color[MAX_RES_PER_POINT];			// colors in host frame
 	float weights[MAX_RES_PER_POINT];		// host-weights for respective residuals.
 
-
-
 	float u,v;
 	int idx;
 	float energyTH;
@@ -442,11 +430,18 @@ struct PointHessian
 	float maxRelBaseline;
 	int numGoodResiduals;
 
+	int line_index = -1;
+
 	enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB, MARGINALIZED};
 	PtStatus status;
 
-    inline void setPointStatus(PtStatus s) {status=s;}
+	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
+	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
+    inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;}
+
+    inline void setPointStatus(PtStatus s) {status=s;}
 
 	inline void setIdepth(float idepth) {
 		this->idepth = idepth;
@@ -462,14 +457,7 @@ struct PointHessian
 		nullspaces_scale = -(idepth*1.001 - idepth/1.001)*500;
     }
 
-
-	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
-	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
-
-
 	void release();
-	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
-    inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;}
 
 	// toKeep变量没用
 	inline bool isOOB(const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg) const

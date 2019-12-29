@@ -3,6 +3,7 @@
 #include <util/Undistort.h>
 #include <OptimizationBackend/MatrixAccumulators.h>
 #include <line/lsd.h>
+#include <line/line_estimate.h>
 
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
@@ -12,6 +13,7 @@
 #include <vector>
 #include <iostream>
 #include <string>
+
 
 #include "tic_toc.h"
 // #include <opencv2/ximageproc.hpp>
@@ -226,11 +228,27 @@ int main(void)
 {
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
+    // // test RANSAC line estimation
+    // ifstream fin("/home/hwj23/Project/dso-master/matlab/line/data1.txt");
+    // vector<Eigen::Vector3f> pts;
+    // float x, y, z;
+    // while(fin >> x >> y >> z){
+    //     pts.push_back(Vector3f(x, y, z)); 
+    // }
+    // Eigen::MatrixXf pts_mat(pts.size(), 3);
+    // for(int i=0; i<pts.size(); i++){
+    //     pts_mat.block<1, 3>(i, 0) = pts[i];
+    // }
+    // Eigen::Vector3f x0, u;
+    // float inlier = dso_line::line_estimate_g(pts_mat, x0, u);
+    // cout << "x0: " << x0.T << endl;
+    // cout << "u:  " << u.T << endl;
+    // printf("inlier: %.2f%%\n", inlier*100);
 
-    // test Eigen
-    Vector3f a, b;
-    a << 1, 2, 3;
-    cout << a * a.transpose() * 2 << endl;
+    // // test Eigen
+    // Vector3f a, b;
+    // a << 1, 2, 3;
+    // cout << a * a.transpose() * 2 << endl;
 
 
     // // flip image
