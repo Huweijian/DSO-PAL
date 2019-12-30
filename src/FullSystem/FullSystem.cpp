@@ -429,13 +429,13 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 			}
 		}
 
-		// 如果比上次的好，就可以退出了，不用继续尝试了
+		// 不比上次差太多，就可以退出了，不用继续尝试了
         if(haveOneGood && achievedRes[0] < lastCoarseRMSE[0]*setting_reTrackThreshold)
             break;
 
 	} // 尝试各种可能位姿
 
-	// 如果所有尝试都挂了，那么全部赋值为0，装死
+	// 如果所有尝试都挂了，那么全部赋值为0，gg
 	if(!haveOneGood)
 	{
         printf("BIG ERROR! tracking failed entirely. Take predictred pose and hope we may somehow recover.\n");
@@ -1004,9 +1004,9 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if 跟踪成功 
 		{
 
-			initializeFromInitializer(fh); //初始第一帧加入fh
+			initializeFromInitializer(fh); //初始帧封装为FrameHessian
 			lock.unlock();
-			deliverTrackedFrame(fh, true); //当前帧也加入fh
+			deliverTrackedFrame(fh, true); //当前帧也封装为FrameHessian
 		}
 		// track失败，丢弃帧
 		else
@@ -1098,6 +1098,7 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
 {
 
+	// yes if preset = 0
 	if(linearizeOperation)
 	{
 		// 判断要不要单步运行
@@ -1261,25 +1262,32 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
 
+	//[ ***step 1*** ] 设置当前估计的fh的位姿, 光度参数
 	// needs to be set by mapping thread
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
 		//更新当前帧的全局位姿
 		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		// TODO: 看不懂
-		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		// 设置评估点(似乎是设置优化初值)
+		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
 	}
 
+
+
+
+	//[ ***step 2*** ] 把这一帧来更新之前帧的未成熟点
 	traceNewCoarse(fh);
 
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
+	//[ ***step 3*** ] 选择要边缘化掉的帧
 	// =========================== Flag Frames to be Marginalized. =========================
 	// 标记要Mag掉的帧
 	flagFramesForMarginalization(fh);
 
 
+	//[ ***step 4*** ] 加入到关键帧序列
 	// =========================== add New Frame to Hessian Struct. =========================
 	// 添加初始化的最后一帧到fh
 	fh->idx = frameHessians.size();
@@ -1290,6 +1298,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	setPrecalcValues();
 
+	//[ ***step 5*** ] 构建之前关键帧与当前帧fh的残差(旧的)
 	// =========================== add new residuals for old points =========================
 	int numFwdResAdde=0;
 	// 枚举所有老帧
@@ -1401,6 +1410,58 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 			i=0;
 		}
 
+	//[ ***step n*** ] 直线传播: 直线传从上一个关键帧传播到当前关键帧
+	{
+		FrameHessian* last_line_fh = frameHessians[frameHessians.size()-2];
+
+		SE3 lkf_fh = fh->PRE_worldToCam * last_line_fh->PRE_camToWorld;
+		Mat33f R_lkf_fh = lkf_fh.rotationMatrix().cast<float>();
+		Vec3f t_lkf_fh = lkf_fh.translation().cast<float>();
+
+		for(int il = 0; il < last_line_fh->line_u.size(); il++){
+			Vec3f P1 = last_line_fh->line_x0[il];
+			Vec3f P2 = last_line_fh->line_x0[il] + last_line_fh->line_u[il];
+
+			P1 = R_lkf_fh * P1 + t_lkf_fh;
+			P2 = R_lkf_fh * P2 + t_lkf_fh;
+
+			fh->line_x0.push_back(P1);
+			Vec3f u = (P2 - P1).normalized();
+			fh->line_u.push_back(u);
+		}
+		
+		{
+			using namespace cv;
+			using namespace std;
+
+			Mat img1 = IOWrap::getOCVImg(last_line_fh->dI, wG[0], hG[0]);
+			Mat img2 = IOWrap::getOCVImg(fh->dI, wG[0], hG[0]);
+
+			Vec3f p1 = Hcalib.makeK() * last_line_fh->line_x0[0] ;
+			p1 = p1 / p1(2);	
+			Vec3f p2 = Hcalib.makeK() * (last_line_fh->line_x0[0] + last_line_fh->line_u[0]);
+			p2 = p2 / p2(2);
+			line(img1, Point(p1(0), p1(1)), Point(p2(0), p2(1)), 255);
+			cout << "P1: \t"<< p1.transpose() << " | " << p2.transpose() << endl;
+
+			p1 = Hcalib.makeK() * fh->line_x0[0] ;
+			p1 = p1 / p1(2);	
+			p2 = Hcalib.makeK() * (fh->line_x0[0] + fh->line_u[0]);
+			p2 = p2 / p2(2);
+			line(img2, Point(p1(0), p1(1)), Point(p2(0), p2(1)), 255);
+			cout << "P2: \t"<<p1.transpose() << " | " << p2.transpose() << endl;
+
+
+			imshow("img1", img1);
+			imshow("img2", img2);
+			waitKey();
+		}
+
+
+	}
+
+
+
 	printLogLine();
 }
 
@@ -1475,6 +1536,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 
 	}
 
+	// 估计3D直线表达式
 	for (int k = 0; k < 2; k++) {
 		std::vector<dso::Pnt*> &lpt = coarseInitializer->line_pts[k];
 		Eigen::MatrixXf mat_lps;

@@ -395,6 +395,15 @@ struct CalibHessian
 		if(c>250) c=250;
 		return Binv[c+1]-Binv[c];
 	}
+
+	inline Mat33f makeK(){
+		Mat33f K = Mat33f::Identity();
+		K(0,0) = fxl();
+		K(1,1) = fyl();
+		K(0,2) = cxl();
+		K(1,2) = cyl();
+		return K;	
+	}
 };
 
 
