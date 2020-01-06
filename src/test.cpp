@@ -10,6 +10,9 @@
 #include <opencv2/line_descriptor.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/ximgproc/slic.hpp>
+#include <ceres/ceres.h>
+#include <ceres/solver.h>
+
 #include <vector>
 #include <iostream>
 #include <string>
@@ -18,7 +21,7 @@
 #include "tic_toc.h"
 // #include <opencv2/ximageproc.hpp>
 
-#define T transpose()
+#define TT transpose()
 using namespace cv;
 using namespace std;
 using namespace Eigen;
@@ -224,9 +227,69 @@ void testmpslam()
     waitKey();
 }
 
-int main(void)
+struct ACOSReprojectError{
+public:
+    ACOSReprojectError(double gx, double gy)
+        :gx_(gx), gy_(gy){};
+
+    template<typename T> 
+    bool operator()(const T* const pose, T* residuals) const {
+        T theta = pose[0]*3.1415/180.0;
+        T x2 = ceres::cos(theta);
+        T y2 = ceres::sin(theta);
+        
+        T v1dotv2 = T(gx_)*x2 + T(gy_)*y2;
+        if((v1dotv2) >= T(1.0) || v1dotv2 <= T(-1.0)){
+            residuals[0] = T(0);
+        }
+        else{
+            residuals[0] = ceres::acos(v1dotv2);
+        }
+
+        // cout <<"res: "<< residuals[0] <<"\tv1.v2: " << v1dotv2 << endl;
+        return true;
+    }
+
+private:
+    const double gx_ = 0;
+    const double gy_ = 0;
+};
+
+int main(int argc, char** argv)
 {
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
+
+    // test Ceres-Solver
+    {
+        using namespace ceres;
+        google::InitGoogleLogging(argv[0]);
+            
+        double x_init = 0.0;
+        double x_val = x_init;
+
+        Problem problem;
+
+        ifstream file("/home/hwj23/Project/dso-master/matlab/line/test.txt");
+        float gx, gy;
+        while(file >> gx >> gy){
+            CostFunction* cost_function =
+                new AutoDiffCostFunction<ACOSReprojectError, 1, 1>(
+                    new ACOSReprojectError(gx, gy));
+            problem.AddResidualBlock(cost_function, NULL, &x_val);
+        }
+
+        Solver::Options options;
+        options.linear_solver_type = DENSE_QR;
+        options.minimizer_progress_to_stdout = true;
+        Solver::Summary summary;
+
+        ceres::Solve(options, &problem, &summary);
+
+        std::cout << summary.BriefReport() << "\n";
+        std::cout << "x : " << x_init << " -> " << x_val << "\n";
+    }
+    
+
 
     // // test RANSAC line estimation
     // ifstream fin("/home/hwj23/Project/dso-master/matlab/line/data1.txt");
