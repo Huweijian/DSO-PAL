@@ -60,8 +60,13 @@ public:
 	void makeK(
 			CalibHessian* HCalib);
 
-	bool debugPrint, debugPlot;
+    void debugPlotIDepthMap(float* minID, float* maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
+    void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);
 
+	// TODO: 回头记得删了
+	void testLine(const SE3 &refToNew);
+
+	bool debugPrint, debugPlot;
 	Mat33f K[PYR_LEVELS];
 	Mat33f Ki[PYR_LEVELS];
 	float fx[PYR_LEVELS];
@@ -75,9 +80,6 @@ public:
 	int w[PYR_LEVELS];
 	int h[PYR_LEVELS];
 
-    void debugPlotIDepthMap(float* minID, float* maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
-    void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);
-
 	FrameHessian* lastRef;
 	AffLight lastRef_aff_g2l;
 	FrameHessian* newFrame;
@@ -87,19 +89,17 @@ public:
 	Vec5 lastResiduals;
 	Vec3 lastFlowIndicators;
 	double firstCoarseRMSE;
+
 private:
-
-
 	void makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians);
-	float* idepth[PYR_LEVELS];
-	float* weightSums[PYR_LEVELS];
-	float* weightSums_bak[PYR_LEVELS];
-
-
 	Vec6 calcResAndGS(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH);
 	Vec6 calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH);
 	void calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l);
 	void calcGS(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l);
+
+	float* idepth[PYR_LEVELS];
+	float* weightSums[PYR_LEVELS];
+	float* weightSums_bak[PYR_LEVELS];
 
 	// pc buffers
 	float* pc_u[PYR_LEVELS];
@@ -116,14 +116,12 @@ private:
 	float* buf_warped_dy;
 	float* buf_warped_residual;
 	float* buf_warped_weight;
-	float* buf_warped_refColor;
+	float* buf_warped_refColor;	//kf的亮度
 	int buf_warped_n;
-
 
     std::vector<float*> ptrToDelete;
 
-
-	Accumulator9 acc;
+	Accumulator9 acc; // 直接法Tracking所用的SSE累加器
 };
 
 

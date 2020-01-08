@@ -56,6 +56,7 @@
 #include "util/ImageAndExposure.h"
 #include "util/pal_interface.h"
 #include "line/line_estimate.h"
+#include "line/line_init.h"
 #include <cmath>
 
 namespace dso
@@ -379,7 +380,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		// 位姿进行不同的尝试
 		SE3 lastF_2_fh_this = lastF_2_fh_tries[i];
 
-		// 在从最高层向下逐层tarck
+		// !!!!! 在从最高层向下逐层tarck !!!!!
 		bool trackingIsGood = coarseTracker->trackNewestCoarse(
 				fh, lastF_2_fh_this, aff_g2l_this,
 				pyrLevelsUsed-1,
@@ -1411,7 +1412,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		}
 
 	//[ ***step n*** ] 直线传播: 直线传从上一个关键帧传播到当前关键帧
-	{
+	if(init_method_g == "line"){
 		FrameHessian* last_line_fh = frameHessians[frameHessians.size()-2];
 
 		SE3 lkf_fh = fh->PRE_worldToCam * last_line_fh->PRE_camToWorld;
@@ -1429,8 +1430,12 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 			Vec3f u = (P2 - P1).normalized();
 			fh->line_u.push_back(u);
 		}
-		
+
+
+		// debug ------------------
 		{
+			printf(" - LINE: %lu lines [Frame(%d) ----> Frame(%d)]\n",fh->line_x0.size(), last_line_fh->shell->incoming_id, fh->shell->incoming_id);
+		
 			using namespace cv;
 			using namespace std;
 
@@ -1455,6 +1460,9 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 			imshow("img1", img1);
 			imshow("img2", img2);
 			waitKey();
+
+		// ------------------------------
+
 		}
 
 
@@ -1539,8 +1547,12 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	// 估计3D直线表达式
 	for (int k = 0; k < 2; k++) {
 		std::vector<dso::Pnt*> &lpt = coarseInitializer->line_pts[k];
-		Eigen::MatrixXf mat_lps;
 		int lpt_size = lpt.size();
+		if(lpt_size == 0){
+			continue;
+		}
+
+		Eigen::MatrixXf mat_lps;
 		mat_lps.resize(lpt_size, 3);
 		mat_lps.setConstant(0);
 		int cnt = 0;

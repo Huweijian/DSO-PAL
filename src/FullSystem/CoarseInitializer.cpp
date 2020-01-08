@@ -65,7 +65,7 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 
 	frameID=-1;
 	fixAffine=true;
-	printDebug=true;
+	printDebug=false;
 
 	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
 	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
@@ -1112,10 +1112,12 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 						sumGrad2 += absgrad;
 					}
 
-					if(lvl == 0 && line_mask_g.at<uchar>(y, x) != 0){
-						int line_idx = line_mask_g.at<uchar>(y, x)-1;
-						line_pts[line_idx].push_back(&(pl[nl]));	
-						pl[nl].line_index = line_idx;
+					if(init_method_g == "line"){
+						if(lvl == 0 && line_mask_g.at<uchar>(y, x) != 0){
+							int line_idx = line_mask_g.at<uchar>(y, x)-1;
+							line_pts[line_idx].push_back(&(pl[nl]));	
+							pl[nl].line_index = line_idx;
+						}
 					}
 
 					nl++;

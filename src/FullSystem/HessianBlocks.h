@@ -125,7 +125,7 @@ struct FrameHessian
 
 	int frameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
-	int idx;
+	int idx;							// kf在队列中的位置
 
 	// Photometric Calibration Stuff
 	float frameEnergyTH;	// set dynamically depending on tracking residual

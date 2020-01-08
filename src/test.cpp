@@ -230,7 +230,9 @@ void testmpslam()
 struct ACOSReprojectError{
 public:
     ACOSReprojectError(double gx, double gy)
-        :gx_(gx), gy_(gy){};
+        :gx_(gx){
+            gy_ = gy;
+        };
 
     template<typename T> 
     bool operator()(const T* const pose, T* residuals) const {
@@ -252,7 +254,7 @@ public:
 
 private:
     const double gx_ = 0;
-    const double gy_ = 0;
+    double gy_;
 };
 
 int main(int argc, char** argv)
@@ -260,37 +262,35 @@ int main(int argc, char** argv)
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
     // test Ceres-Solver
-    {
-        using namespace ceres;
-        google::InitGoogleLogging(argv[0]);
+    // {
+    //     using namespace ceres;
+    //     google::InitGoogleLogging("ceres_tttttttest");
             
-        double x_init = 0.0;
-        double x_val = x_init;
+    //     double x_init = 0.0;
+    //     double x_val = x_init;
 
-        Problem problem;
+    //     Problem problem;
 
-        ifstream file("/home/hwj23/Project/dso-master/matlab/line/test.txt");
-        float gx, gy;
-        while(file >> gx >> gy){
-            CostFunction* cost_function =
-                new AutoDiffCostFunction<ACOSReprojectError, 1, 1>(
-                    new ACOSReprojectError(gx, gy));
-            problem.AddResidualBlock(cost_function, NULL, &x_val);
-        }
+    //     ifstream file("/home/hwj23/Project/dso-master/matlab/line/test.txt");
+    //     float gx, gy;
+    //     while(file >> gx >> gy){
+    //         CostFunction* cost_function =
+    //             new AutoDiffCostFunction<ACOSReprojectError, 1, 1>(
+    //                 new ACOSReprojectError(gx, gy));
+    //         problem.AddResidualBlock(cost_function, NULL, &x_val);
+    //     }
 
-        Solver::Options options;
-        options.linear_solver_type = DENSE_QR;
-        options.minimizer_progress_to_stdout = true;
-        Solver::Summary summary;
+    //     Solver::Options options;
+    //     options.linear_solver_type = DENSE_QR;
+    //     options.minimizer_progress_to_stdout = true;
+    //     Solver::Summary summary;
 
-        ceres::Solve(options, &problem, &summary);
+    //     ceres::Solve(options, &problem, &summary);
 
-        std::cout << summary.BriefReport() << "\n";
-        std::cout << "x : " << x_init << " -> " << x_val << "\n";
-    }
+    //     std::cout << summary.BriefReport() << "\n";
+    //     std::cout << "x : " << x_init << " -> " << x_val << "\n";
+    // }
     
-
-
     // // test RANSAC line estimation
     // ifstream fin("/home/hwj23/Project/dso-master/matlab/line/data1.txt");
     // vector<Eigen::Vector3f> pts;
@@ -308,10 +308,13 @@ int main(int argc, char** argv)
     // cout << "u:  " << u.T << endl;
     // printf("inlier: %.2f%%\n", inlier*100);
 
-    // // test Eigen
-    // Vector3f a, b;
-    // a << 1, 2, 3;
-    // cout << a * a.transpose() * 2 << endl;
+    // test Eigen
+    Vector3f a, b;
+    a << 1, 2, 3;
+    auto arr = a.data();
+    Matrix3f m;
+    m << 1, 2, 3, 4, 5, 6, 7, 8, 9;
+    cout << m(0, 0);
 
 
     // // flip image

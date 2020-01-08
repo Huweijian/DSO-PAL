@@ -30,17 +30,17 @@
             "request": "launch",
             "program": "${workspaceFolder}/build/bin/dso_dataset",
 
-            // D435
-            "args": [   "files=/home/hwj23/Dataset/D435/s6/images", 
-                        "calib=/home/hwj23/Dataset/D435/camera.txt", 
-                        "gamma=/home/hwj23/Dataset/D435/pcalib.txt", 
-                        "vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png", 
-                        "preset=0", 
-                        "mode=0",
-                        "start=30",
-                        "init=line"
-                        // "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
-                    ],
+            // // D435
+            // "args": [   "files=/home/hwj23/Dataset/D435/s6/images", 
+            //             "calib=/home/hwj23/Dataset/D435/camera.txt", 
+            //             "gamma=/home/hwj23/Dataset/D435/pcalib.txt", 
+            //             "vignette=/home/hwj23/Dataset/D435/vignetteSmoothed.png", 
+            //             "preset=0", 
+            //             "mode=0",
+            //             "start=30",
+            //             "init=line"
+            //             // "trajectory=/home/hwj23/Dataset/D435/trajectory_304_306.txt"
+            //         ],
 
             // // TUM S19
             // "args": [   "files=/home/hwj23/Dataset/TUM/sequence_19/images.zip", 
@@ -52,12 +52,13 @@
             //             "init=1"
             //         ],
 
-            // SIMU movex
-            // "args": [   "files=/home/hwj23/Dataset/simu/movex/color/", 
-            //             "calib=/home/hwj23/Dataset/simu/camera.cfg", 
-            //             "preset=0", 
-            //             "mode=2" 
-            //         ],
+            // // SIMU 
+            "args": [   "files=/home/hwj23/Dataset/simu/s17/color/", 
+                        "calib=/home/hwj23/Dataset/simu/camera_s17-now.txt", 
+                        "preset=0", 
+                        "mode=2",
+                        "init=line"
+                    ],
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

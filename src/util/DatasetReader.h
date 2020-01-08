@@ -31,6 +31,7 @@
 #include <fstream>
 #include <dirent.h>
 #include <algorithm>
+#include <cstring>
 
 #include "util/Undistort.h"
 #include "IOWrapper/ImageRW.h"
@@ -313,18 +314,19 @@ private:
 			if(line_mask_g.empty()){
 				printf(" - 初始化前赋予直线检测真值\n");
 
-				std::string line_gt_file = path + "/../line_gt_00030_undist.png";
+				char str_id[10] = "";
+				sprintf(str_id, "%05d", id);
 
+				std::string line_gt_file = path + "/../line_gt_" + str_id + "_undist.png";
+
+				// read image and undistort
 				// MinimalImageB* line_mask_img = IOWrap::readImageBW_8U(line_gt_file);
-				// for(int i=0; i<line_mask_img->h*line_mask_img->w; i++){
-				// 	if(line_mask_img->data[i] < 254)
-				// 		line_mask_img->data[i] = 0;
-				// }
-
 				// ImageAndExposure* line_undist = undistort->undistort<unsigned char>(line_mask_img, 0.0, 0.0, 1);
 				// Mat img = IOWrap::getOCVImg_tem(line_undist->image, line_undist->w, line_undist->h);
 
+				// OpenCV read image
 				cv::Mat img =  imread(line_gt_file, 0);
+
 				line_mask_g = Mat::zeros(img.size(), CV_8UC1);
 				line_mask_g.setTo(1, (img == 254));
 				line_mask_g.setTo(2, (img == 255));
