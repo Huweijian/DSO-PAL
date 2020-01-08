@@ -1457,9 +1457,9 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 			cout << "P2: \t"<<p1.transpose() << " | " << p2.transpose() << endl;
 
 
-			imshow("img1", img1);
-			imshow("img2", img2);
-			waitKey();
+			// imshow("img1", img1);
+			// imshow("img2", img2);
+			// waitKey(1);
 
 		// ------------------------------
 

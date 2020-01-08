@@ -317,19 +317,19 @@ private:
 				char str_id[10] = "";
 				sprintf(str_id, "%05d", id);
 
-				std::string line_gt_file = path + "/../line_gt_" + str_id + "_undist.png";
-
-				// read image and undistort
-				// MinimalImageB* line_mask_img = IOWrap::readImageBW_8U(line_gt_file);
+				// read raw image and undistort
+				// MinimalImageB* line_mask_img = IOWrap::readImageBW_8U(path + "/" + str_id + ".png");
 				// ImageAndExposure* line_undist = undistort->undistort<unsigned char>(line_mask_img, 0.0, 0.0, 1);
 				// Mat img = IOWrap::getOCVImg_tem(line_undist->image, line_undist->w, line_undist->h);
 
-				// OpenCV read image
+				// OpenCV read distorted image
+				std::string line_gt_file = path + "/../line_gt_" + str_id + "_undist.png";
 				cv::Mat img =  imread(line_gt_file, 0);
 
 				line_mask_g = Mat::zeros(img.size(), CV_8UC1);
 				line_mask_g.setTo(1, (img == 254));
 				line_mask_g.setTo(2, (img == 255));
+
 				// imshow("hi", line_mask_g);
 				// imshow("img", img);
 				// waitKey();

@@ -25,12 +25,11 @@ endif()
 set(EXECUTABLE_OUTPUT_PATH bin)
 set(LIBRARY_OUTPUT_PATH lib)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
-message(${CMAKE_MODULE_PATH})
 
 # required librarie
 find_package(aruco REQUIRED)
 find_package(SuiteParse REQUIRED)
-find_package(Eigen3 REQUIRED)
+find_package(Eigen3 3.2.10 EXACT REQUIRED)
 find_package(Boost COMPONENTS system thread) 
 find_package(Ceres REQUIRED)
 
@@ -73,7 +72,7 @@ set(dso_SOURCE_FILES
 
 
 
-include_directories(
+  include_directories(
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon

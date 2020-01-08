@@ -55,7 +55,8 @@
         "mutex": "cpp",
         "algorithm": "cpp",
         "cfenv": "cpp",
-        "string": "cpp"
+        "string": "cpp",
+        "core": "cpp"
     },
     "cSpell.enabledLanguageIds": [
         "latex",
