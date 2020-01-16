@@ -159,6 +159,5 @@ add_executable(test_dso
 	${PROJECT_SOURCE_DIR}/src/util/pal_model.cpp
 	${PROJECT_SOURCE_DIR}/src/util/pal_interface.cpp
 	${PROJECT_SOURCE_DIR}/src/line/lsd.cpp
-	${PROJECT_SOURCE_DIR}/src/line/line_estimate.cpp
 	)
 target_link_libraries(test_dso dso ${OpenCV_LIBS} ${aruco_LIBS} ${CERES_LIBRARIES})

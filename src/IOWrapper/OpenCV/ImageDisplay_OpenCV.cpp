@@ -70,7 +70,6 @@ cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h){
 		for(int y=0; y<h; y++){
 			img.at<uchar>(y, x) = dI[y*w+x][0]/2;
 		}
-
 	}
 	return img;
 }

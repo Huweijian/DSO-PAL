@@ -11,9 +11,9 @@
 std::string init_method_g = "default";
 cv::Mat line_mask_g;
 
+
+
 namespace dso{
-
-
 Vec3f CoarseInitializer::calcResAndGS_v2(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
 		Mat88f &H_out_sc, Vec8f &b_out_sc,

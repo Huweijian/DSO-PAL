@@ -37,11 +37,19 @@ clear;
 % plot3(pfit(:, 1), pfit(:, 2), pfit(:, 3));
 % % axis([-Inf Inf -Inf Inf 0 2])
 
-%% test arccos
+%% generate grad data to test arccos cost function
+% clear;
+% theta = deg2rad(50 + randn(100, 1));
+% x = cos(theta);
+% y = sin(theta);
+% g = [x y];
+% dlmwrite('test.txt', g, ' ');
+
+%% 
 clear;
-theta = deg2rad(50 + randn(100, 1));
-x = cos(theta);
-y = sin(theta);
-g = [x y];
-dlmwrite('test.txt', g, ' ');
+q = [1 0 2 3];
+R = quat2rotm(q);
+q2 = rotm2quat(R);
+pt = [1.2 2.3 -2]';
+R * pt
 

@@ -485,10 +485,7 @@ Vec6 CoarseTracker::calcRes(
 		resImage->setConst(Vec3b(255,255,255));
 	}
 
-	// test line -------------
-	if(lvl == 0){
-		testLine(refToNew);
-	}
+
 
 
 	// hwjdebug----------------------
@@ -926,6 +923,9 @@ bool CoarseTracker::trackNewestCoarse(
 			printf("REPEAT LEVEL!\n");
 		}
 	} // 金字塔level
+
+	// test line -------------
+	testLine(refToNew_current);
 
 	// set!
 	// 保存更新结果
