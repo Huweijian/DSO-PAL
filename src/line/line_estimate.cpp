@@ -134,8 +134,6 @@ public:
         T p0[3], p1[3];
         T l_p0T[3] = {T(l_p0_[0]), T(l_p0_[1]), T(l_p0_[2]) };
         T l_p1T[3] = {T(l_p1_[0]), T(l_p1_[1]), T(l_p1_[2]) };
-        // cout <<" - Pt = " << l_p0T[0] << ", " << l_p1T[0] << endl;
-        // cout <<" - Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] << endl;
 
         ceres::UnitQuaternionRotatePoint(pose, l_p0T, p0);
         ceres::UnitQuaternionRotatePoint(pose, l_p1T, p1);
@@ -143,6 +141,10 @@ public:
             p0[i]+= pose[4+i];  
             p1[i]+= pose[4+i];
         }
+
+        // cout <<"Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] <<" " << pose[5] << " " << pose[6] << endl;
+        // cout <<"Line P1= (" << l_p0T[0]  << " " << l_p0T[1] << " " << l_p0T[2] << ") -> ( " << p0[0] << " " << p0[1] << " " << p0[2] << endl;
+        // cout <<"Line P2= (" << l_p1T[0]  << " " << l_p1T[1] << " " << l_p1T[2] << ") -> ( " << p1[0] << " " << p1[1] << " " << p1[2] << endl;
         // cout <<" - RotPt = " << p0[0] << ", " << p1[0] << endl;
         T lx = p1[0]/p1[2] - p0[0]/p0[2];
         T ly = p1[1]/p1[2] - p0[1]/p0[2];
@@ -166,7 +168,7 @@ public:
             residuals[0] = T(0);
         }
         else{
-            residuals[0] = ceres::acos(dot_res) / dist_ ;
+            residuals[0] = (dot_res) / dist_ ;
         }
         return true;
     }
@@ -174,7 +176,8 @@ public:
     static ceres::CostFunction *Create(
             float gx, float gy, float dist, 
             const Eigen::Vector3f &l_x0, const Eigen::Vector3f &l_u,
-            const Eigen::Matrix3f &K){
+            const Eigen::Matrix3f &K,
+            LineReprojectError *err_out = nullptr){
 
         // double l_p0[3], l_p1[3], 
         float camera[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
@@ -182,10 +185,13 @@ public:
         Eigen::Vector3f l_p1 = l_p0 + l_u;
         float g_norm = std::sqrt(gx*gx + gy*gy) + 0.00001;
         gx /= g_norm; gy/= g_norm;
-        
-        return (
-            new ceres::AutoDiffCostFunction<LineReprojectError, 1, 7>(
-                new LineReprojectError(gx, gy, dist, l_p0.data(), l_p1.data(), camera)));
+
+        LineReprojectError *err = new LineReprojectError(gx, gy, dist, l_p0.data(), l_p1.data(), camera);
+        if(err_out != nullptr){
+            err_out = err;
+        }
+
+        return (new ceres::AutoDiffCostFunction<LineReprojectError, 1, 7>(err));
     }
 
    private:
@@ -218,18 +224,17 @@ namespace dso{
         cv::Mat img_new = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
 
         // 优化初值
-        Mat33f Rn = Sophus::SO3f::exp(Vec3f(0, 0, 0.02)).matrix();
-        R = R*Rn; 
         Eigen::Quaternion<float> q(R);
         double pose_val_init[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
         double pose_val[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
+
         // --debug -----------
-        Mat33f R_d; Vec3f t_d;
-        {
-            float pose_dy = 0.01;
-            pose_val[5] = pose_val_init[5] + pose_dy;
-            pose_to_Rt(pose_val, R_d, t_d);
-        }
+        // Mat33f R_d; Vec3f t_d;
+        // {
+        //     float pose_dy = 0.01;
+        //     pose_val[5] = pose_val_init[5] + pose_dy;
+        //     pose_to_Rt(pose_val, R_d, t_d);
+        // }
         // ---------------
 
         // auto &pv_ = pose_val;
@@ -270,24 +275,28 @@ namespace dso{
                         hit_img[1], hit_img[2], HIT_PT_DIST, 
                         lastRef->line_x0[i], lastRef->line_u[i], K);
 
-                // debug single residual block ---------------------
-                // 发现问题,梯度可能会相反
-                {
-                    using namespace cv;
-                    double cost = 0;
-                    double* param[] = {pose_val};
-                    float gra[2] = {hit_img[1], hit_img[2]};
-
-                    bool ret = cost_function->Evaluate(param, &cost, NULL);
-                    resi从弧度变成角度,可视化一下,看看残差是否正确
-                    printf(" - cost(%.4f) dist(%.2f) grad(%.2f, %.2f)\n ", 
-                            ret ? cost : -9999.9999, HIT_PT_DIST, hit_img[1], hit_img[2]);
-                    cv::Mat img_nd = img_new.clone();
-                    cv::drawMarker(img_nd, cv::Point(hit_ptx, hit_pty), 255, MARKER_SQUARE);
-                    cv::line(img_nd, Point(hit_ptx, hit_pty), Point(hit_ptx + gra[0], hit_pty+gra[1]), 255);
-                    imshow("debug_residuals", img_nd);
-                    waitKey(0);
-                }
+                // // debug single residual block ---------------------
+                // 这里似乎没用,因为不能真正可视化出位姿改变导致的hitpt的改变
+                // if(px_idx1 >= 225)
+                // {
+                //     using namespace cv;
+                //     // 在这里调节pose,看看单个残差的效果
+                //     for (double dy = -0.5; dy <= 0.5; dy += 0.02) {
+                //         double cost = 0.0;
+                //         pose_val[4] = pose_val_init[4] + dy;
+                //         double *param[] = {pose_val};
+                //         float gra[2] = {hit_img[1], hit_img[2]};
+                //         bool ret = cost_function->Evaluate(param, &cost, NULL);
+                //         printf(" - cost(%.4f) dx(%.2f) dist(%.2f) grad(%.2f, %.2f) idx=%d\n ",
+                //                ret ? 90 - std::acos(std::abs(cost)) / M_PI * 180 : -9999.9999, dy, HIT_PT_DIST, hit_img[1], hit_img[2], px_idx1);
+                //         cv::Mat img_nd = img_new.clone();
+                //         cv::drawMarker(img_nd, cv::Point(hit_ptx, hit_pty), 255, MARKER_SQUARE);
+                //         cv::line(img_nd, Point(hit_ptx, hit_pty), Point(hit_ptx + gra[0], hit_pty + gra[1]), 255);
+                //         imshow("debug_residuals", img_nd);
+                //         waitKey(0);
+                //     }
+                //     pose_val[4] = pose_val_init[4];
+                // }
 
                 // ----------------------------------------
 
@@ -316,23 +325,21 @@ namespace dso{
             }
         }
 
-        // debug overall cost -------------------
-        {
+        // // debug overall cost -------------------
+        // {
             double cost = 0.0;
-            for(double dy = -0.05; dy <=0.05; dy +=0.002){
-                pose_val[5] = pose_val_init[5] + dy;
-                problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
-                printf("dy=%.2f, pose=(%.2f, %.2f, %.2f, %.2f | %.2f, %.2f, %.2f), cost = %.2f\n", 
-                    dy, pose_val[0], pose_val[1], pose_val[2], pose_val[3], pose_val[4], pose_val[5], pose_val[6], cost);
-                Mat33f RR; Vec3f tt; Vec2f ll[2];
-                pose_to_Rt(pose_val, RR, tt);
-                line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K); 
-                cv::Mat img_line = img_new.clone();
-                draw_line2d(img_line, ll[0], ll[1]);
-                imshow("debug_img", img_line);
-                cv::waitKey();
-            }
-        }
+            bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
+            printf(" - cost=%.8f pose=(%.2f, %.2f, %.2f, %.2f | %.2f, %.2f, %.2f)\n", 
+                ret ? cost : -999, pose_val[0], pose_val[1], pose_val[2], pose_val[3], pose_val[4], pose_val[5], pose_val[6]);
+        //     Mat33f RR; Vec3f tt; Vec2f ll[2];
+        //     pose_to_Rt(pose_val, RR, tt);
+        //     line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K); 
+        //     cv::Mat img_line = img_new.clone();
+        //     draw_line2d(img_line, ll[0], ll[1]);
+        //     imshow("debug_img", img_line);
+        //     cv::waitKey();
+        //     return ;
+        // }
 
         // ------------------
 
@@ -340,19 +347,19 @@ namespace dso{
         Solver::Options options;
         options.linear_solver_type = DENSE_QR;
         options.minimizer_progress_to_stdout = true;
-        options.max_num_iterations = 5;
+        options.max_num_iterations = 20;
         Solver::Summary summary;
         ceres::Solve(options, &problem, &summary);
 
         // 输出结果
-        std::cout << summary.BriefReport() << "\n";
+        std::cout << summary.FullReport() << "\n";
         {
             using namespace cv;
             printf(" * [%d] residuals\n", problem.NumResidualBlocks());
             auto &pvi_ = pose_val_init;
-            printf("   Pose0 = (%.2f, %.2f, %.2f, %.2f),  (%.2f, %.2f, %.2f) \n", pvi_[0], pvi_[1],pvi_[2],pvi_[3],pvi_[4],pvi_[5],pvi_[6]);
+            printf("   Pose0 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1],pvi_[2],pvi_[3],pvi_[4],pvi_[5],pvi_[6]);
             auto &pv_ = pose_val;
-            printf("   Pose1 = (%.2f, %.2f, %.2f, %.2f),  (%.2f, %.2f, %.2f) \n", pv_[0], pv_[1],pv_[2],pv_[3],pv_[4],pv_[5],pv_[6]);
+            printf("   Pose1 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pv_[0], pv_[1],pv_[2],pv_[3],pv_[4],pv_[5],pv_[6]);
             Mat33f R2 = Quaternionf(pv_[0], pv_[1], pv_[2], pv_[3]).toRotationMatrix(); 
             Vec3f t2(pv_[4], pv_[5], pv_[6]);
             
@@ -370,7 +377,7 @@ namespace dso{
             }
             cv::imshow("ref",img_ref);
             cv::imshow("pt_track",img_pt);
-            cv::imshow("line_track",img_line);
+            cv::imshow("pt+line_track",img_line);
 
             cv::waitKey();
         }

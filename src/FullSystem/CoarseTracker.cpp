@@ -925,7 +925,20 @@ bool CoarseTracker::trackNewestCoarse(
 	} // 金字塔level
 
 	// test line -------------
-	testLine(refToNew_current);
+	{
+
+	SE3 pose_init = refToNew_current;
+	// for(float dy = -0.01; dy <0.01; dy += 0.0005){
+	float dy = -0.003;{
+		printf("\n[Test Pose] dy=%.4f\n", dy);
+		Vec6 pose =  pose_init.log();
+		pose[1] += dy;
+		refToNew_current = SE3::exp(pose);
+		testLine(refToNew_current);
+	}
+
+	}
+	// ------------------
 
 	// set!
 	// 保存更新结果

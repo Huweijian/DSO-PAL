@@ -12,7 +12,7 @@
                 "isDefault": true
             },
             "args": [
-                "-j6"
+                "-j2"
             ],
             "options": {
                 "cwd": "${workspaceFolder}/build/"
