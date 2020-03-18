@@ -13,6 +13,7 @@
 #include <ceres/ceres.h>
 #include <ceres/solver.h>
 #include <ceres/rotation.h>
+#include <ceres/cost_function.h>
 
 #include <vector>
 #include <iostream>
@@ -259,34 +260,111 @@ private:
     double gy_;
 };
 
+cv::Mat cost_img1;
+cv::Mat cost_img2;
+class ImageCost : public ceres::SizedCostFunction<1, 2> {
+    public:
+    ImageCost(cv::Mat* img, double v1):img(img), v1(v1){};
+    virtual bool Evaluate(double const *const *parameters,
+                          double *residuals,
+                          double **jacobians) const {
+        double x = parameters[0][0];
+        double y = parameters[0][1];
+        int ix = (int)x;
+        int iy = (int)y;
+        float dx = x - ix;
+        float dy = y - iy;
+        float dxdy = dx * dy;
+        if (x < 1 || x > cost_img2.cols - 2 || y < 1 || y > cost_img2.rows - 2) {
+            return false;
+        }
+        double v2 = dxdy * cost_img2.at<ushort>(iy + 1, ix + 1) + (dy - dxdy) * cost_img2.at<ushort>(iy + 1, ix) + (dx - dxdy) * cost_img2.at<ushort>(iy, ix + 1) + (1 - dx - dy + dxdy) * cost_img2.at<ushort>(iy, ix);
+        residuals[0] = v2 - v1;
+
+        if (jacobians != nullptr) {
+            jacobians[0][1] = cost_img2.at<ushort>(iy+1, ix) -cost_img2.at<ushort>(iy-1, ix) ;
+            jacobians[0][0] = cost_img2.at<ushort>(iy, ix+1) -cost_img2.at<ushort>(iy, ix-1) ;
+        }
+
+        printf(" p2=(%.2f, %.2f) \t%.2f-%.2f = \t%.2f(cost)\n", x, y, v2, v1, residuals[0]);
+        return true;
+    }
+    cv::Mat* img;
+    double v1;
+};
+
+struct AllCost {
+    AllCost(cv::Mat *img, cv::Point2f &pt, double v1)
+        : image_cost_(new ImageCost(img, v1)), pt(pt) {};
+
+    template <typename T>
+    bool operator()(const T *trans,
+                    T *residual) const {
+        
+        T p2[2];
+        p2[0] = T(pt.x) + trans[0];
+        p2[1] = T(pt.y) + trans[1];
+
+        // Note that we call image_cost_, just like it was
+        // any other templated functor.
+        cout << "[T = " << trans[0]  << " " << trans[1]<< "  ] ";
+        return image_cost_(p2, residual);
+    }
+
+    private:
+    double v1;
+    cv::Point2f pt;
+    ceres::CostFunctionToFunctor<1, 2> image_cost_;
+};
+
 int main(int argc, char** argv)
 {
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
-    // test Ceres-Solver
+    // test Ceres-Solver mix diff
     {
         using namespace ceres;
         google::InitGoogleLogging("ceres_tttttttest");
+        cost_img1 = Mat::zeros(201, 201, CV_16UC1);
+        cost_img2 = Mat::zeros(201, 201, CV_16UC1);
+        for(int i=0; i<201; i++){
+            for(int j=0; j<201; j++){
+                float ctr[2] = {100, 100};
+                int val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
+                cost_img1.at<ushort>(i, j) = val;
+
+                ctr[0] = 103.222; ctr[1] = 93;
+                val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
+                cost_img2.at<ushort>(i, j) = val;
+            }
+        }
+        imshow("img1", cost_img1);
+        imshow("img2", cost_img2);
+        printf("start\n");
+        waitKey(1);
             
-        double x_init = 50.0;
-        double x_val = x_init;
+        double a_init[2] = {0.0, 0.0};
+        double a_val[2] = {a_init[0], a_init[1]};
 
         Problem problem;
+        for(int i=0; i<10; i++){
+            int x = 30+ rand() % 140;
+            int y = 30+ rand() % 140;
+            printf("raw data: (%d, %d)\n", x, y);
+            double v1 = cost_img1.at<ushort>(y, x);
+            cv::Point2f p2(x, y);
+            CostFunction *cost_function =
+                new AutoDiffCostFunction<AllCost, 1, 2>(
+                    new AllCost(&cost_img2, p2, v1));
 
-        ifstream file("/home/hwj23/Project/dso-master/matlab/line/2d_grad_simu.txt");
-        float gx, gy;
-        while(file >> gx >> gy){
-            float g_norm = std::sqrt(gx*gx + gy*gy);
-            gx /= g_norm; gy/= g_norm;
-            CostFunction* cost_function =
-                new AutoDiffCostFunction<ACOSReprojectError, 1, 1>(
-                    new ACOSReprojectError(gx, gy));
-            problem.AddResidualBlock(cost_function, NULL, &x_val);
-            double resi = 0;
-            double* param[] = {&x_val};
-            cost_function->Evaluate(param, &resi, nullptr);
-            printf("resi = %.2f [ %.2f ], param = %.2f, data_theta = %.2f \n", resi, -x_val/180*3.14159 + atan2(gy, gx), x_val/180*3.14, atan2(gy, gx));
+            problem.AddResidualBlock(cost_function, NULL, a_val);
         }
+
+        // a_val[0] = 3.222; a_val[1] =  3.222;
+        // double cost;
+        // problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
+        // cout << cost << endl; return 0;
+
 
         Solver::Options options;
         options.linear_solver_type = DENSE_QR;
@@ -296,8 +374,55 @@ int main(int argc, char** argv)
         ceres::Solve(options, &problem, &summary);
 
         std::cout << summary.BriefReport() << "\n";
-        std::cout << "x : " << x_init << " -> " << x_val << "\n";
+        printf("x: (%.2f, %.2f) -> (%.2f, %.2f)\n", a_init[0], a_init[1], a_val[0], a_val[1]);
+        return 0;
     }
+
+    // test Ceres-Solver
+    // {
+    //     using namespace ceres;
+    //     google::InitGoogleLogging("ceres_tttttttest");
+            
+    //     double x_init = 20.0;
+    //     double x_val = x_init;
+
+    //     Problem problem;
+
+    //     ifstream file("/home/hwj23/Project/dso-master/matlab/line/2d_grad_simu.txt");
+    //     float gx, gy;
+    //     while(file >> gx >> gy){
+    //         float g_norm = std::sqrt(gx*gx + gy*gy);
+    //         gx /= g_norm; gy/= g_norm;
+    //         CostFunction* cost_function =
+    //             new AutoDiffCostFunction<ACOSReprojectError, 1, 1>(
+    //                 new ACOSReprojectError(gx, gy));
+            
+
+    //         problem.AddResidualBlock(cost_function, NULL, &x_val);
+    //         double resi = 0;
+    //         double* param[] = {&x_val};
+
+    //         for(int i=0; i<80; i+=5){
+    //             x_val = i;
+    //             double resi = 0;
+    //             cost_function->Evaluate(param, &resi, nullptr);
+    //             printf("param=%.2f, resi=%.4f\n", x_val, resi);
+    //         }
+
+    //         cost_function->Evaluate(param, &resi, nullptr);
+    //         printf("resi = %.2f [ %.2f ], param = %.2f, data_theta = %.2f \n", resi, -x_val/180*3.14159 + atan2(gy, gx), x_val/180*3.14, atan2(gy, gx));
+    //     }
+
+    //     Solver::Options options;
+    //     options.linear_solver_type = DENSE_QR;
+    //     options.minimizer_progress_to_stdout = true;
+    //     Solver::Summary summary;
+
+    //     ceres::Solve(options, &problem, &summary);
+
+    //     std::cout << summary.BriefReport() << "\n";
+    //     std::cout << "x : " << x_init << " -> " << x_val << "\n";
+    // }
     
     // // test RANSAC line estimation
     // ifstream fin("/home/hwj23/Project/dso-master/matlab/line/data1.txt");
