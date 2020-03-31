@@ -56,7 +56,8 @@
         "algorithm": "cpp",
         "cfenv": "cpp",
         "string": "cpp",
-        "core": "cpp"
+        "core": "cpp",
+        "random": "cpp"
     },
     "cSpell.enabledLanguageIds": [
         "latex",

@@ -3,6 +3,7 @@
 #include <ceres/rotation.h>
 
 #include "line_estimate.h"
+#include "line_base.h"
 #include "FullSystem/CoarseTracker.h"
 #include "FullSystem/HessianBlocks.h"
 
@@ -14,43 +15,6 @@ using namespace std;
 using namespace Eigen;
 
 namespace dso_line{
-
-bool line3d_to_2d(
-        const Eigen::Vector3f &line_x0, const Eigen::Vector3f &line_u, 
-        Eigen::Vector2f &line2d_x0, Eigen::Vector2f &line2d_u, 
-        const Eigen::Matrix3f &R, const Eigen::Vector3f &t, 
-        const Matrix3f &K){
-    
-    Vector3f P[2];
-    P[0] = line_x0;
-    P[1] = line_x0 + line_u;
-    for(int i=0; i<2; i++){
-        P[i] = R * P[i] + t; 
-        P[i] /= P[i][2]; 
-        P[i] = K * P[i];
-    }
-    line2d_x0 = P[0].block<2, 1>(0, 0);
-    P[1] = P[1] - P[0];
-    line2d_u = P[1].block<2, 1>(0, 0);
-    line2d_u.normalize();
-    }
-
-void draw_line2d(cv::Mat &img, const Eigen::Vector2f &x0, const Eigen::Vector2f &u, unsigned char color = 255) {
-    using namespace Eigen;
-    int l_dir[2] = {0, 1};  // 直线的主方向和次方向
-    int sz[2] = {img.cols, img.rows};
-
-    if (abs(u[1]) > abs(u[0])) {
-        std::swap(l_dir[0], l_dir[1]);
-    }
-
-    Vector2f uu = u / u[l_dir[0]];               //主方向归一化
-    Vector2f p0 = x0 + (0 - x0[l_dir[0]]) * uu;  //直线起点归零
-    Vector2f p1 = x0 + (sz[l_dir[0]] - x0[l_dir[0]]) * uu;
-    line(img, cv::Point(p0[0], p0[1]), cv::Point(p1[0], p1[1]), color);
-    return;
-}
-
 void pose_to_Rt(double pose[7], Eigen::Matrix3f &R, Eigen::Vector3f &t){
     R = Eigen::Quaternionf(pose[0], pose[1], pose[2], pose[3]);    
     t = Eigen::Vector3f(pose[4], pose[5], pose[6]);
@@ -88,7 +52,7 @@ float line_estimate_g(const Eigen::MatrixXf &points, Eigen::Vector3f &x0_ret, Ei
             }
         }
         if(inliner > max_inlier){
-            printf("*");
+            // printf("*");
             max_inlier = inliner;
             best_x0 = x0;
             best_u = u;
@@ -115,79 +79,138 @@ float line_estimate_g(const Eigen::MatrixXf &points, Eigen::Vector3f &x0_ret, Ei
     // cout << summary.BriefReport() << endl;
 }
 
-struct LineReprojectError{
-public:
+class ImageCost : public ceres::SizedCostFunction<1, 4> {
+    public:
+    ImageCost(const Eigen::Vector3f* img, const Eigen::Vector2i &wh)
+    :img(img), wh(wh){
+        rows = wh(1);
+        cols = wh(0);
+    };
 
-    LineReprojectError(float gx, float gy, float dist, float l_p0[3], float l_p1[3], float camera[4])
-        :gx_(gx), gy_(gy), dist_(dist){
-            for(int i=0; i<3; i++){
-                l_p0_[i] = l_p0[i];
-                l_p1_[i] = l_p1[i];
-            }
-            for(int i=0; i<4; i++){
-                camera_[i] = camera[i];
-            }
-        };
+    virtual bool Evaluate(double const *const *parameters,
+                          double *residuals,
+                          double **jacobians) const {
+        double x = parameters[0][0];
+        double y = parameters[0][1];
+        double l_dir[2];
+        l_dir[0] = parameters[0][2];
+        l_dir[1] = parameters[0][3];
 
-    template<typename T> 
-    bool operator()(const T* const pose, T* residuals) const {
-        T p0[3], p1[3];
-        T l_p0T[3] = {T(l_p0_[0]), T(l_p0_[1]), T(l_p0_[2]) };
-        T l_p1T[3] = {T(l_p1_[0]), T(l_p1_[1]), T(l_p1_[2]) };
+        if (x < 1 || x > cols - 2 || y < 1 || y > rows - 2) {
+            // printf("eval() failed! p=(%.2f, %.2f)\n", x, y);
+            return false;
+        }
+        // printf("eval() succes! p=(%.2f, %.2f)\n", x, y);
 
-        ceres::UnitQuaternionRotatePoint(pose, l_p0T, p0);
-        ceres::UnitQuaternionRotatePoint(pose, l_p1T, p1);
-        for(int i=0; i<3; i++){
-            p0[i]+= pose[4+i];  
-            p1[i]+= pose[4+i];
+        int ix = (int)x;
+        int iy = (int)y;
+        float dx = x - ix;
+        float dy = y - iy;
+        float dxdy = dx * dy;
+        const Eigen::Vector3f* bp = img +ix+iy*cols;
+        Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+cols)
+	        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+cols)
+	        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
+			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
+
+        double grad_len = sqrt(hitpt(1)*hitpt(1) + hitpt(2)*hitpt(2));
+        residuals[0] = (hitpt(1)*l_dir[0] + hitpt(2)*l_dir[1]) / grad_len;
+
+        if (jacobians != nullptr) {
+            double gxx = (*(bp+1))[1] - (*(bp-1))[1];
+            double gxy = (*(bp+cols))[1] - (*(bp-cols))[1];
+            double gyx = (*(bp+1))[2] - (*(bp-1))[2];
+            double gyy = (*(bp+cols))[2] - (*(bp-cols))[2];
+
+            jacobians[0][0] = (l_dir[0]*gxx + l_dir[1]*gyx) / grad_len;
+            jacobians[0][1] = (l_dir[0]*gyx + l_dir[1]*gyy) / grad_len;
+            jacobians[0][2] =  hitpt(1) / grad_len;
+            jacobians[0][3] =  hitpt(2) / grad_len;
+
         }
 
-        // cout <<"Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] <<" " << pose[5] << " " << pose[6] << endl;
-        // cout <<"Line P1= (" << l_p0T[0]  << " " << l_p0T[1] << " " << l_p0T[2] << ") -> ( " << p0[0] << " " << p0[1] << " " << p0[2] << endl;
-        // cout <<"Line P2= (" << l_p1T[0]  << " " << l_p1T[1] << " " << l_p1T[2] << ") -> ( " << p1[0] << " " << p1[1] << " " << p1[2] << endl;
-        // cout <<" - RotPt = " << p0[0] << ", " << p1[0] << endl;
-        T lx = p1[0]/p1[2] - p0[0]/p0[2];
-        T ly = p1[1]/p1[2] - p0[1]/p0[2];
-        // cout <<" - NormL = " << lx << ", " << ly << endl;
-
-        // 归一化似乎用处不看
-        T l_norm = ceres::sqrt(lx*lx + ly*ly);
-        lx /= l_norm; ly /= l_norm; 
-        
-        // test 计算直线角度和像素梯度之差 ---------------------
-        // T theta = pose[0]*3.1415/180.0;
-        // T x2 = ceres::cos(theta);
-        // T y2 = ceres::sin(theta);
-        // T dot_res = gx_ * x2 + gy_ * y2;
-        // -------------------------------------------------
-
-        T dot_res = lx*gx_+ly*gy_;
-        // cout <<" - Res = (" << lx << ", " << ly << ")  *  (" << gx_ << ", " << gy_ << ") = " << dot_res << endl;
-
-        if((dot_res) >= T(1.0) || dot_res <= T(-1.0)){
-            residuals[0] = T(0);
-        }
-        else{
-            residuals[0] = (dot_res) / dist_ ;
-        }
+        // printf(" p2=(%.2f, %.2f) \t%.2f-%.2f = \t%.2f(cost)\n", x, y, v2, v1, residuals[0]);
         return true;
+    }
+    int rows = 0, cols = 0;
+    const Eigen::Vector3f* img;
+    const Eigen::Vector2i &wh;
+};
+
+struct LineReprojectError {
+   public:
+    LineReprojectError(const Eigen::Vector3f* line_pt[3], float camera_param[4], const Eigen::Vector3f* img, const Eigen::Vector2i &wh)
+    : image_cost_(new ImageCost(img, wh))
+    {
+        for (int i = 0; i < 3; i++) {
+            L_p0[i] = (*line_pt[0])[i];
+            L_p1[i] = (*line_pt[1])[i];
+            L_p2[i] = (*line_pt[2])[i];
+        }
+        for (int i = 0; i < 4; i++) {
+            camera[i] = camera_param[i];
+        }
+    };
+
+    // 待估计变量:R t
+    // 残差:res = ADIFF( dir(l) - grad(p2))
+    // l = proj(L, R, t)
+    // p2 = proj(P, R, t)
+    template <typename T>
+    bool operator()(const T *const pose, T *residuals) const {
+        // 3D直线上的3D点(左右两个端点+直线上的点),变量本地化
+        T L_pt[3][3]; 
+        for(int i=0; i<3; i++){
+            L_pt[0][i] = T(L_p0[i]);
+            L_pt[1][i] = T(L_p1[i]); 
+            L_pt[2][i] = T(L_p2[i]); 
+        }
+
+
+        // 旋转位移
+        T l_p[3][3];
+        for(int i=0; i<3; i++){
+            ceres::UnitQuaternionRotatePoint(pose, L_pt[i], l_p[i]);
+            for(int j=0; j<3; j++){
+                l_p[i][j] += pose[4+j];
+            }
+        }
+
+        // 计算2D直线方向
+        T lx = l_p[1][0] / l_p[1][2] - l_p[0][0] / l_p[0][2];
+        T ly = l_p[1][1] / l_p[1][2] - l_p[0][1] / l_p[0][2];
+        T l_norm = ceres::sqrt(lx * lx + ly * ly);// 归一化似乎用处不看
+        lx /= l_norm;
+        ly /= l_norm;
+
+        // 另一个点投影到图像上
+        T l_pt[2];
+        l_pt[0] = l_p[2][0] / l_p[2][2] * camera[0] + camera[2];
+        l_pt[1] = l_p[2][1] / l_p[2][2] * camera[1] + camera[3];
+
+        T params[4] = {l_pt[0], l_pt[1], lx, ly};
+        // cout << "line_PT3 = " << L_pt[2][0] << " " << L_pt[2][1] << " " << L_pt[2][2] << endl;
+        // cout <<"Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] <<" " << pose[5] << " " << pose[6] << endl;
+        // cout << "Transformed line_PT3 = " << l_p[2][0] << " " << l_p[2][1] << " " << l_p[2][2] << endl;
+        // printf("camera = [%.2f %.2f %.2f %.2f]\n", camera[0], camera[1],camera[2],camera[3]);
+        // cout << "line_pt2 = " << l_pt[0] << " " << l_pt[1] << endl;
+
+        return image_cost_(params, residuals);
     }
 
     static ceres::CostFunction *Create(
-            float gx, float gy, float dist, 
-            const Eigen::Vector3f &l_x0, const Eigen::Vector3f &l_u,
-            const Eigen::Matrix3f &K,
-            LineReprojectError *err_out = nullptr){
-
-        // double l_p0[3], l_p1[3], 
+        const Eigen::Vector3f &l_x0, const Eigen::Vector3f &l_u,
+        const Eigen::Vector3f &l_pt,
+        const Eigen::Matrix3f &K,
+        const Eigen::Vector3f *img,
+        const Eigen::Vector2i &wh,
+        LineReprojectError *err_out = nullptr) {
         float camera[4] = {K(0, 0), K(1, 1), K(0, 2), K(1, 2)};
-        Eigen::Vector3f l_p0 = l_x0;
-        Eigen::Vector3f l_p1 = l_p0 + l_u;
-        float g_norm = std::sqrt(gx*gx + gy*gy) + 0.00001;
-        gx /= g_norm; gy/= g_norm;
+        Eigen::Vector3f l_x1 = l_x0 + l_u;
+        const Eigen::Vector3f * line_pt[3] = {&l_x0, &l_x1, &l_pt};
 
-        LineReprojectError *err = new LineReprojectError(gx, gy, dist, l_p0.data(), l_p1.data(), camera);
-        if(err_out != nullptr){
+        LineReprojectError *err = new LineReprojectError(line_pt, camera, img, wh);
+        if (err_out != nullptr) {
             err_out = err;
         }
 
@@ -195,12 +218,11 @@ public:
     }
 
    private:
-    const double gx_;
-    const double gy_;
-    const double dist_;
-    double l_p0_[3];
-    double l_p1_[3];
-    double camera_[4];  // fx, fy, cx, cy
+    double L_p0[3];
+    double L_p1[3];
+    double L_p2[3];
+    double camera[4];  // fx, fy, cx, c
+    ceres::CostFunctionToFunctor<1, 4> image_cost_;
 };
 }
 
@@ -225,8 +247,10 @@ namespace dso{
 
         // 优化初值
         Eigen::Quaternion<float> q(R);
-        double pose_val_init[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
-        double pose_val[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
+        // double pose_val_init[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
+        // double pose_val[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
+        double pose_val_init[7] = {1, 0, 0, 0, 0, 0, 0};
+        double pose_val[7] = {1, 0, 0, 0, 0, 0, 0};
 
         // --debug -----------
         // Mat33f R_d; Vec3f t_d;
@@ -243,143 +267,154 @@ namespace dso{
         // 添加残差项
         Problem problem;
         for(int i = 0; i<line_num; i++){
+            // 3D直线投影到当前坐标系
+            Vector3f P[2];
+            P[0] = R * lastRef->line_x0[i] + t;
+            P[1] = R * (lastRef->line_x0[i] + lastRef->line_u[i]) + t;
+            Vector3f U = P[1] - P[0];
+
+            // 相机FoV的3D平面
+            Vector3f pt[4];
+            pt[0] = Vector3f(-cx[lvl] /fx[lvl], -cy[lvl]/fy[lvl], 1);
+            pt[1] = Vector3f(-cx[lvl] /fx[lvl], +cy[lvl]/fy[lvl], 1);
+            pt[2] = Vector3f(+cx[lvl] /fx[lvl], +cy[lvl]/fy[lvl], 1);
+            pt[3] = Vector3f(+cx[lvl] /fx[lvl], -cy[lvl]/fy[lvl], 1);
+            Vector4f plane[4];
+            for(int i=0; i<4; i++){
+                Vector3f &x1=pt[i], &x2=pt[(i+1)%4], x3(0, 0, 0);
+                plane[i].block<3, 1>(0, 0) = (x1-x3).cross(x2-x3);
+                plane[i](3) = (-x3.transpose()) * (x1.cross(x2));
+            }
+
+            // 3D直线投影到2D
+            Vector3f Pt[4]; int Pt_cnt = 0;
             Vec2f line2d_x0, line2d_u;
             line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d_x0, line2d_u, R, t, K);
-            // 尝试把直线附近的点加入到residualblock中
-            int l_dir[2] = {0, 1};     // 直线的主方向和次方向
-            if(abs(line2d_u[1]) > abs(line2d_u[0])){
-                swap(l_dir[0], l_dir[1]);
-            }
 
-            line2d_u = line2d_u / line2d_u[l_dir[0]];  //主方向归一化
-            line2d_x0 = line2d_x0 + (0 - line2d_x0[l_dir[0]]) * line2d_u;  //直线起点归零
-
-            cout << "line 3D: (" << lastRef->line_x0[i].transpose() << ")\t(" << lastRef->line_u[i].transpose() << ")" << endl;
-            cout << "line 2D: (" << line2d_x0.transpose() << ")\t(" << line2d_u.transpose() << ")" << endl;
-            printf("\t main dir : [ %s ]\n", l_dir[0] == 0 ? "--" : "|");
-
-            for (int px_idx1 = 3; px_idx1 < sizel[l_dir[0]] - 3; px_idx1+=3) {
-                Vec2f px = line2d_x0 + px_idx1 * line2d_u;
-                float px_idx2 = px[l_dir[1]];
-                if(px_idx2 < 3 && px_idx2 >= sizel[l_dir[1]] - 3){
-                    continue;
+            // 找到2D直线在FoV边界点对应的3D点
+            Vector2f pt_pixel[4];
+            pt_pixel[0] = Vector2f(0, 0);
+            pt_pixel[1] = Vector2f(0, hl);
+            pt_pixel[2] = Vector2f(wl, hl);
+            pt_pixel[3] = Vector2f(wl, 0);
+            Matrix4f L = plucker_l(Line{&P[0], &U});
+            for(int i=0; i<4; i++){
+                Vector2f p1 = pt_pixel[i]-line2d_x0, p2 = pt_pixel[(i+1)%4]-line2d_x0;
+                auto &u = line2d_u;
+                if((u[0]*p1[1] - u[1]*p1[0]) * (u[0]*p2[1] - u[1]*p2[0]) <= 0){
+                    Vector4f Pt4 = L * plane[i]; 
+                    Pt[Pt_cnt++] = Pt4.segment<3>(0) / Pt4(3);
                 }
-                float hit_pt[2] = {(float)px_idx1, px_idx2};
-                float hit_ptx = hit_pt[l_dir[0]];
-                float hit_pty = hit_pt[l_dir[1]];
+            }
+            assert(Pt_cnt == 2);
 
-                // 添加hit点
-                const float HIT_PT_DIST = 1;
-                Vec3f hit_img = getInterpolatedElement33(dIp_new, hit_ptx, hit_pty, wl);
-                CostFunction* cost_function = LineReprojectError::Create(
-                        hit_img[1], hit_img[2], HIT_PT_DIST, 
-                        lastRef->line_x0[i], lastRef->line_u[i], K);
+            // 在FoV内的3D直线段上均匀选择N个点,投影到2D,加入优化框架
+            Vector3f Pt_dir = Pt[1] - Pt[0];
+            const int NUM_SAMPLE_PT = 31;
+            for (int p = 1; p < NUM_SAMPLE_PT; p++) {
+                Vector3f Pt_cur = Pt[0] + Pt_dir / (NUM_SAMPLE_PT)*p;
+                CostFunction *cost_function = LineReprojectError::Create(
+                    lastRef->line_x0[i], lastRef->line_u[i], Pt_cur,
+                    K, dIp_new, Vector2i(wl, hl));
 
-                // // debug single residual block ---------------------
-                // 这里似乎没用,因为不能真正可视化出位姿改变导致的hitpt的改变
-                // if(px_idx1 >= 225)
+                // debug 显示3D采样点的位置
                 // {
                 //     using namespace cv;
-                //     // 在这里调节pose,看看单个残差的效果
-                //     for (double dy = -0.5; dy <= 0.5; dy += 0.02) {
-                //         double cost = 0.0;
-                //         pose_val[4] = pose_val_init[4] + dy;
-                //         double *param[] = {pose_val};
-                //         float gra[2] = {hit_img[1], hit_img[2]};
-                //         bool ret = cost_function->Evaluate(param, &cost, NULL);
-                //         printf(" - cost(%.4f) dx(%.2f) dist(%.2f) grad(%.2f, %.2f) idx=%d\n ",
-                //                ret ? 90 - std::acos(std::abs(cost)) / M_PI * 180 : -9999.9999, dy, HIT_PT_DIST, hit_img[1], hit_img[2], px_idx1);
-                //         cv::Mat img_nd = img_new.clone();
-                //         cv::drawMarker(img_nd, cv::Point(hit_ptx, hit_pty), 255, MARKER_SQUARE);
-                //         cv::line(img_nd, Point(hit_ptx, hit_pty), Point(hit_ptx + gra[0], hit_pty + gra[1]), 255);
-                //         imshow("debug_residuals", img_nd);
-                //         waitKey(0);
-                //     }
-                //     pose_val[4] = pose_val_init[4];
+                //     cv::Mat testimg = img_new.clone();
+                //     // cv::drawMarker(testimg, cv::Point(pt_cur(0), pt_cur(1)), 255);
+
+                //     draw_line2d(testimg, line2d_x0, line2d_u, 255);
+                //     cv::imshow("Pt", testimg);
+                //     cv::waitKey();
+                //     break;
                 // }
 
-                // ----------------------------------------
+                // cout << "line 3D: (" << lastRef->line_x0[i].transpose() << ")\t(" << lastRef->line_u[i].transpose() << ")" << endl;
+                // cout << "line 2D: (" << line2d_x0.transpose() << ")\t(" << line2d_u.transpose() << ")" << endl;
+                // printf("\t main dir : [ %s ]\n", l_dir[0] == 0 ? "--" : "|");
 
+                // // debug single residual block ---------------------
+                // if (p == 10) {
+                //     using namespace cv;
+                //     // 在这里调节pose,看看单个残差的效果
+                //     double cost = 0.0;
+                //     double *param[] = {pose_val};
+                //     bool ret = cost_function->Evaluate(param, &cost, NULL);
+                //     printf(" - cost(%.4f)\n ",ret ? 90 - std::acos(std::abs(cost)) / M_PI * 180 : -9999.9999);
+
+                //     cv::Mat img_nd = img_new.clone();
+                //     Vec3f pt_cur = K * Pt_cur;
+                //     pt_cur /= pt_cur(2);
+                //     cv::drawMarker(img_nd, cv::Point(pt_cur(0), pt_cur(1)), 255, MARKER_SQUARE);
+                //     // TODO 调试单个误差,可视化当前点的梯度/找到输出cost=-9999的原因
+                //     float gra[2] = {newFrame->dIp[lvl][(int)(pt_cur(0)+pt_cur(1)*wl)](1), newFrame->dIp[lvl][(int)(pt_cur(0)+pt_cur(1)*wl)](2)};
+                //     cv::line(img_nd, Point(pt_cur(0), pt_cur(1)), Point(pt_cur(0) + gra[0], pt_cur(1) + gra[1]), 255);
+                //     imshow("debug_single_residuals", img_nd);
+                //     waitKey(0);
+                // }
 
                 problem.AddResidualBlock(cost_function, NULL, pose_val);
+            }
+            // ----------------------------------------
 
-                // printf("hit pt: (%.2f, %.2f)\n", hit_ptx, hit_pty);
-                // printf("%.2f  %.2f \n", hit_img[1], hit_img[2]);
+            // // debug overall cost -------------------
+            {
+                // double cost = 0.0;
+                // bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
+                // printf(" - cost=%.8f pose=(%.2f, %.2f, %.2f, %.2f | %.2f, %.2f, %.2f)\n",
+                //        ret ? cost : -999, pose_val[0], pose_val[1], pose_val[2], pose_val[3], pose_val[4], pose_val[5], pose_val[6]);
+                // Mat33f RR = R;
+                // Vec3f tt = t;
+                // Vec2f ll[2];
+                // // pose_to_Rt(pose_val, RR, tt);
+                // line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K);
+                // cv::Mat img_line = img_new.clone();
+                // draw_line2d(img_line, ll[0], ll[1]);
+                // imshow("debug_img", img_line);
+                // cv::waitKey();
+                // return;
+            }
 
-                // 添加周围点
-                const int EX_NUM = -1;
-                for(int j=-EX_NUM; j<=EX_NUM; j++){
-                    if( j != 0){
-                        int hit_pti[2] = {(int)hit_ptx, (int)hit_pty};
-                        hit_pti[l_dir[1]] += j;
-                        // printf("\tpt: (%d, %d)\n", hit_pti[0], hit_pti[1]);
-                        int dist = abs(j);
-                        Vec3f &px_img = dIp_new[hit_pti[1]*wl + hit_pti[0]];
-                        CostFunction* cost_fun = LineReprojectError::Create(
-                            px_img[1], px_img[2], dist, 
-                            lastRef->line_x0[i], lastRef->line_u[i], K);
-                        problem.AddResidualBlock(cost_fun, NULL, pose_val);
-                    }
+            // ------------------
+
+            // 求解优化问题
+            Solver::Options options;
+            options.linear_solver_type = DENSE_QR;
+            options.minimizer_progress_to_stdout = true;
+            options.max_num_iterations = 20;
+            Solver::Summary summary;
+            ceres::Solve(options, &problem, &summary);
+
+            // 输出结果
+            std::cout << summary.BriefReport() << "\n";
+            {
+                using namespace cv;
+                printf(" * [%d] residuals\n", problem.NumResidualBlocks());
+                auto &pvi_ = pose_val_init;
+                printf("   Pose0 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1], pvi_[2], pvi_[3], pvi_[4], pvi_[5], pvi_[6]);
+                auto &pv_ = pose_val;
+                printf("   Pose1 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pv_[0], pv_[1], pv_[2], pv_[3], pv_[4], pv_[5], pv_[6]);
+                Mat33f R2 = Quaternionf(pv_[0], pv_[1], pv_[2], pv_[3]).toRotationMatrix();
+                Vec3f t2(pv_[4], pv_[5], pv_[6]);
+
+                Mat img_ref = IOWrap::getOCVImg(lastRef->dI, wG[0], hG[0]);
+                Mat img_pt = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
+                Mat img_line = img_pt.clone();
+                Vec2f line2d[2];
+                for (int i = 0; i < line_num; i++) {
+                    line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], Mat33f::Identity(), Vec3f::Zero(), K);
+                    draw_line2d(img_ref, line2d[0], line2d[1]);
+                    line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], R, t, K);
+                    draw_line2d(img_pt, line2d[0], line2d[1]);
+                    line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], R2, t2, K);
+                    draw_line2d(img_line, line2d[0], line2d[1]);
                 }
+                cv::imshow("ref", img_ref);
+                cv::imshow("pt_track", img_pt);
+                cv::imshow("pt+line_track", img_line);
 
+                cv::waitKey();
             }
         }
-
-        // // debug overall cost -------------------
-        // {
-            double cost = 0.0;
-            bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
-            printf(" - cost=%.8f pose=(%.2f, %.2f, %.2f, %.2f | %.2f, %.2f, %.2f)\n", 
-                ret ? cost : -999, pose_val[0], pose_val[1], pose_val[2], pose_val[3], pose_val[4], pose_val[5], pose_val[6]);
-        //     Mat33f RR; Vec3f tt; Vec2f ll[2];
-        //     pose_to_Rt(pose_val, RR, tt);
-        //     line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K); 
-        //     cv::Mat img_line = img_new.clone();
-        //     draw_line2d(img_line, ll[0], ll[1]);
-        //     imshow("debug_img", img_line);
-        //     cv::waitKey();
-        //     return ;
-        // }
-
-        // ------------------
-
-        // 求解优化问题
-        Solver::Options options;
-        options.linear_solver_type = DENSE_QR;
-        options.minimizer_progress_to_stdout = true;
-        options.max_num_iterations = 20;
-        Solver::Summary summary;
-        ceres::Solve(options, &problem, &summary);
-
-        // 输出结果
-        std::cout << summary.FullReport() << "\n";
-        {
-            using namespace cv;
-            printf(" * [%d] residuals\n", problem.NumResidualBlocks());
-            auto &pvi_ = pose_val_init;
-            printf("   Pose0 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1],pvi_[2],pvi_[3],pvi_[4],pvi_[5],pvi_[6]);
-            auto &pv_ = pose_val;
-            printf("   Pose1 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pv_[0], pv_[1],pv_[2],pv_[3],pv_[4],pv_[5],pv_[6]);
-            Mat33f R2 = Quaternionf(pv_[0], pv_[1], pv_[2], pv_[3]).toRotationMatrix(); 
-            Vec3f t2(pv_[4], pv_[5], pv_[6]);
-            
-            Mat img_ref = IOWrap::getOCVImg(lastRef->dI, wG[0], hG[0]);
-            Mat img_pt = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
-            Mat img_line = img_pt.clone();
-            Vec2f line2d[2];
-            for(int i=0; i<line_num; i++){
-                line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], Mat33f::Identity(), Vec3f::Zero(), K);
-                draw_line2d(img_ref, line2d[0], line2d[1]);
-                line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], R, t, K);
-                draw_line2d(img_pt, line2d[0], line2d[1]);
-                line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], R2, t2, K);
-                draw_line2d(img_line, line2d[0], line2d[1]);
-            }
-            cv::imshow("ref",img_ref);
-            cv::imshow("pt_track",img_pt);
-            cv::imshow("pt+line_track",img_line);
-
-            cv::waitKey();
-        }
-}
+    }
 }

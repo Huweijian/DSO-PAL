@@ -926,17 +926,16 @@ bool CoarseTracker::trackNewestCoarse(
 
 	// test line -------------
 	{
-
-	SE3 pose_init = refToNew_current;
-	// for(float dy = -0.01; dy <0.01; dy += 0.0005){
-	float dy = -0.003;{
-		printf("\n[Test Pose] dy=%.4f\n", dy);
-		Vec6 pose =  pose_init.log();
-		pose[1] += dy;
-		refToNew_current = SE3::exp(pose);
-		testLine(refToNew_current);
-	}
-
+		for(float delta = -0.05; delta <0.05; delta += 0.005)
+		// float delta = 0;	
+		{
+			SE3 pose_test = refToNew_current;
+			printf("\n[Test Pose] dy=%.4f\n", delta);
+			Vec6 pose = pose_test.log();
+			pose[5] += delta;
+			pose_test = SE3::exp(pose);
+			testLine(pose_test);
+		}
 	}
 	// ------------------
 

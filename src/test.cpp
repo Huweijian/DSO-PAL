@@ -4,6 +4,7 @@
 #include <OptimizationBackend/MatrixAccumulators.h>
 #include <line/lsd.h>
 #include <line/line_estimate.h>
+#include <line/line_base.h>
 
 #include <Eigen/Core>
 #include <opencv2/core/eigen.hpp>
@@ -286,7 +287,7 @@ class ImageCost : public ceres::SizedCostFunction<1, 2> {
             jacobians[0][0] = cost_img2.at<ushort>(iy, ix+1) -cost_img2.at<ushort>(iy, ix-1) ;
         }
 
-        printf(" p2=(%.2f, %.2f) \t%.2f-%.2f = \t%.2f(cost)\n", x, y, v2, v1, residuals[0]);
+        // printf(" p2=(%.2f, %.2f) \t%.2f-%.2f = \t%.2f(cost)\n", x, y, v2, v1, residuals[0]);
         return true;
     }
     cv::Mat* img;
@@ -307,7 +308,7 @@ struct AllCost {
 
         // Note that we call image_cost_, just like it was
         // any other templated functor.
-        cout << "[T = " << trans[0]  << " " << trans[1]<< "  ] ";
+        // cout << "[T = " << trans[0]  << " " << trans[1]<< "  ] ";
         return image_cost_(p2, residual);
     }
 
@@ -321,62 +322,75 @@ int main(int argc, char** argv)
 {
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
 
-    // test Ceres-Solver mix diff
+    // test plucker
     {
-        using namespace ceres;
-        google::InitGoogleLogging("ceres_tttttttest");
-        cost_img1 = Mat::zeros(201, 201, CV_16UC1);
-        cost_img2 = Mat::zeros(201, 201, CV_16UC1);
-        for(int i=0; i<201; i++){
-            for(int j=0; j<201; j++){
-                float ctr[2] = {100, 100};
-                int val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
-                cost_img1.at<ushort>(i, j) = val;
+        using namespace dso_line;
+        Vector3f x0(0, 0, 0), u(1, 1, 1);
+        dso_line::Line l{&x0, &u};
+        Matrix4f L = plucker_l(l);
+        Vector4f plane(1, 1, 1, -1);
+        
+        Vector4f pt = L * plane;
+        pt = pt / pt(3);
+        cout << pt.TT << endl;
 
-                ctr[0] = 103.222; ctr[1] = 93;
-                val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
-                cost_img2.at<ushort>(i, j) = val;
-            }
-        }
-        imshow("img1", cost_img1);
-        imshow("img2", cost_img2);
-        printf("start\n");
-        waitKey(1);
-            
-        double a_init[2] = {0.0, 0.0};
-        double a_val[2] = {a_init[0], a_init[1]};
+        Matrix4f Ls = plucker_swap(L);
+        pt = Vector4f(1, 1, 0, 1);
+        plane = Ls * pt;
+        cout << plane.TT << endl;
 
-        Problem problem;
-        for(int i=0; i<10; i++){
-            int x = 30+ rand() % 140;
-            int y = 30+ rand() % 140;
-            printf("raw data: (%d, %d)\n", x, y);
-            double v1 = cost_img1.at<ushort>(y, x);
-            cv::Point2f p2(x, y);
-            CostFunction *cost_function =
-                new AutoDiffCostFunction<AllCost, 1, 2>(
-                    new AllCost(&cost_img2, p2, v1));
-
-            problem.AddResidualBlock(cost_function, NULL, a_val);
-        }
-
-        // a_val[0] = 3.222; a_val[1] =  3.222;
-        // double cost;
-        // problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
-        // cout << cost << endl; return 0;
-
-
-        Solver::Options options;
-        options.linear_solver_type = DENSE_QR;
-        options.minimizer_progress_to_stdout = true;
-        Solver::Summary summary;
-
-        ceres::Solve(options, &problem, &summary);
-
-        std::cout << summary.BriefReport() << "\n";
-        printf("x: (%.2f, %.2f) -> (%.2f, %.2f)\n", a_init[0], a_init[1], a_val[0], a_val[1]);
-        return 0;
     }
+
+
+    // test Ceres-Solver mix diff
+    // {
+    //     using namespace ceres;
+    //     google::InitGoogleLogging("ceres_tttttttest");
+    //     cost_img1 = Mat::zeros(201, 201, CV_16UC1);
+    //     cost_img2 = Mat::zeros(201, 201, CV_16UC1);
+    //     for(int i=0; i<201; i++){
+    //         for(int j=0; j<201; j++){
+    //             float ctr[2] = {100, 100};
+    //             int val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
+    //             cost_img1.at<ushort>(i, j) = val;
+
+    //             ctr[0] = 107; ctr[1] = 93;
+    //             val = (i-ctr[0])*(i-ctr[0]) + (j-ctr[1])*(j-ctr[1]);
+    //             cost_img2.at<ushort>(i, j) = val;
+    //         }
+    //     }
+    //     imshow("img1", cost_img1);
+    //     imshow("img2", cost_img2);
+    //     printf("start\n");
+    //     waitKey(1);
+            
+    //     double a_init[2] = {0.0, 0.0};
+    //     double a_val[2] = {a_init[0], a_init[1]};
+
+    //     Problem problem;
+    //     for(int i=0; i<10; i++){
+    //         int x = 100; //30+ rand() % 140;
+    //         int y = 30+ rand() % 140;
+    //         printf("raw data: (%d, %d)\n", x, y);
+    //         double v1 = cost_img1.at<ushort>(y, x);
+    //         cv::Point2f p2(x, y);
+    //         CostFunction *cost_function =
+    //             new AutoDiffCostFunction<AllCost, 1, 2>(
+    //                 new AllCost(&cost_img2, p2, v1));
+
+    //         problem.AddResidualBlock(cost_function, NULL, a_val);
+    //     }
+    //     Solver::Options options;
+    //     options.linear_solver_type = DENSE_QR;
+    //     options.minimizer_progress_to_stdout = true;
+    //     Solver::Summary summary;
+
+    //     ceres::Solve(options, &problem, &summary);
+
+    //     std::cout << summary.BriefReport() << "\n";
+    //     printf("x: (%.2f, %.2f) -> (%.2f, %.2f)\n", a_init[0], a_init[1], a_val[0], a_val[1]);
+    //     return 0;
+    // }
 
     // test Ceres-Solver
     // {

@@ -1513,8 +1513,10 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	// 枚举每个点
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
-		// 运气不好 并且不是直线点,拜拜
-		if(rand()/(float)RAND_MAX > keepPercentage && coarseInitializer->points[0][i].line_index == -1){
+		// 运气不好 且就是普通的点,不在直线上,拜拜
+		// [TODO]这里似乎有bug,用上面的表达式就不行, 下面的表达式就OK
+		// if(rand()/(float)RAND_MAX > keepPercentage && coarseInitializer->points[0][i].line_index == -1){
+		if(rand()/(float)RAND_MAX > keepPercentage ){
 			continue;
 		}
 
