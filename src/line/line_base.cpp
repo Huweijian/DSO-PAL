@@ -21,6 +21,7 @@ bool line3d_to_2d(
         P[i] /= P[i][2]; 
         P[i] = K * P[i];
     }
+
     line2d_x0 = P[0].block<2, 1>(0, 0);
     P[1] = P[1] - P[0];
     line2d_u = P[1].block<2, 1>(0, 0);

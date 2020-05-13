@@ -926,14 +926,18 @@ bool CoarseTracker::trackNewestCoarse(
 
 	// test line -------------
 	{
-		for(float delta = -0.05; delta <0.05; delta += 0.005)
+		const int ip_can[] = {1,5,3,4,2,0};
+		for(int ip=0; ip<6; ip++)
+		for(float delta = 0.015; delta <0.02; delta += 0.0001)
 		// float delta = 0;	
 		{
 			SE3 pose_test = refToNew_current;
-			printf("\n[Test Pose] dy=%.4f\n", delta);
+			printf("[Test Pose] delta pose[%d]=%.4f  -->  \n", ip_can[ip], delta);
+			// printf("%d %.4f\t", ip_can[ip], delta);
 			Vec6 pose = pose_test.log();
-			pose[5] += delta;
+			pose[ip_can[ip]] += delta;
 			pose_test = SE3::exp(pose);
+			// TEST
 			testLine(pose_test);
 		}
 	}

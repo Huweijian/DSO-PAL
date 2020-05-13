@@ -64,7 +64,7 @@ public:
     void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);
 
 	// TODO: 回头记得删了
-	void testLine(const SE3 &refToNew);
+	void testLine(SE3 &refToNew);
 
 	bool debugPrint, debugPlot;
 	Mat33f K[PYR_LEVELS];

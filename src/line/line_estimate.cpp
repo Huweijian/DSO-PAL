@@ -108,28 +108,36 @@ class ImageCost : public ceres::SizedCostFunction<1, 4> {
         float dy = y - iy;
         float dxdy = dx * dy;
         const Eigen::Vector3f* bp = img +ix+iy*cols;
+
+        printf(" - pt=(%.2f, %.2f)  [%.2f %.2f %.2f %.2f] \n", x, y, dxdy, (dy-dxdy), (dx-dxdy), (1-dx-dy+dxdy));
+        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1+cols))(0), (*(bp+1+cols))(1),(*(bp+1+cols))(2));
+        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+cols))(0), (*(bp+cols))(1),(*(bp+cols))(2));
+        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1))(0), (*(bp+1))(1),(*(bp+1))(2));
+        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp))(0), (*(bp))(1),(*(bp))(2));
+
         Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+cols)
 	        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+cols)
 	        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
 			+ (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
 
+
         double grad_len = sqrt(hitpt(1)*hitpt(1) + hitpt(2)*hitpt(2));
+        double grad_len_2 = grad_len * grad_len;
         residuals[0] = (hitpt(1)*l_dir[0] + hitpt(2)*l_dir[1]) / grad_len;
 
         if (jacobians != nullptr) {
-            double gxx = (*(bp+1))[1] - (*(bp-1))[1];
-            double gxy = (*(bp+cols))[1] - (*(bp-cols))[1];
-            double gyx = (*(bp+1))[2] - (*(bp-1))[2];
-            double gyy = (*(bp+cols))[2] - (*(bp-cols))[2];
+            double gxx = 0.5 * (*(bp+1))[1] - (*(bp-1))[1];
+            double gxy = 0.5 * (*(bp+cols))[1] - (*(bp-cols))[1];
+            double gyx = 0.5 * (*(bp+1))[2] - (*(bp-1))[2];
+            double gyy = 0.5 * (*(bp+cols))[2] - (*(bp-cols))[2];
 
             jacobians[0][0] = (l_dir[0]*gxx + l_dir[1]*gyx) / grad_len;
             jacobians[0][1] = (l_dir[0]*gyx + l_dir[1]*gyy) / grad_len;
             jacobians[0][2] =  hitpt(1) / grad_len;
             jacobians[0][3] =  hitpt(2) / grad_len;
-
         }
 
-        // printf(" p2=(%.2f, %.2f) \t%.2f-%.2f = \t%.2f(cost)\n", x, y, v2, v1, residuals[0]);
+        // printf(" grad=( %.2f, %.2f) \t line=(%.2f, %.2f) \t cost=%.2f\n", hitpt(1), hitpt(2), l_dir[0], l_dir[1], residuals[0]);
         return true;
     }
     int rows = 0, cols = 0;
@@ -170,9 +178,10 @@ struct LineReprojectError {
         // 旋转位移
         T l_p[3][3];
         for(int i=0; i<3; i++){
-            ceres::UnitQuaternionRotatePoint(pose, L_pt[i], l_p[i]);
+            // ceres::AngleAxisRotatePoint(pose, L_pt[i], l_p[i]);
             for(int j=0; j<3; j++){
-                l_p[i][j] += pose[4+j];
+                // l_p[i][j] += pose[3+j];
+                l_p[i][j] = L_pt[i][j] + pose[j];
             }
         }
 
@@ -193,7 +202,7 @@ struct LineReprojectError {
         // cout <<"Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] <<" " << pose[5] << " " << pose[6] << endl;
         // cout << "Transformed line_PT3 = " << l_p[2][0] << " " << l_p[2][1] << " " << l_p[2][2] << endl;
         // printf("camera = [%.2f %.2f %.2f %.2f]\n", camera[0], camera[1],camera[2],camera[3]);
-        // cout << "line_pt2 = " << l_pt[0] << " " << l_pt[1] << endl;
+        cout << "line_pt2 = " << l_pt[0] << " " << l_pt[1] << "\t";
 
         return image_cost_(params, residuals);
     }
@@ -214,21 +223,21 @@ struct LineReprojectError {
             err_out = err;
         }
 
-        return (new ceres::AutoDiffCostFunction<LineReprojectError, 1, 7>(err));
+        return (new ceres::AutoDiffCostFunction<LineReprojectError, 1, 3>(err));
     }
 
    private:
     double L_p0[3];
     double L_p1[3];
     double L_p2[3];
-    double camera[4];  // fx, fy, cx, c
+    double camera[4];  // fx, fy, cx, cy
     ceres::CostFunctionToFunctor<1, 4> image_cost_;
 };
 }
 
 namespace dso{
 
-	void CoarseTracker::testLine(const SE3 &refToNew){
+	void CoarseTracker::testLine(SE3 &refToNew){
         using namespace ceres;
         using namespace dso_line; 
 
@@ -244,35 +253,22 @@ namespace dso{
         Mat33f K; K << fx[lvl], 0, cx[lvl], 0, fy[lvl], cy[lvl], 0, 0, 1;
         Vec3f* dIp_new = newFrame->dIp[lvl];
         cv::Mat img_new = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
+        vector<Vector3f> sample_pts;
 
         // 优化初值
-        Eigen::Quaternion<float> q(R);
-        // double pose_val_init[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
-        // double pose_val[7] = {q.w(), q.x(), q.y(), q.z(), t[0], t[1], t[2]};
-        double pose_val_init[7] = {1, 0, 0, 0, 0, 0, 0};
-        double pose_val[7] = {1, 0, 0, 0, 0, 0, 0};
-
-        // --debug -----------
-        // Mat33f R_d; Vec3f t_d;
-        // {
-        //     float pose_dy = 0.01;
-        //     pose_val[5] = pose_val_init[5] + pose_dy;
-        //     pose_to_Rt(pose_val, R_d, t_d);
-        // }
-        // ---------------
-
-        // auto &pv_ = pose_val;
-        // printf(" * Pose = (%.2f, %.2f, %.2f, %.2f),  (%.2f, %.2f, %.2f) \n", pv_[0], pv_[1],pv_[2],pv_[3],pv_[4],pv_[5],pv_[6]);
+        double pose_val_init[6] = {0, 0, 0, 0, 0, 0};
+        double pose_val[6] = {0, 0, 0, 0, 0, 0};
 
         // 添加残差项
         Problem problem;
         for(int i = 0; i<line_num; i++){
-            // 3D直线投影到当前坐标系
+            // [1]. 3D直线的方程,从世界坐标系转换到当前坐标系
             Vector3f P[2];
             P[0] = R * lastRef->line_x0[i] + t;
             P[1] = R * (lastRef->line_x0[i] + lastRef->line_u[i]) + t;
             Vector3f U = P[1] - P[0];
 
+            // [2]. 找到当前视场下的3D直线段
             // 相机FoV的3D平面
             Vector3f pt[4];
             pt[0] = Vector3f(-cx[lvl] /fx[lvl], -cy[lvl]/fy[lvl], 1);
@@ -308,21 +304,23 @@ namespace dso{
             }
             assert(Pt_cnt == 2);
 
-            // 在FoV内的3D直线段上均匀选择N个点,投影到2D,加入优化框架
+            // [3]. 在FoV内的3D直线段上均匀选择N个点,投影到2D,加入优化框架
             Vector3f Pt_dir = Pt[1] - Pt[0];
-            const int NUM_SAMPLE_PT = 31;
-            for (int p = 1; p < NUM_SAMPLE_PT; p++) {
-                Vector3f Pt_cur = Pt[0] + Pt_dir / (NUM_SAMPLE_PT)*p;
+            const int NUM_SAMPLE_PT = 50;
+            for (int p = 1; p <= NUM_SAMPLE_PT; p++) {
+                Vector3f Pt_cur = Pt[0] + Pt_dir / (NUM_SAMPLE_PT+1)*p;
                 CostFunction *cost_function = LineReprojectError::Create(
                     lastRef->line_x0[i], lastRef->line_u[i], Pt_cur,
                     K, dIp_new, Vector2i(wl, hl));
+                Vector3f pt_cur = K * Pt_cur;
+                pt_cur /= pt_cur(2);
+                sample_pts.push_back(pt_cur);
 
-                // debug 显示3D采样点的位置
+                // // debug 显示3D采样点的位置
                 // {
                 //     using namespace cv;
                 //     cv::Mat testimg = img_new.clone();
-                //     // cv::drawMarker(testimg, cv::Point(pt_cur(0), pt_cur(1)), 255);
-
+                //     cv::drawMarker(testimg, cv::Point(pt_cur(0), pt_cur(1)), 255);
                 //     draw_line2d(testimg, line2d_x0, line2d_u, 255);
                 //     cv::imshow("Pt", testimg);
                 //     cv::waitKey();
@@ -346,7 +344,6 @@ namespace dso{
                 //     Vec3f pt_cur = K * Pt_cur;
                 //     pt_cur /= pt_cur(2);
                 //     cv::drawMarker(img_nd, cv::Point(pt_cur(0), pt_cur(1)), 255, MARKER_SQUARE);
-                //     // TODO 调试单个误差,可视化当前点的梯度/找到输出cost=-9999的原因
                 //     float gra[2] = {newFrame->dIp[lvl][(int)(pt_cur(0)+pt_cur(1)*wl)](1), newFrame->dIp[lvl][(int)(pt_cur(0)+pt_cur(1)*wl)](2)};
                 //     cv::line(img_nd, Point(pt_cur(0), pt_cur(1)), Point(pt_cur(0) + gra[0], pt_cur(1) + gra[1]), 255);
                 //     imshow("debug_single_residuals", img_nd);
@@ -357,45 +354,88 @@ namespace dso{
             }
             // ----------------------------------------
 
-            // // debug overall cost -------------------
+            // debug overall cost -------------------
             {
-                // double cost = 0.0;
-                // bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, NULL, NULL, NULL);
-                // printf(" - cost=%.8f pose=(%.2f, %.2f, %.2f, %.2f | %.2f, %.2f, %.2f)\n",
-                //        ret ? cost : -999, pose_val[0], pose_val[1], pose_val[2], pose_val[3], pose_val[4], pose_val[5], pose_val[6]);
-                // Mat33f RR = R;
-                // Vec3f tt = t;
-                // Vec2f ll[2];
-                // // pose_to_Rt(pose_val, RR, tt);
-                // line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K);
-                // cv::Mat img_line = img_new.clone();
+                using namespace cv;
+                double cost = 0.0;
+                vector<double> residual;
+                vector<double> grad;
+                ceres::CRSMatrix jaco;
+                bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, &residual, &grad, &jaco);
+                printf(" - cost=%.8f\n", ret ? cost : -999);
+                printf(" - Resi(%lu): ", residual.size());for(auto i : residual) printf("%.2f ", i); printf("\n");
+                printf(" - Grad(%lu): ", grad.size());for(auto i : grad) printf("%.2f ", i); printf("\n");
+
+                // printf("%.8f \n", ret ? cost : -999);
+                Mat33f RR = R;
+                Vec3f tt = t;
+                Vec2f ll[2];
+                // pose_to_Rt(pose_val, RR, tt);
+                line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K);
+                Mat img_line = img_new.clone();
+
                 // draw_line2d(img_line, ll[0], ll[1]);
-                // imshow("debug_img", img_line);
-                // cv::waitKey();
-                // return;
+                for(auto &ptf : sample_pts){
+                    Vector3i pt = ptf.cast<int>();
+                    drawMarker(img_line, Point(pt(0), pt(1)), 255, MARKER_SQUARE);
+
+                    int ix = pt(0);
+                    int iy = pt(1);
+                    float dx = ptf(0) - ix;
+                    float dy = ptf(1) - iy;
+                    float dxdy = dx * dy;
+                    const Eigen::Vector3f* bp = dIp_new +ix+iy*wl;
+                    Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+wl)
+                        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+wl)
+                        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
+                        + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
+                    
+                    // double grad[] = {dIp_new[pt(1)*wl+pt(0)](1), dIp_new[pt(1)*wl+pt(0)](2)};
+                    double grad[] = {hitpt(1), hitpt(2)};
+
+                    line(img_line, Point(pt(0), pt(1)), Point(pt(0)+grad[0], pt(1)+grad[1]), 255);
+                    // printf("line_pt(%.2f, %.2f) grad(%.2f, %.2f)\n", ptf(0), ptf(1), grad[0], grad[1]);
+                }
+                imshow("debug_img", img_line);
+                moveWindow("debug_img", 100, 100);
+                cv::waitKey(0);
+                return;
             }
 
             // ------------------
 
+
             // 求解优化问题
             Solver::Options options;
+            options.minimizer_type = TRUST_REGION;
             options.linear_solver_type = DENSE_QR;
             options.minimizer_progress_to_stdout = true;
-            options.max_num_iterations = 20;
+            // options.use_nonmonotonic_steps = true;
+            options.max_num_iterations = 50;
             Solver::Summary summary;
             ceres::Solve(options, &problem, &summary);
+
+            Mat33f R2 = Mat33f::Identity(); 
+            Vector3f rotv(pose_val[0], pose_val[1], pose_val[2]);
+            if(rotv.norm() > 1e-4)
+                R2 = AngleAxisf(rotv.norm(), rotv.normalized()).toRotationMatrix();
+            Vec3f t2 = R2 * t + Vec3f(pose_val[3], pose_val[4], pose_val[5]);
+            R2 = R2 * R;
+            
+            refToNew.translation() = t2.cast<double>();
+            refToNew.setRotationMatrix(R2.cast<double>());
 
             // 输出结果
             std::cout << summary.BriefReport() << "\n";
             {
                 using namespace cv;
-                printf(" * [%d] residuals\n", problem.NumResidualBlocks());
+                // printf(" * [%d] residuals\n", problem.NumResidualBlocks());
+                printf("   %s(%d) cost: %.4f -> %.4f msg:%s\n", summary.termination_type==0?"good":"bad ", summary.termination_type,
+                summary.initial_cost, summary.final_cost, summary.message.data());
                 auto &pvi_ = pose_val_init;
-                printf("   Pose0 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1], pvi_[2], pvi_[3], pvi_[4], pvi_[5], pvi_[6]);
+                // printf("   Pose0 = (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1], pvi_[2], pvi_[3], pvi_[4], pvi_[5]);
                 auto &pv_ = pose_val;
-                printf("   Pose1 = (%.3f, %.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pv_[0], pv_[1], pv_[2], pv_[3], pv_[4], pv_[5], pv_[6]);
-                Mat33f R2 = Quaternionf(pv_[0], pv_[1], pv_[2], pv_[3]).toRotationMatrix();
-                Vec3f t2(pv_[4], pv_[5], pv_[6]);
+                printf("   Pose1 = (%.4f, %.4f, %.4f),  (%.4f, %.4f, %.4f) \n", pv_[0], pv_[1], pv_[2], pv_[3], pv_[4], pv_[5]);
 
                 Mat img_ref = IOWrap::getOCVImg(lastRef->dI, wG[0], hG[0]);
                 Mat img_pt = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
@@ -409,9 +449,11 @@ namespace dso{
                     line3d_to_2d(lastRef->line_x0[i], lastRef->line_u[i], line2d[0], line2d[1], R2, t2, K);
                     draw_line2d(img_line, line2d[0], line2d[1]);
                 }
-                cv::imshow("ref", img_ref);
+                // cv::imshow("ref", img_ref);
                 cv::imshow("pt_track", img_pt);
+                moveWindow("pt_track", 100, 100);
                 cv::imshow("pt+line_track", img_line);
+                moveWindow("pt+line_track", 100 + 480 + 100, 100);
 
                 cv::waitKey();
             }
