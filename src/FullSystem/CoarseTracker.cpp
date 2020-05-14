@@ -924,11 +924,12 @@ bool CoarseTracker::trackNewestCoarse(
 		}
 	} // 金字塔level
 
-	// test line -------------
 	if(init_method_g == "line"){
+
+		// // test line -------------
 		const int ip_can[] = {1,5,3,4,2,0};
 		for(int ip=0; ip<6; ip++)
-		for(float delta = 0.015; delta <0.02; delta += 0.0001)
+		for(float delta = 0.015; delta <0.02; delta += 0.001)
 		// float delta = 0;	
 		{
 			SE3 pose_test = refToNew_current;
@@ -937,11 +938,13 @@ bool CoarseTracker::trackNewestCoarse(
 			Vec6 pose = pose_test.log();
 			pose[ip_can[ip]] += delta;
 			pose_test = SE3::exp(pose);
-			// TEST
-			testLine(pose_test);
+			refinePose(pose_test);
 		}
+		// // ------------------
+
+		// refinePose(refToNew_current);
 	}
-	// ------------------
+
 
 	// set!
 	// 保存更新结果

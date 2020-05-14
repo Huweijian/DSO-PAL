@@ -178,10 +178,9 @@ struct LineReprojectError {
         // 旋转位移
         T l_p[3][3];
         for(int i=0; i<3; i++){
-            // ceres::AngleAxisRotatePoint(pose, L_pt[i], l_p[i]);
+            ceres::AngleAxisRotatePoint(pose, L_pt[i], l_p[i]);
             for (int j = 0; j < 3; j++) {
-                // l_p[i][j] += pose[3+j];
-                l_p[i][j] = L_pt[i][j] + pose[j];
+                l_p[i][j] = l_p[i][j] + pose[3+j];
             }
         }
 
@@ -223,7 +222,7 @@ struct LineReprojectError {
             err_out = err;
         }
 
-        return (new ceres::AutoDiffCostFunction<LineReprojectError, 1, 3>(err));
+        return (new ceres::AutoDiffCostFunction<LineReprojectError, 1, 6>(err));
     }
 
    private:
@@ -237,7 +236,7 @@ struct LineReprojectError {
 
 namespace dso{
 
-	void CoarseTracker::testLine(SE3 &refToNew){
+	void CoarseTracker::refinePose(SE3 &refToNew){
         using namespace ceres;
         using namespace dso_line; 
 
@@ -405,38 +404,38 @@ namespace dso{
             // ------------------
 
 
+
             // 求解优化问题
             Solver::Options options;
             options.minimizer_type = TRUST_REGION;
             options.linear_solver_type = DENSE_QR;
             // options.minimizer_progress_to_stdout = true;
             // options.use_nonmonotonic_steps = true;
-            options.max_num_iterations = 50;
+            options.max_num_iterations = 100;
             Solver::Summary summary;
             ceres::Solve(options, &problem, &summary);
 
             Mat33f R2 = Mat33f::Identity(); 
+
             Vector3f rotv(pose_val[0], pose_val[1], pose_val[2]);
-            if(rotv.norm() > 1e-4)
+            if(rotv.norm() > 1e-8)
                 R2 = AngleAxisf(rotv.norm(), rotv.normalized()).toRotationMatrix();
             Vec3f t2 = R2 * t + Vec3f(pose_val[3], pose_val[4], pose_val[5]);
             R2 = R2 * R;
             
-            refToNew.translation() = t2.cast<double>();
-            refToNew.setRotationMatrix(R2.cast<double>());
+            // refToNew.translation() = t2.cast<double>();
+            // refToNew.setRotationMatrix(R2.cast<double>());
 
             // 输出结果
             std::cout << summary.BriefReport() << "\n";
             {
                 using namespace cv;
                 // printf(" * [%d] residuals\n", problem.NumResidualBlocks());
-                printf("   %s(%d) cost: %.4f -> %.4f msg:%s\n", summary.termination_type==0?"good":"bad ", summary.termination_type,
-                summary.initial_cost, summary.final_cost, summary.message.data());
+                printf("  cost: %.4f -> %.4f \tmsg:%s\n", summary.initial_cost, summary.final_cost, summary.message.data());
                 auto &pvi_ = pose_val_init;
                 // printf("   Pose0 = (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1], pvi_[2], pvi_[3], pvi_[4], pvi_[5]);
                 auto &pv_ = pose_val;
                 printf("   Pose1 = (%.4f, %.4f, %.4f),  (%.4f, %.4f, %.4f) \n", pv_[0], pv_[1], pv_[2], pv_[3], pv_[4], pv_[5]);
-                printf("   t0 = (%.4f %.4f %.4f)\n", t(0), t(1), t(2));
 
                 Mat img_ref = IOWrap::getOCVImg(lastRef->dI, wG[0], hG[0]);
                 Mat img_pt = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
