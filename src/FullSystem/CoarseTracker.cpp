@@ -925,7 +925,7 @@ bool CoarseTracker::trackNewestCoarse(
 	} // 金字塔level
 
 	// test line -------------
-	{
+	if(init_method_g == "line"){
 		const int ip_can[] = {1,5,3,4,2,0};
 		for(int ip=0; ip<6; ip++)
 		for(float delta = 0.015; delta <0.02; delta += 0.0001)

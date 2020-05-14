@@ -109,11 +109,11 @@ class ImageCost : public ceres::SizedCostFunction<1, 4> {
         float dxdy = dx * dy;
         const Eigen::Vector3f* bp = img +ix+iy*cols;
 
-        printf(" - pt=(%.2f, %.2f)  [%.2f %.2f %.2f %.2f] \n", x, y, dxdy, (dy-dxdy), (dx-dxdy), (1-dx-dy+dxdy));
-        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1+cols))(0), (*(bp+1+cols))(1),(*(bp+1+cols))(2));
-        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+cols))(0), (*(bp+cols))(1),(*(bp+cols))(2));
-        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1))(0), (*(bp+1))(1),(*(bp+1))(2));
-        printf(" - (%.2f, %.2f, %.2f)\n", (*(bp))(0), (*(bp))(1),(*(bp))(2));
+        // printf(" - pt=(%.2f, %.2f)  [%.2f %.2f %.2f %.2f] \n", x, y, dxdy, (dy-dxdy), (dx-dxdy), (1-dx-dy+dxdy));
+        // printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1+cols))(0), (*(bp+1+cols))(1),(*(bp+1+cols))(2));
+        // printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+cols))(0), (*(bp+cols))(1),(*(bp+cols))(2));
+        // printf(" - (%.2f, %.2f, %.2f)\n", (*(bp+1))(0), (*(bp+1))(1),(*(bp+1))(2));
+        // printf(" - (%.2f, %.2f, %.2f)\n", (*(bp))(0), (*(bp))(1),(*(bp))(2));
 
         Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+cols)
 	        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+cols)
@@ -179,7 +179,7 @@ struct LineReprojectError {
         T l_p[3][3];
         for(int i=0; i<3; i++){
             // ceres::AngleAxisRotatePoint(pose, L_pt[i], l_p[i]);
-            for(int j=0; j<3; j++){
+            for (int j = 0; j < 3; j++) {
                 // l_p[i][j] += pose[3+j];
                 l_p[i][j] = L_pt[i][j] + pose[j];
             }
@@ -202,7 +202,7 @@ struct LineReprojectError {
         // cout <<"Pose.R = (" << pose[0] << ", " << pose[1] << ", "<< pose[2] << ", "<< pose[3] << "); Pose.T = "<< pose[4] <<" " << pose[5] << " " << pose[6] << endl;
         // cout << "Transformed line_PT3 = " << l_p[2][0] << " " << l_p[2][1] << " " << l_p[2][2] << endl;
         // printf("camera = [%.2f %.2f %.2f %.2f]\n", camera[0], camera[1],camera[2],camera[3]);
-        cout << "line_pt2 = " << l_pt[0] << " " << l_pt[1] << "\t";
+        // cout << "line_pt2 = " << l_pt[0] << " " << l_pt[1] << "\t";
 
         return image_cost_(params, residuals);
     }
@@ -355,52 +355,52 @@ namespace dso{
             // ----------------------------------------
 
             // debug overall cost -------------------
-            {
-                using namespace cv;
-                double cost = 0.0;
-                vector<double> residual;
-                vector<double> grad;
-                ceres::CRSMatrix jaco;
-                bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, &residual, &grad, &jaco);
-                printf(" - cost=%.8f\n", ret ? cost : -999);
-                printf(" - Resi(%lu): ", residual.size());for(auto i : residual) printf("%.2f ", i); printf("\n");
-                printf(" - Grad(%lu): ", grad.size());for(auto i : grad) printf("%.2f ", i); printf("\n");
+            // {
+            //     using namespace cv;
+            //     double cost = 0.0;
+            //     vector<double> residual;
+            //     vector<double> grad;
+            //     ceres::CRSMatrix jaco;
+            //     bool ret = problem.Evaluate(Problem::EvaluateOptions(), &cost, &residual, &grad, &jaco);
+            //     printf(" - cost=%.8f\n", ret ? cost : -999);
+            //     printf(" - Resi(%lu): ", residual.size());for(auto i : residual) printf("%.2f ", i); printf("\n");
+            //     printf(" - Grad(%lu): ", grad.size());for(auto i : grad) printf("%.2f ", i); printf("\n");
 
-                // printf("%.8f \n", ret ? cost : -999);
-                Mat33f RR = R;
-                Vec3f tt = t;
-                Vec2f ll[2];
-                // pose_to_Rt(pose_val, RR, tt);
-                line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K);
-                Mat img_line = img_new.clone();
+            //     // printf("%.8f \n", ret ? cost : -999);
+            //     Mat33f RR = R;
+            //     Vec3f tt = t;
+            //     Vec2f ll[2];
+            //     // pose_to_Rt(pose_val, RR, tt);
+            //     line3d_to_2d(lastRef->line_x0[0], lastRef->line_u[0], ll[0], ll[1], RR, tt, K);
+            //     Mat img_line = img_new.clone();
 
-                // draw_line2d(img_line, ll[0], ll[1]);
-                for(auto &ptf : sample_pts){
-                    Vector3i pt = ptf.cast<int>();
-                    drawMarker(img_line, Point(pt(0), pt(1)), 255, MARKER_SQUARE);
+            //     // draw_line2d(img_line, ll[0], ll[1]);
+            //     for(auto &ptf : sample_pts){
+            //         Vector3i pt = ptf.cast<int>();
+            //         drawMarker(img_line, Point(pt(0), pt(1)), 255, MARKER_SQUARE);
 
-                    int ix = pt(0);
-                    int iy = pt(1);
-                    float dx = ptf(0) - ix;
-                    float dy = ptf(1) - iy;
-                    float dxdy = dx * dy;
-                    const Eigen::Vector3f* bp = dIp_new +ix+iy*wl;
-                    Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+wl)
-                        + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+wl)
-                        + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
-                        + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
+            //         int ix = pt(0);
+            //         int iy = pt(1);
+            //         float dx = ptf(0) - ix;
+            //         float dy = ptf(1) - iy;
+            //         float dxdy = dx * dy;
+            //         const Eigen::Vector3f* bp = dIp_new +ix+iy*wl;
+            //         Eigen::Vector3f hitpt = dxdy * *(const Eigen::Vector3f*)(bp+1+wl)
+            //             + (dy-dxdy) * *(const Eigen::Vector3f*)(bp+wl)
+            //             + (dx-dxdy) * *(const Eigen::Vector3f*)(bp+1)
+            //             + (1-dx-dy+dxdy) * *(const Eigen::Vector3f*)(bp);
                     
-                    // double grad[] = {dIp_new[pt(1)*wl+pt(0)](1), dIp_new[pt(1)*wl+pt(0)](2)};
-                    double grad[] = {hitpt(1), hitpt(2)};
+            //         // double grad[] = {dIp_new[pt(1)*wl+pt(0)](1), dIp_new[pt(1)*wl+pt(0)](2)};
+            //         double grad[] = {hitpt(1), hitpt(2)};
 
-                    line(img_line, Point(pt(0), pt(1)), Point(pt(0)+grad[0], pt(1)+grad[1]), 255);
-                    // printf("line_pt(%.2f, %.2f) grad(%.2f, %.2f)\n", ptf(0), ptf(1), grad[0], grad[1]);
-                }
-                imshow("debug_img", img_line);
-                moveWindow("debug_img", 100, 100);
-                cv::waitKey(0);
-                return;
-            }
+            //         line(img_line, Point(pt(0), pt(1)), Point(pt(0)+grad[0], pt(1)+grad[1]), 255);
+            //         // printf("line_pt(%.2f, %.2f) grad(%.2f, %.2f)\n", ptf(0), ptf(1), grad[0], grad[1]);
+            //     }
+            //     imshow("debug_img", img_line);
+            //     moveWindow("debug_img", 100, 100);
+            //     cv::waitKey(0);
+            //     return;
+            // }
 
             // ------------------
 
@@ -409,7 +409,7 @@ namespace dso{
             Solver::Options options;
             options.minimizer_type = TRUST_REGION;
             options.linear_solver_type = DENSE_QR;
-            options.minimizer_progress_to_stdout = true;
+            // options.minimizer_progress_to_stdout = true;
             // options.use_nonmonotonic_steps = true;
             options.max_num_iterations = 50;
             Solver::Summary summary;
@@ -436,6 +436,7 @@ namespace dso{
                 // printf("   Pose0 = (%.3f, %.3f, %.3f),  (%.3f, %.3f, %.3f) \n", pvi_[0], pvi_[1], pvi_[2], pvi_[3], pvi_[4], pvi_[5]);
                 auto &pv_ = pose_val;
                 printf("   Pose1 = (%.4f, %.4f, %.4f),  (%.4f, %.4f, %.4f) \n", pv_[0], pv_[1], pv_[2], pv_[3], pv_[4], pv_[5]);
+                printf("   t0 = (%.4f %.4f %.4f)\n", t(0), t(1), t(2));
 
                 Mat img_ref = IOWrap::getOCVImg(lastRef->dI, wG[0], hG[0]);
                 Mat img_pt = IOWrap::getOCVImg(newFrame->dI, wG[0], hG[0]);
