@@ -64,11 +64,21 @@ void displayImage(const char* windowName, const cv::Mat& image, bool autoSize)
 }
 
 
-cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h){
+cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h, int idx, float bias){
 	cv::Mat img(h, w, CV_8UC1);
 	for(int x=0; x<w; x++){
 		for(int y=0; y<h; y++){
-			img.at<uchar>(y, x) = dI[y*w+x][0]/2;
+			img.at<uchar>(y, x) = (dI[y*w+x][idx] + bias);
+		}
+	}
+	return img;
+}
+
+cv::Mat getOCVImg_float(Eigen::Vector3f* dI, int w, int h, int idx){
+	cv::Mat img(h, w, CV_32FC1);
+	for(int x=0; x<w; x++){
+		for(int y=0; y<h; y++){
+			img.at<float>(y, x) = dI[y*w+x][idx];
 		}
 	}
 	return img;

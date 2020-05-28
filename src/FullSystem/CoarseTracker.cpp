@@ -926,12 +926,13 @@ bool CoarseTracker::trackNewestCoarse(
 
 	if(init_method_g == "line"){
 
-		// // test line -------------
-		const int ip_can[] = {1,5,3,4,2,0};
-		for(int ip=0; ip<6; ip++)
-		for(float delta = 0.015; delta <0.02; delta += 0.001)
+		// test line -------------
+		const int ip_can[] = {1,2,3,4,5};
+		for(int ip=0; ip<sizeof(ip_can)/sizeof(int); ip++)
+		for(float delta = 0.04; delta >=-0.04; delta -= 0.001)
 		// float delta = 0;	
 		{
+
 			SE3 pose_test = refToNew_current;
 			printf("[Test Pose] delta pose[%d]=%.4f  -->  \n", ip_can[ip], delta);
 			// printf("%d %.4f\t", ip_can[ip], delta);
@@ -940,7 +941,7 @@ bool CoarseTracker::trackNewestCoarse(
 			pose_test = SE3::exp(pose);
 			refinePose(pose_test);
 		}
-		// // ------------------
+		// ------------------
 
 		// refinePose(refToNew_current);
 	}

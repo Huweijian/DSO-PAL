@@ -39,7 +39,8 @@ void displayImage(const char* windowName, const MinimalImageB3* img, bool autoSi
 void displayImage(const char* windowName, const MinimalImageF* img, bool autoSize = false);
 void displayImage(const char* windowName, const MinimalImageF3* img, bool autoSize = false);
 void displayImage(const char* windowName, const MinimalImageB16* img, bool autoSize = false);
-cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h);
+cv::Mat getOCVImg(Eigen::Vector3f* dI, int w, int h, int idx = 0, float bias = 0.0);
+cv::Mat getOCVImg_float(Eigen::Vector3f* dI, int w, int h, int idx = 0);
 
 template<typename T>
 cv::Mat getOCVImg_tem(T* data, int w, int h){

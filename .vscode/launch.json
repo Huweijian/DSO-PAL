@@ -52,13 +52,23 @@
             //             // "init=1"
             //         ],
 
-            // // SIMU 
+            // SIMU LINE
             "args": [   "files=/home/hwj23/Dataset/simu/s17/color/", 
                         "calib=/home/hwj23/Dataset/simu/camera_s17-now.txt", 
                         "preset=0", 
                         "mode=2",
                         "init=line"
                     ],
+
+            // // // SIMU HAO 
+            // "args": [   
+            //     "files=/home/hwj23/Dataset/hao/s2_zhu/", 
+            //     "calib=/home/hwj23/Dataset/hao/PAL.txt", 
+            //     "preset=0", 
+            //     "mode=2",
+            // ],
+
+
 
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

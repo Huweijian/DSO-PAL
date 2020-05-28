@@ -20,7 +20,6 @@
 #include <iostream>
 #include <string>
 
-
 #include "tic_toc.h"
 // #include <opencv2/ximageproc.hpp>
 
@@ -321,6 +320,16 @@ struct AllCost {
 int main(int argc, char** argv)
 {
     // pal_init("/home/hwj23/Dataset/PAL/calib_results_real.txt");
+    {
+        SE3d T;
+        T.translation() = Vector3d(1, 2, 3);
+        Matrix3d R = AngleAxisd(3.14/2, Vector3d(1, 1, 0).normalized()).toRotationMatrix();
+
+        T.setRotationMatrix(R);
+        cout << SE3::log(T) << endl;
+        cout << T.translation() << endl;
+        return 0;
+    }
 
     // test plucker
     {
@@ -338,7 +347,6 @@ int main(int argc, char** argv)
         pt = Vector4f(1, 1, 0, 1);
         plane = Ls * pt;
         cout << plane.TT << endl;
-
     }
 
 
